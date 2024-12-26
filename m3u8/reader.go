@@ -143,8 +143,6 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 	var err error
 
 	state := new(decodingState)
-	wv := new(WV)
-
 	for !eof {
 		if line, err = buf.ReadString('\n'); err == io.EOF {
 			eof = true
@@ -152,14 +150,11 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 			break
 		}
 		line = trimLineEnd(line)
-		err = decodeLineOfMediaPlaylist(p, wv, state, line, strict)
+		err = decodeLineOfMediaPlaylist(p, state, line, strict)
 		if strict && err != nil {
 			return err
 		}
 
-	}
-	if state.tagWV {
-		p.WV = wv
 	}
 	if strict && !state.m3u {
 		return ErrExtM3UAbsent
@@ -213,7 +208,6 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	var err error
 
 	state := new(decodingState)
-	wv := new(WV)
 
 	master = NewMasterPlaylist()
 	media, err = NewMediaPlaylist(8, 1024) // Winsize for VoD will become 0, capacity auto extends
@@ -242,14 +236,11 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 			return master, state.listType, err
 		}
 
-		err = decodeLineOfMediaPlaylist(media, wv, state, line, strict)
+		err = decodeLineOfMediaPlaylist(media, state, line, strict)
 		if strict && err != nil {
 			return media, state.listType, err
 		}
 
-	}
-	if state.listType == MEDIA && state.tagWV {
-		media.WV = wv
 	}
 
 	if strict && !state.m3u {
@@ -456,7 +447,7 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 }
 
 // Parse one line of media playlist.
-func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, line string, strict bool) error {
+func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line string, strict bool) error {
 	var err error
 
 	// check for custom tags first to allow custom parsing of existing tags
@@ -737,105 +728,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 	case strings.HasPrefix(line, "#EXT-X-I-FRAMES-ONLY"):
 		state.listType = MEDIA
 		p.Iframe = true
-	case strings.HasPrefix(line, "#WV-AUDIO-CHANNELS"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-AUDIO-CHANNELS %d", &wv.AudioChannels); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-AUDIO-FORMAT"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-AUDIO-FORMAT %d", &wv.AudioFormat); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-AUDIO-PROFILE-IDC"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-AUDIO-PROFILE-IDC %d", &wv.AudioProfileIDC); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-AUDIO-SAMPLE-SIZE"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-AUDIO-SAMPLE-SIZE %d", &wv.AudioSampleSize); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-AUDIO-SAMPLING-FREQUENCY"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-AUDIO-SAMPLING-FREQUENCY %d", &wv.AudioSamplingFrequency); strict &&
-			err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-CYPHER-VERSION"):
-		state.listType = MEDIA
-		wv.CypherVersion = line[19:]
-		state.tagWV = true
-	case strings.HasPrefix(line, "#WV-ECM"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-ECM %s", &wv.ECM); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-VIDEO-FORMAT"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-VIDEO-FORMAT %d", &wv.VideoFormat); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-VIDEO-FRAME-RATE"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-VIDEO-FRAME-RATE %d", &wv.VideoFrameRate); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-VIDEO-LEVEL-IDC"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-VIDEO-LEVEL-IDC %d", &wv.VideoLevelIDC); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-VIDEO-PROFILE-IDC"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-VIDEO-PROFILE-IDC %d", &wv.VideoProfileIDC); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-	case strings.HasPrefix(line, "#WV-VIDEO-RESOLUTION"):
-		state.listType = MEDIA
-		wv.VideoResolution = line[21:]
-		state.tagWV = true
-	case strings.HasPrefix(line, "#WV-VIDEO-SAR"):
-		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-VIDEO-SAR %s", &wv.VideoSAR); strict && err != nil {
-			return err
-		}
-		if err == nil {
-			state.tagWV = true
-		}
-		//case strings.HasPrefix(line, "#"):
-		// Unknown TAG
 	}
 	return err
 }

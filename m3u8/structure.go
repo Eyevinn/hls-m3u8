@@ -120,7 +120,6 @@ type MediaPlaylist struct {
 	Key              *Key // Key correspnds to optioinal EXT-X-KEY tag (optional) for encrypted segments
 	// Map is EXT-X-MAP tag (optional) and provides an address to a Media Initialization Section
 	Map            *Map
-	WV             *WV // Widevine related tags outside of M3U8 specs
 	Custom         map[string]CustomTag
 	customDecoders []CustomDecoder
 }
@@ -141,7 +140,6 @@ type MediaPlaylist struct {
 type MasterPlaylist struct {
 	Variants            []*Variant
 	Args                string // optional arguments placed after URI (URI?Args)
-	CypherVersion       string // non-standard tag for Widevine (see also WV struct)
 	buf                 bytes.Buffer
 	ver                 uint8
 	independentSegments bool
@@ -256,25 +254,6 @@ type Map struct {
 	Offset int64 // [@o] is offset from the start of the file under URI
 }
 
-// WV structure represents metadata  for Google Widevine playlists.
-// This format not described in IETF draft but provied by Widevine Live Packager as
-// additional tags with #WV-prefix.
-type WV struct {
-	AudioChannels          uint
-	AudioFormat            uint
-	AudioProfileIDC        uint
-	AudioSampleSize        uint
-	AudioSamplingFrequency uint
-	CypherVersion          string
-	ECM                    string
-	VideoFormat            uint
-	VideoFrameRate         uint
-	VideoLevelIDC          uint
-	VideoProfileIDC        uint
-	VideoResolution        string
-	VideoSAR               string
-}
-
 // Playlist interface applied to various playlist types.
 type Playlist interface {
 	Encode() *bytes.Buffer
@@ -314,7 +293,6 @@ type CustomTag interface {
 type decodingState struct {
 	listType           ListType
 	m3u                bool
-	tagWV              bool
 	tagStreamInf       bool
 	tagInf             bool
 	tagSCTE35          bool

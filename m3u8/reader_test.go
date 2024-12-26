@@ -440,32 +440,6 @@ func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
 	}
 }
 
-func TestDecodeMediaPlaylistWithWidevine(t *testing.T) {
-	f, err := os.Open("sample-playlists/widevine-bitrate.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err := NewMediaPlaylist(5, 798)
-	if err != nil {
-		t.Fatalf("Create media playlist failed: %s", err)
-	}
-	err = p.DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	//fmt.Printf("Playlist object: %+v\n", p)
-	// check parsed values
-	if p.ver != 2 {
-		t.Errorf("Version of parsed playlist = %d (must = 2)", p.ver)
-	}
-	if p.TargetDuration != 9 {
-		t.Errorf("TargetDuration of parsed playlist = %f (must = 9.0)", p.TargetDuration)
-	}
-	// TODO check other values…
-	//fmt.Printf("%+v\n", p.Key)
-	//fmt.Println(p.Encode().String())
-}
-
 func TestDecodeMasterPlaylistWithAutodetection(t *testing.T) {
 	f, err := os.Open("sample-playlists/master.m3u8")
 	if err != nil {

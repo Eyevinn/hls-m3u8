@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+The following changes are wrt to initial copy of `grafov/m3u8` files: 
+
+- code changes to pass linting including Example names
 - made errors more consistent and more verbose
+- removed all Widevine-specific HLS extensions (obsolete)
 
 ### Added
 
