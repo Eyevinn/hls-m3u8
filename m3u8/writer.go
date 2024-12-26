@@ -378,9 +378,9 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 // playlists.  This operation does reset cache.
 func (p *MediaPlaylist) Slide(uri string, duration float64, title string) {
 	if !p.Closed && p.count >= p.winsize {
-		p.Remove()
+		_ = p.Remove()
 	}
-	p.Append(uri, duration, title)
+	_ = p.Append(uri, duration, title)
 }
 
 // ResetCache resets playlist cache. Next called Encode() will
@@ -463,7 +463,8 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
 	p.buf.WriteRune('\n')
 	p.buf.WriteString("#EXT-X-TARGETDURATION:")
-	p.buf.WriteString(strconv.FormatInt(int64(math.Ceil(p.TargetDuration)), 10)) // due section 3.4.2 of M3U8 specs EXT-X-TARGETDURATION must be integer
+	// due section 3.4.2 of M3U8 specs EXT-X-TARGETDURATION must be integer
+	p.buf.WriteString(strconv.FormatInt(int64(math.Ceil(p.TargetDuration)), 10))
 	p.buf.WriteRune('\n')
 	if p.StartTime > 0.0 {
 		p.buf.WriteString("#EXT-X-START:TIME-OFFSET=")

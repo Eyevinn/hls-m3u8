@@ -57,7 +57,7 @@ type SCTE35Syntax uint
 
 const (
 	// SCTE35_67_2014 will be the default due to backwards compatibility reasons.
-	SCTE35_67_2014 SCTE35Syntax = iota // SCTE35_67_2014 defined in http://www.scte.org/documents/pdf/standards/SCTE%2067%202014.pdf
+	SCTE35_67_2014 SCTE35Syntax = iota // SCTE35_67_2014 defined in [scte67]
 	SCTE35_OATCLS                      // SCTE35_OATCLS is a non-standard but common format
 )
 
@@ -99,8 +99,8 @@ const (
 //	#EXTINF:7.975,
 //	https://priv.example.com/fileSequence2682.ts
 type MediaPlaylist struct {
-	TargetDuration   float64
-	SeqNo            uint64 // EXT-X-MEDIA-SEQUENCE
+	TargetDuration   float64 // TargetDuration is the maximum media segment duration in seconds (an integer)
+	SeqNo            uint64  // EXT-X-MEDIA-SEQUENCE
 	Segments         []*MediaSegment
 	Args             string // optional arguments placed after URIs (URI?Args)
 	Iframe           bool   // EXT-X-I-FRAMES-ONLY
@@ -110,7 +110,6 @@ type MediaPlaylist struct {
 	StartTime        float64
 	StartTimePrecise bool
 	durationAsInt    bool // output durations as integers of floats?
-	keyformat        int
 	winsize          uint // max number of segments displayed in an encoded playlist; need set to zero for VOD playlists
 	capacity         uint // total capacity of slice used for the playlist
 	head             uint // head of FIFO, we add segments to head
@@ -118,11 +117,12 @@ type MediaPlaylist struct {
 	count            uint // number of segments added to the playlist
 	buf              bytes.Buffer
 	ver              uint8
-	Key              *Key // EXT-X-KEY is optional encryption key displayed before any segments (default key for the playlist)
-	Map              *Map // EXT-X-MAP is optional tag specifies how to obtain the Media Initialization Section (default map for the playlist)
-	WV               *WV  // Widevine related tags outside of M3U8 specs
-	Custom           map[string]CustomTag
-	customDecoders   []CustomDecoder
+	Key              *Key // Key correspnds to optioinal EXT-X-KEY tag (optional) for encrypted segments
+	// Map is EXT-X-MAP tag (optional) and provides an address to a Media Initialization Section
+	Map            *Map
+	WV             *WV // Widevine related tags outside of M3U8 specs
+	Custom         map[string]CustomTag
+	customDecoders []CustomDecoder
 }
 
 // MasterPlaylist structure represents a master playlist which
@@ -170,12 +170,13 @@ type VariantParams struct {
 	Video            string
 	Subtitles        string // EXT-X-STREAM-INF only
 	Captions         string // EXT-X-STREAM-INF only
-	Name             string // EXT-X-STREAM-INF only (non standard Wowza/JWPlayer extension to name the variant/quality in UA)
-	Iframe           bool   // EXT-X-I-FRAME-STREAM-INF
-	VideoRange       string
-	HDCPLevel        string
-	FrameRate        float64        // EXT-X-STREAM-INF
-	Alternatives     []*Alternative // EXT-X-MEDIA
+	// Name (EXT-X-STREAM-INF only) is a non standard Wowza/JWPlayer extension to name the variant/quality in UA
+	Name         string
+	Iframe       bool // EXT-X-I-FRAME-STREAM-INF
+	VideoRange   string
+	HDCPLevel    string
+	FrameRate    float64        // EXT-X-STREAM-INF
+	Alternatives []*Alternative // EXT-X-MEDIA
 }
 
 // Alternative structure represents EXT-X-MEDIA tag in variants.
@@ -196,17 +197,26 @@ type Alternative struct {
 // media playlist. Media segment may be encrypted. Widevine supports
 // own tags for encryption metadata.
 type MediaSegment struct {
-	SeqId           uint64
-	Title           string // optional second parameter for EXTINF tag
-	URI             string
-	Duration        float64   // first parameter for EXTINF tag; duration must be integers if protocol version is less than 3 but we are always keep them float
-	Limit           int64     // EXT-X-BYTERANGE <n> is length in bytes for the file under URI
-	Offset          int64     // EXT-X-BYTERANGE [@o] is offset from the start of the file under URI
-	Key             *Key      // EXT-X-KEY displayed before the segment and means changing of encryption key (in theory each segment may have own key)
-	Map             *Map      // EXT-X-MAP displayed before the segment
-	Discontinuity   bool      // EXT-X-DISCONTINUITY indicates an encoding discontinuity between the media segment that follows it and the one that preceded it (i.e. file format, number and type of tracks, encoding parameters, encoding sequence, timestamp sequence)
-	SCTE            *SCTE     // SCTE-35 used for Ad signaling in HLS
-	ProgramDateTime time.Time // EXT-X-PROGRAM-DATE-TIME tag associates the first sample of a media segment with an absolute date and/or time
+	SeqId uint64
+	Title string // optional second parameter for EXTINF tag
+	URI   string
+	// Duration is the first parameter for EXTINF tag.
+	// It provides the duration in seconds of the segment.
+	// if  protocol version is 2 or less, its value must be an integer.
+	Duration float64
+	Limit    int64 // EXT-X-BYTERANGE <n> is length in bytes for the file under URI.
+	Offset   int64 // EXT-X-BYTERANGE [@o] is offset from the start of the file under URI.
+	// Key is EXT-X-KEY displayed before the segment changes the key for encryption until next Key tag.
+	Key *Key
+	// Map is EXT-X-MAP tag (optional) and provides an address to a Media Initialization Section.
+	Map *Map
+	// Discontinuity is EXT-X-DISCONTINUITY and indicates an encoding discontinuity between the media segment
+	// that follows it and the one that preceded it.
+	Discontinuity bool
+	SCTE          *SCTE // SCTE-35 used for Ad signaling in HLS.
+	// ProgramDateTime is EXT-X-PROGRAM-DATE-TIME tag .
+	// It associates the first sample of a media segment with an absolute date and/or time.
+	ProgramDateTime time.Time
 	Custom          map[string]CustomTag
 }
 
@@ -326,3 +336,7 @@ type decodingState struct {
 	scte               *SCTE
 	custom             map[string]CustomTag
 }
+
+/*
+[scte67]: http://www.scte.org/documents/pdf/standards/SCTE%2067%202014.pdf
+*/

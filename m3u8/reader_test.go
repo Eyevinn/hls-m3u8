@@ -199,9 +199,12 @@ func TestDecodeMasterPlaylistWithIFrameStreamInf(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := map[int]*Variant{
-		86000:  {URI: "low/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 86000, ProgramId: 1, Codecs: "c1", Resolution: "1x1", Video: "1", Iframe: true}},
-		150000: {URI: "mid/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 150000, ProgramId: 1, Codecs: "c2", Resolution: "2x2", Video: "2", Iframe: true}},
-		550000: {URI: "hi/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 550000, ProgramId: 1, Codecs: "c2", Resolution: "2x2", Video: "2", Iframe: true}},
+		86000: {URI: "low/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 86000, ProgramId: 1, Codecs: "c1",
+			Resolution: "1x1", Video: "1", Iframe: true}},
+		150000: {URI: "mid/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 150000, ProgramId: 1, Codecs: "c2",
+			Resolution: "2x2", Video: "2", Iframe: true}},
+		550000: {URI: "hi/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 550000, ProgramId: 1, Codecs: "c2",
+			Resolution: "2x2", Video: "2", Iframe: true}},
 	}
 	for _, variant := range p.Variants {
 		for k, expect := range expected {
@@ -276,24 +279,42 @@ func TestDecodeMasterWithHLSV7(t *testing.T) {
 	}
 	var unexpected []*Variant
 	expected := map[string]VariantParams{
-		"sdr_720/prog_index.m3u8":      {Bandwidth: 3971374, AverageBandwidth: 2778321, Codecs: "hvc1.2.4.L123.B0", Resolution: "1280x720", Captions: "NONE", VideoRange: "SDR", HDCPLevel: "NONE", FrameRate: 23.976},
-		"sdr_1080/prog_index.m3u8":     {Bandwidth: 10022043, AverageBandwidth: 6759875, Codecs: "hvc1.2.4.L123.B0", Resolution: "1920x1080", Captions: "NONE", VideoRange: "SDR", HDCPLevel: "TYPE-0", FrameRate: 23.976},
-		"sdr_2160/prog_index.m3u8":     {Bandwidth: 28058971, AverageBandwidth: 20985770, Codecs: "hvc1.2.4.L150.B0", Resolution: "3840x2160", Captions: "NONE", VideoRange: "SDR", HDCPLevel: "TYPE-1", FrameRate: 23.976},
-		"dolby_720/prog_index.m3u8":    {Bandwidth: 5327059, AverageBandwidth: 3385450, Codecs: "dvh1.05.01", Resolution: "1280x720", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "NONE", FrameRate: 23.976},
-		"dolby_1080/prog_index.m3u8":   {Bandwidth: 12876596, AverageBandwidth: 7999361, Codecs: "dvh1.05.03", Resolution: "1920x1080", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-0", FrameRate: 23.976},
-		"dolby_2160/prog_index.m3u8":   {Bandwidth: 30041698, AverageBandwidth: 24975091, Codecs: "dvh1.05.06", Resolution: "3840x2160", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-1", FrameRate: 23.976},
-		"hdr10_720/prog_index.m3u8":    {Bandwidth: 5280654, AverageBandwidth: 3320040, Codecs: "hvc1.2.4.L123.B0", Resolution: "1280x720", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "NONE", FrameRate: 23.976},
-		"hdr10_1080/prog_index.m3u8":   {Bandwidth: 12886714, AverageBandwidth: 7964551, Codecs: "hvc1.2.4.L123.B0", Resolution: "1920x1080", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-0", FrameRate: 23.976},
-		"hdr10_2160/prog_index.m3u8":   {Bandwidth: 29983769, AverageBandwidth: 24833402, Codecs: "hvc1.2.4.L150.B0", Resolution: "3840x2160", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-1", FrameRate: 23.976},
-		"sdr_720/iframe_index.m3u8":    {Bandwidth: 593626, AverageBandwidth: 248586, Codecs: "hvc1.2.4.L123.B0", Resolution: "1280x720", Iframe: true, VideoRange: "SDR", HDCPLevel: "NONE"},
-		"sdr_1080/iframe_index.m3u8":   {Bandwidth: 956552, AverageBandwidth: 399790, Codecs: "hvc1.2.4.L123.B0", Resolution: "1920x1080", Iframe: true, VideoRange: "SDR", HDCPLevel: "TYPE-0"},
-		"sdr_2160/iframe_index.m3u8":   {Bandwidth: 1941397, AverageBandwidth: 826971, Codecs: "hvc1.2.4.L150.B0", Resolution: "3840x2160", Iframe: true, VideoRange: "SDR", HDCPLevel: "TYPE-1"},
-		"dolby_720/iframe_index.m3u8":  {Bandwidth: 573073, AverageBandwidth: 232253, Codecs: "dvh1.05.01", Resolution: "1280x720", Iframe: true, VideoRange: "PQ", HDCPLevel: "NONE"},
-		"dolby_1080/iframe_index.m3u8": {Bandwidth: 905037, AverageBandwidth: 365337, Codecs: "dvh1.05.03", Resolution: "1920x1080", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-0"},
-		"dolby_2160/iframe_index.m3u8": {Bandwidth: 1893236, AverageBandwidth: 739114, Codecs: "dvh1.05.06", Resolution: "3840x2160", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-1"},
-		"hdr10_720/iframe_index.m3u8":  {Bandwidth: 572673, AverageBandwidth: 232511, Codecs: "hvc1.2.4.L123.B0", Resolution: "1280x720", Iframe: true, VideoRange: "PQ", HDCPLevel: "NONE"},
-		"hdr10_1080/iframe_index.m3u8": {Bandwidth: 905053, AverageBandwidth: 364552, Codecs: "hvc1.2.4.L123.B0", Resolution: "1920x1080", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-0"},
-		"hdr10_2160/iframe_index.m3u8": {Bandwidth: 1895477, AverageBandwidth: 739757, Codecs: "hvc1.2.4.L150.B0", Resolution: "3840x2160", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-1"},
+		"sdr_720/prog_index.m3u8": {Bandwidth: 3971374, AverageBandwidth: 2778321, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1280x720", Captions: "NONE", VideoRange: "SDR", HDCPLevel: "NONE", FrameRate: 23.976},
+		"sdr_1080/prog_index.m3u8": {Bandwidth: 10022043, AverageBandwidth: 6759875, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1920x1080", Captions: "NONE", VideoRange: "SDR", HDCPLevel: "TYPE-0", FrameRate: 23.976},
+		"sdr_2160/prog_index.m3u8": {Bandwidth: 28058971, AverageBandwidth: 20985770, Codecs: "hvc1.2.4.L150.B0",
+			Resolution: "3840x2160", Captions: "NONE", VideoRange: "SDR", HDCPLevel: "TYPE-1", FrameRate: 23.976},
+		"dolby_720/prog_index.m3u8": {Bandwidth: 5327059, AverageBandwidth: 3385450, Codecs: "dvh1.05.01",
+			Resolution: "1280x720", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "NONE", FrameRate: 23.976},
+		"dolby_1080/prog_index.m3u8": {Bandwidth: 12876596, AverageBandwidth: 7999361, Codecs: "dvh1.05.03",
+			Resolution: "1920x1080", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-0", FrameRate: 23.976},
+		"dolby_2160/prog_index.m3u8": {Bandwidth: 30041698, AverageBandwidth: 24975091, Codecs: "dvh1.05.06",
+			Resolution: "3840x2160", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-1", FrameRate: 23.976},
+		"hdr10_720/prog_index.m3u8": {Bandwidth: 5280654, AverageBandwidth: 3320040, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1280x720", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "NONE", FrameRate: 23.976},
+		"hdr10_1080/prog_index.m3u8": {Bandwidth: 12886714, AverageBandwidth: 7964551, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1920x1080", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-0", FrameRate: 23.976},
+		"hdr10_2160/prog_index.m3u8": {Bandwidth: 29983769, AverageBandwidth: 24833402, Codecs: "hvc1.2.4.L150.B0",
+			Resolution: "3840x2160", Captions: "NONE", VideoRange: "PQ", HDCPLevel: "TYPE-1", FrameRate: 23.976},
+		"sdr_720/iframe_index.m3u8": {Bandwidth: 593626, AverageBandwidth: 248586, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1280x720", Iframe: true, VideoRange: "SDR", HDCPLevel: "NONE"},
+		"sdr_1080/iframe_index.m3u8": {Bandwidth: 956552, AverageBandwidth: 399790, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1920x1080", Iframe: true, VideoRange: "SDR", HDCPLevel: "TYPE-0"},
+		"sdr_2160/iframe_index.m3u8": {Bandwidth: 1941397, AverageBandwidth: 826971, Codecs: "hvc1.2.4.L150.B0",
+			Resolution: "3840x2160", Iframe: true, VideoRange: "SDR", HDCPLevel: "TYPE-1"},
+		"dolby_720/iframe_index.m3u8": {Bandwidth: 573073, AverageBandwidth: 232253, Codecs: "dvh1.05.01",
+			Resolution: "1280x720", Iframe: true, VideoRange: "PQ", HDCPLevel: "NONE"},
+		"dolby_1080/iframe_index.m3u8": {Bandwidth: 905037, AverageBandwidth: 365337, Codecs: "dvh1.05.03",
+			Resolution: "1920x1080", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-0"},
+		"dolby_2160/iframe_index.m3u8": {Bandwidth: 1893236, AverageBandwidth: 739114, Codecs: "dvh1.05.06",
+			Resolution: "3840x2160", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-1"},
+		"hdr10_720/iframe_index.m3u8": {Bandwidth: 572673, AverageBandwidth: 232511, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1280x720", Iframe: true, VideoRange: "PQ", HDCPLevel: "NONE"},
+		"hdr10_1080/iframe_index.m3u8": {Bandwidth: 905053, AverageBandwidth: 364552, Codecs: "hvc1.2.4.L123.B0",
+			Resolution: "1920x1080", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-0"},
+		"hdr10_2160/iframe_index.m3u8": {Bandwidth: 1895477, AverageBandwidth: 739757, Codecs: "hvc1.2.4.L150.B0",
+			Resolution: "3840x2160", Iframe: true, VideoRange: "PQ", HDCPLevel: "TYPE-1"},
 	}
 	for _, variant := range p.Variants {
 		var found bool
@@ -581,8 +602,10 @@ func TestMediaPlaylistWithOATCLSSCTE35Tag(t *testing.T) {
 	pp := p.(*MediaPlaylist)
 
 	expect := map[int]*SCTE{
-		0: {Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Start, Cue: "/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==", Time: 15},
-		1: {Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Mid, Cue: "/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==", Time: 15, Elapsed: 8.844},
+		0: {Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Start,
+			Cue: "/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==", Time: 15},
+		1: {Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Mid,
+			Cue: "/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==", Time: 15, Elapsed: 8.844},
 		2: {Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_End},
 	}
 	for i := 0; i < int(pp.Count()); i++ {
@@ -695,7 +718,8 @@ func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
 		}
 
 		if len(pp.Custom) != len(testCase.expectedPlaylistTags) {
-			t.Errorf("Did not parse expected number of custom tags. Got: %d Expected: %d", len(pp.Custom), len(testCase.expectedPlaylistTags))
+			t.Errorf("Did not parse expected number of custom tags. Got: %d Expected: %d", len(pp.Custom),
+				len(testCase.expectedPlaylistTags))
 		} else {
 			// we have the same count, lets confirm its the right tags
 			for _, expectedTag := range testCase.expectedPlaylistTags {
@@ -802,7 +826,8 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 		}
 
 		if len(pp.Custom) != len(testCase.expectedPlaylistTags) {
-			t.Errorf("Did not parse expected number of custom tags. Got: %d Expected: %d", len(pp.Custom), len(testCase.expectedPlaylistTags))
+			t.Errorf("Did not parse expected number of custom tags. Got: %d Expected: %d", len(pp.Custom),
+				len(testCase.expectedPlaylistTags))
 		} else {
 			// we have the same count, lets confirm its the right tags
 			for _, expectedTag := range testCase.expectedPlaylistTags {
@@ -831,7 +856,8 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 
 			if expectedSegmentTag == nil || expectedSegmentTag.index != i {
 				if len(seg.Custom) != 0 {
-					t.Errorf("Did not parse expected number of custom tags on Segment %d. Got: %d Expected: %d", i, len(seg.Custom), 0)
+					t.Errorf("Did not parse expected number of custom tags on Segment %d. Got: %d Expected: %d",
+						i, len(seg.Custom), 0)
 				}
 				continue
 			}
@@ -841,7 +867,8 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 			expectedIndex++
 
 			if len(expectedSegmentTag.names) != len(seg.Custom) {
-				t.Errorf("Did not parse expected number of custom tags on Segment %d. Got: %d Expected: %d", i, len(seg.Custom), len(expectedSegmentTag.names))
+				t.Errorf("Did not parse expected number of custom tags on Segment %d. Got: %d Expected: %d", i,
+					len(seg.Custom), len(expectedSegmentTag.names))
 			} else {
 				// we have the same count, lets confirm its the right tags
 				for _, expectedTag := range expectedSegmentTag.names {
@@ -853,7 +880,8 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 		}
 
 		if expectedIndex != len(testCase.expectedSegmentTags) {
-			t.Errorf("Did not parse custom tags on all expected segments. Parsed Segments: %d Expected: %d", expectedIndex, len(testCase.expectedSegmentTags))
+			t.Errorf("Did not parse custom tags on all expected segments. Parsed Segments: %d Expected: %d",
+				expectedIndex, len(testCase.expectedSegmentTags))
 		}
 	}
 }

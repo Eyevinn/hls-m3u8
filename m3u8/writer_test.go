@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -292,7 +291,8 @@ func TestSetDefaultKeyForMediaPlaylist(t *testing.T) {
 		if e != nil {
 			t.Fatalf("Create media playlist failed: %s", e)
 		}
-		if e := p.SetDefaultKey("AES-128", "https://example.com", "iv", test.KeyFormat, test.KeyFormatVersions); e != nil {
+		if e := p.SetDefaultKey("AES-128", "https://example.com", "iv", test.KeyFormat,
+			test.KeyFormatVersions); e != nil {
 			t.Errorf("Set key to a media playlist failed: %s", e)
 		}
 		if p.ver != test.ExpectVersion {
@@ -498,10 +498,10 @@ func TestEncryptionKeyMethodNoneInMediaPlaylist(t *testing.T) {
 	if e != nil {
 		t.Fatalf("Create media playlist failed: %s", e)
 	}
-	p.Append("segment-1.ts", 4, "")
-	p.SetKey("AES-128", "key-uri", "iv", "identity", "1")
-	p.Append("segment-2.ts", 4, "")
-	p.SetKey("NONE", "", "", "", "")
+	_ = p.Append("segment-1.ts", 4, "")
+	_ = p.SetKey("AES-128", "key-uri", "iv", "identity", "1")
+	_ = p.Append("segment-2.ts", 4, "")
+	_ = p.SetKey("NONE", "", "", "", "")
 	expected := `#EXT-X-KEY:METHOD=NONE
 #EXTINF:4.000,
 segment-2.ts`
@@ -533,20 +533,28 @@ func TestMediaPlaylistWithIntegerDurations(t *testing.T) {
 // 11 times encode structure to HLS with integer target durations
 // Last playlist must be empty
 func TestMediaPlaylistWithEmptyMedia(t *testing.T) {
-	p, e := NewMediaPlaylist(3, 10)
-	if e != nil {
-		t.Fatalf("Create media playlist failed: %s", e)
+	p, err := NewMediaPlaylist(3, 10)
+	if err != nil {
+		t.Fatalf("Create media playlist failed: %s", err)
 	}
 	for i := 1; i < 10; i++ {
-		e = p.Append(fmt.Sprintf("test%d.ts", i), 5.6, "")
-		if e != nil {
-			t.Errorf("Add segment #%d to a media playlist failed: %s", i, e)
+		err = p.Append(fmt.Sprintf("test%d.ts", i), 5.6, "")
+		if err != nil {
+			t.Errorf("Add segment #%d to a media playlist failed: %s", i, err)
 		}
 	}
-	for i := 1; i < 11; i++ {
+	for i := 1; i < 10; i++ {
 		// fmt.Println(p.Encode().String())
-		p.Remove()
-	} // TODO add check for buffers equality
+		err = p.Remove()
+		if err != nil {
+			t.Errorf("Remove segment #%d failed: %s", i, err)
+		}
+	}
+	err = p.Remove()
+	if err == nil {
+		t.Error("Expected error, received nil")
+	}
+	// TODO add check for buffers equality
 }
 
 // Create new media playlist with winsize == capacity
@@ -580,10 +588,12 @@ func TestClosedMediaPlaylist(t *testing.T) {
 // Create new media playlist as sliding playlist.
 func TestLargeMediaPlaylistWithParallel(t *testing.T) {
 	testCount := 10
-	expect, err := ioutil.ReadFile("sample-playlists/media-playlist-large.m3u8")
+	expected, err := os.ReadFile("sample-playlists/media-playlist-large.m3u8")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Fix potential CRLF issues on Windows
+	expected = bytes.Replace(expected, []byte("\r\n"), []byte("\n"), -1)
 	var wg sync.WaitGroup
 	for i := 0; i < testCount; i++ {
 		wg.Add(1)
@@ -591,19 +601,25 @@ func TestLargeMediaPlaylistWithParallel(t *testing.T) {
 			defer wg.Done()
 			f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("%s", err)
+				t.Fail()
 			}
 			p, err := NewMediaPlaylist(50000, 50000)
 			if err != nil {
-				t.Fatalf("Create media playlist failed: %s", err)
+				t.Errorf("Create media playlist failed: %s", err)
+				t.Fail()
 			}
 			if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
-				t.Fatal(err)
+				t.Errorf("Decode media playlist failed: %s", err)
+				t.Fail()
 			}
 
 			actual := p.Encode().Bytes() // disregard output
-			if bytes.Compare(expect, actual) != 0 {
-				t.Fatal("not matched")
+			// Fix potential CRLF issues on Windows
+			actual = bytes.Replace(actual, []byte("\r\n"), []byte("\n"), -1)
+			if !bytes.Equal(expected, actual) {
+				t.Errorf("Expected playlist does not match actual")
+				t.Fail()
 			}
 		}()
 		wg.Wait()
@@ -789,7 +805,8 @@ func TestNewMasterPlaylistWithAlternatives(t *testing.T) {
 	if m.ver != 4 {
 		t.Fatalf("Expected version 4, actual, %d", m.ver)
 	}
-	expected := `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="main",DEFAULT=YES,AUTOSELECT=YES,LANGUAGE="english",URI="800/rendition.m3u8"`
+	expected := `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="main",DEFAULT=YES,` +
+		`AUTOSELECT=YES,LANGUAGE="english",URI="800/rendition.m3u8"`
 	if !strings.Contains(m.String(), expected) {
 		t.Fatalf("Master playlist did not contain: %s\nMaster Playlist:\n%v", expected, m.String())
 	}
@@ -812,7 +829,7 @@ func TestNewMasterPlaylistWithClosedCaptionEqNone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create media playlist failed: %s", err)
 	}
-	m.Append(fmt.Sprintf("eng_rendition_rendition.m3u8"), p, *vp)
+	m.Append("eng_rendition_rendition.m3u8", p, *vp)
 
 	expected := "CLOSED-CAPTIONS=NONE"
 	if !strings.Contains(m.String(), expected) {
@@ -821,7 +838,7 @@ func TestNewMasterPlaylistWithClosedCaptionEqNone(t *testing.T) {
 	// quotes need to be include if not eq NONE
 	vp.Captions = "CC1"
 	m2 := NewMasterPlaylist()
-	m2.Append(fmt.Sprintf("eng_rendition_rendition.m3u8"), p, *vp)
+	m2.Append("eng_rendition_rendition.m3u8", p, *vp)
 	expected = `CLOSED-CAPTIONS="CC1"`
 	if !strings.Contains(m2.String(), expected) {
 		t.Fatalf("Master playlist did not contain: %s\nMaster Playlist:\n%v", expected, m2.String())
@@ -949,10 +966,10 @@ func TestMasterSetVersion(t *testing.T) {
 // Create new media playlist
 // Add two segments to media playlist
 // Print it
-func ExampleMediaPlaylist_String() {
+func ExampleNewMediaPlaylist_string() {
 	p, _ := NewMediaPlaylist(1, 2)
-	p.Append("test01.ts", 5.0, "")
-	p.Append("test02.ts", 6.0, "")
+	_ = p.Append("test01.ts", 5.0, "")
+	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
 	// Output:
 	// #EXTM3U
@@ -966,10 +983,10 @@ func ExampleMediaPlaylist_String() {
 // Create new media playlist
 // Add two segments to media playlist
 // Print it
-func ExampleMediaPlaylist_String_Winsize0() {
+func ExampleNewMediaPlaylist_stringWinsize0() {
 	p, _ := NewMediaPlaylist(0, 2)
-	p.Append("test01.ts", 5.0, "")
-	p.Append("test02.ts", 6.0, "")
+	_ = p.Append("test01.ts", 5.0, "")
+	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
 	// Output:
 	// #EXTM3U
@@ -985,10 +1002,10 @@ func ExampleMediaPlaylist_String_Winsize0() {
 // Create new media playlist
 // Add two segments to media playlist
 // Print it
-func ExampleMediaPlaylist_String_Winsize0_VOD() {
+func ExampleNewMediaPlaylist_stringWinsize0VOD() {
 	p, _ := NewMediaPlaylist(0, 2)
-	p.Append("test01.ts", 5.0, "")
-	p.Append("test02.ts", 6.0, "")
+	_ = p.Append("test01.ts", 5.0, "")
+	_ = p.Append("test02.ts", 6.0, "")
 	p.Close()
 	fmt.Printf("%s\n", p)
 	// Output:
@@ -1006,14 +1023,16 @@ func ExampleMediaPlaylist_String_Winsize0_VOD() {
 // Create new master playlist
 // Add media playlist
 // Encode structures to HLS
-func ExampleMasterPlaylist_String() {
+func ExampleNewMasterPlaylist_string() {
 	m := NewMasterPlaylist()
 	p, _ := NewMediaPlaylist(3, 5)
 	for i := 0; i < 5; i++ {
-		p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
+		_ = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, AverageBandwidth: 1500000, Resolution: "576x480", FrameRate: 25.000})
-	m.Append("chunklist2.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, AverageBandwidth: 1500000, Resolution: "576x480", FrameRate: 25.000})
+	m.Append("chunklist1.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, AverageBandwidth: 1500000,
+		Resolution: "576x480", FrameRate: 25.000})
+	m.Append("chunklist2.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, AverageBandwidth: 1500000,
+		Resolution: "576x480", FrameRate: 25.000})
 	fmt.Printf("%s", m)
 	// Output:
 	// #EXTM3U
@@ -1024,7 +1043,7 @@ func ExampleMasterPlaylist_String() {
 	// chunklist2.m3u8
 }
 
-func ExampleMasterPlaylist_String_with_hlsv7() {
+func ExampleNewMasterPlaylist_stringWithHLSv7() {
 	m := NewMasterPlaylist()
 	m.SetVersion(7)
 	m.SetIndependentSegments(true)
@@ -1041,7 +1060,7 @@ func ExampleMasterPlaylist_String_with_hlsv7() {
 	// #EXT-X-I-FRAME-STREAM-INF:PROGRAM-ID=0,BANDWIDTH=905053,AVERAGE-BANDWIDTH=364552,CODECS="hvc1.2.4.L123.B0",RESOLUTION=1920x1080,VIDEO-RANGE=PQ,HDCP-LEVEL=TYPE-0,URI="hdr10_1080/iframe_index.m3u8"
 }
 
-func ExampleMediaPlaylist_Segments_scte35_oatcls() {
+func ExampleDecode_mediaPlaylistSegmentsSCTE35OATCLS() {
 	f, _ := os.Open("sample-playlists/media-playlist-with-oatcls-scte35.m3u8")
 	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
 	pp := p.(*MediaPlaylist)
@@ -1084,7 +1103,7 @@ func ExampleMediaPlaylist_Segments_scte35_67_2014() {
 
 // Range over segments of media playlist. Check for ring buffer corner
 // cases.
-func ExampleMediaPlaylistGetAllSegments() {
+func ExampleNewMediaPlaylist_getAllSegments() {
 	m, _ := NewMediaPlaylist(3, 3)
 	_ = m.Append("t00.ts", 10, "")
 	_ = m.Append("t01.ts", 10, "")
@@ -1092,20 +1111,20 @@ func ExampleMediaPlaylistGetAllSegments() {
 	for _, v := range m.GetAllSegments() {
 		fmt.Printf("%s\n", v.URI)
 	}
-	m.Remove()
-	m.Remove()
-	m.Remove()
+	_ = m.Remove()
+	_ = m.Remove()
+	_ = m.Remove()
 	_ = m.Append("t03.ts", 10, "")
 	_ = m.Append("t04.ts", 10, "")
 	for _, v := range m.GetAllSegments() {
 		fmt.Printf("%s\n", v.URI)
 	}
-	m.Remove()
-	m.Remove()
+	_ = m.Remove()
+	_ = m.Remove()
 	_ = m.Append("t05.ts", 10, "")
 	_ = m.Append("t06.ts", 10, "")
-	m.Remove()
-	m.Remove()
+	_ = m.Remove()
+	_ = m.Remove()
 	// empty because removed two elements
 	for _, v := range m.GetAllSegments() {
 		fmt.Printf("%s\n", v.URI)

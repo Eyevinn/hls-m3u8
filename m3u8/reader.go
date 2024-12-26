@@ -263,7 +263,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	case MEDIA:
 		if media.Closed || media.MediaType == EVENT {
 			// VoD and Event's should show the entire playlist
-			media.SetWinSize(0)
+			_ = media.SetWinSize(0)
 		}
 		return media, MEDIA, nil
 	}
@@ -454,8 +454,8 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 				state.variant.HDCPLevel = v
 			}
 		}
-	case strings.HasPrefix(line, "#"):
-		// comments are ignored
+		//case strings.HasPrefix(line, "#"):
+		// unknown TAG
 	}
 	return err
 }
@@ -551,7 +551,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 		}
 		// If EXT-X-KEY appeared before reference to segment (EXTINF) then it linked to this segment
 		if state.tagKey {
-			p.Segments[p.last()].Key = &Key{state.xkey.Method, state.xkey.URI, state.xkey.IV, state.xkey.Keyformat, state.xkey.Keyformatversions}
+			p.Segments[p.last()].Key = &Key{state.xkey.Method, state.xkey.URI, state.xkey.IV, state.xkey.Keyformat,
+				state.xkey.Keyformatversions}
 			// First EXT-X-KEY may appeared in the header of the playlist and linked to first segment
 			// but for convenient playlist generation it also linked as default playlist key
 			if p.Key == nil {
@@ -777,7 +778,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 		}
 	case strings.HasPrefix(line, "#WV-AUDIO-SAMPLING-FREQUENCY"):
 		state.listType = MEDIA
-		if _, err = fmt.Sscanf(line, "#WV-AUDIO-SAMPLING-FREQUENCY %d", &wv.AudioSamplingFrequency); strict && err != nil {
+		if _, err = fmt.Sscanf(line, "#WV-AUDIO-SAMPLING-FREQUENCY %d", &wv.AudioSamplingFrequency); strict &&
+			err != nil {
 			return err
 		}
 		if err == nil {
@@ -839,8 +841,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 		if err == nil {
 			state.tagWV = true
 		}
-	case strings.HasPrefix(line, "#"):
-		// comments are ignored
+		//case strings.HasPrefix(line, "#"):
+		// Unknown TAG
 	}
 	return err
 }
