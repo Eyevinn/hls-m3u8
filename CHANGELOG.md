@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+
+- Nothing yet
+
+## v0.1.0 - cleaned grafov/m3u8 code
 
 ### Changed
 
-The following changes are wrt to initial copy of `grafov/m3u8` files: 
+The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 
 - code changes to pass linting including Example names
 - made errors more consistent and more verbose
@@ -18,3 +22,6 @@ The following changes are wrt to initial copy of `grafov/m3u8` files:
 ### Added
 
 - initial version of the repo
+
+[Unreleased]: https://github.com/Eyevinn/mp4ff/compare/v0.1.0...HEAD
+[grafov]: https://github.com/grafov/m3u8
