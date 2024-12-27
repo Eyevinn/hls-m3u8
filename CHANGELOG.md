@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CHANNELS attribute to EXT-X-MEDIA
 
+### Fixed
+
+- Renditions were not properly distributed to Variants
+
 ## v0.1.0 - cleaned grafov/m3u8 code
 
 ### Changed

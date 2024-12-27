@@ -87,6 +87,9 @@ func (p *MasterPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 
 func (p *MasterPlaylist) attachRenditionsToVariants(alternatives []*Alternative) {
 	for _, variant := range p.Variants {
+		if variant.Iframe {
+			continue
+		}
 		for _, alt := range alternatives {
 			if alt == nil {
 				continue
@@ -231,7 +234,6 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		line = trimLineEnd(line)
 
 		err = decodeLineOfMasterPlaylist(master, state, line, strict)
-		master.attachRenditionsToVariants(state.alternatives)
 		if strict && err != nil {
 			return master, state.listType, err
 		}
@@ -249,6 +251,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 
 	switch state.listType {
 	case MASTER:
+		master.attachRenditionsToVariants(state.alternatives)
 		return master, MASTER, nil
 	case MEDIA:
 		if media.Closed || media.MediaType == EVENT {
@@ -398,10 +401,6 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		state.listType = MASTER
 		state.variant = new(Variant)
 		state.variant.Iframe = true
-		if len(state.alternatives) > 0 {
-			state.variant.Alternatives = state.alternatives
-			state.alternatives = nil
-		}
 		p.Variants = append(p.Variants, state.variant)
 		for k, v := range decodeParamsLine(line[26:]) {
 			switch k {
