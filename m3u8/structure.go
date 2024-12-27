@@ -189,6 +189,7 @@ type Alternative struct {
 	Forced          string
 	Characteristics string
 	Subtitles       string
+	Channels        string
 }
 
 // MediaSegment structure represents a media segment included in a

@@ -149,6 +149,11 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 					p.buf.WriteString(alt.URI)
 					p.buf.WriteRune('"')
 				}
+				if alt.Channels != "" {
+					p.buf.WriteString(",CHANNELS=\"")
+					p.buf.WriteString(alt.Channels)
+					p.buf.WriteRune('"')
+				}
 				p.buf.WriteRune('\n')
 			}
 		}

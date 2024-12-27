@@ -334,6 +334,8 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 				alt.Subtitles = v
 			case "URI":
 				alt.URI = v
+			case "CHANNELS":
+				alt.Channels = v
 			}
 		}
 		state.alternatives = append(state.alternatives, &alt)
