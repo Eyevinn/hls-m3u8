@@ -192,8 +192,7 @@ type Alternative struct {
 }
 
 // MediaSegment structure represents a media segment included in a
-// media playlist. Media segment may be encrypted. Widevine supports
-// own tags for encryption metadata.
+// media playlist. Media segment may be encrypted.
 type MediaSegment struct {
 	SeqId uint64
 	Title string // optional second parameter for EXTINF tag

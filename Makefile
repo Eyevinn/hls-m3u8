@@ -10,7 +10,7 @@ lint: prepare
 
 .PHONY: prepare
 prepare:
-	go mod vendor
+	go mod tidy
 
 cmd1 cmd2:
 	go build -ldflags "-X github.com/Eyevinn/{Name}/internal.commitVersion=$$(git describe --tags HEAD) -X github.com/Eyevinn/{Name}/internal.commitDate=$$(git log -1 --format=%ct)" -o out/$@ ./cmd/$@/main.go

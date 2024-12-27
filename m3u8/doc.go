@@ -2,7 +2,7 @@ package m3u8
 
 /* Package m3u8 is parser & generator library for Apple HLS.
 
-M3U8 is simple text format and parsing library for it must be simple
+M3U8 is line-based text format and parsing library for it must be simple
 too. It did not offer ways to play HLS or handle playlists over
 HTTP. Library features are:
 
@@ -10,8 +10,8 @@ HTTP. Library features are:
   - Parsing and generation of master-playlists and media-playlists.
   - Autodetect input streams as master or media playlists.
   - Offer structures for keeping playlists metadata.
-  - Encryption keys support for usage with DRM systems like Verimatrix (http://verimatrix.com) etc.
-  - Support for non standard Google Widevine (http://www.widevine.com) tags.
+  - Support for sliding window for live media playlists.
+  - Encryption keys support for usage with DRM systems.
 
 Library coded accordingly with IETF draft
 http://tools.ietf.org/html/draft-pantos-http-live-streaming

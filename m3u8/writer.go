@@ -411,7 +411,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 
-	// default key (workaround for Widevine)
+	// default key (workaround for Widevine). Is this needed when no Widevine?
 	if p.Key != nil {
 		p.buf.WriteString("#EXT-X-KEY:")
 		p.buf.WriteString("METHOD=")
