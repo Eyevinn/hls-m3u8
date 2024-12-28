@@ -1100,6 +1100,10 @@ func TestDecodeRenditionsAndIframes(t *testing.T) {
 			}
 		}
 	}
+	allRenditions := pp.GetAllAlternatives()
+	if len(allRenditions) != 2 {
+		t.Error("Expected 2 renditions in the master playlist")
+	}
 }
 
 /****************

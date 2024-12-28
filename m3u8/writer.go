@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -309,6 +310,31 @@ func (p *MasterPlaylist) SetIndependentSegments(b bool) {
 // string representation.
 func (p *MasterPlaylist) String() string {
 	return p.Encode().String()
+}
+
+// GetAllAlternatives returns all alternative renditions sorted by
+// groupID, type, name, and language.
+func (p *MasterPlaylist) GetAllAlternatives() []*Alternative {
+	added := make(map[string]*Alternative)
+
+	for _, v := range p.Variants {
+		for _, alt := range v.Alternatives {
+			key := fmt.Sprintf("%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language)
+			if _, ok := added[key]; !ok {
+				added[key] = alt
+			}
+		}
+	}
+	alts := make([]*Alternative, 0, len(added))
+	keys := make([]string, 0, len(added))
+	for k := range added {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		alts = append(alts, added[key])
+	}
+	return alts
 }
 
 // NewMediaPlaylist creates a new media playlist structure. Winsize
