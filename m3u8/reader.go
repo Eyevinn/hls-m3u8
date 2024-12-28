@@ -233,14 +233,18 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		}
 		line = trimLineEnd(line)
 
-		err = decodeLineOfMasterPlaylist(master, state, line, strict)
-		if strict && err != nil {
-			return master, state.listType, err
+		if state.listType != MEDIA {
+			err = decodeLineOfMasterPlaylist(master, state, line, strict)
+			if strict && err != nil {
+				return master, state.listType, err
+			}
 		}
 
-		err = decodeLineOfMediaPlaylist(media, state, line, strict)
-		if strict && err != nil {
-			return media, state.listType, err
+		if state.listType != MASTER {
+			err = decodeLineOfMediaPlaylist(media, state, line, strict)
+			if strict && err != nil {
+				return media, state.listType, err
+			}
 		}
 
 	}
@@ -301,7 +305,6 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 	case line == "#EXTM3U": // start tag first
 		state.m3u = true
 	case strings.HasPrefix(line, "#EXT-X-VERSION:"): // version tag
-		state.listType = MASTER
 		_, err = fmt.Sscanf(line, "#EXT-X-VERSION:%d", &p.ver)
 		if strict && err != nil {
 			return err
@@ -569,7 +572,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.listType = MEDIA
 		p.Closed = true
 	case strings.HasPrefix(line, "#EXT-X-VERSION:"):
-		state.listType = MEDIA
 		if _, err = fmt.Sscanf(line, "#EXT-X-VERSION:%d", &p.ver); strict && err != nil {
 			return err
 		}
