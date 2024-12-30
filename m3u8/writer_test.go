@@ -1137,6 +1137,27 @@ func ExampleNewMediaPlaylist_getAllSegments() {
 	// t04.ts
 }
 
+func TestKeyIsNotDuplicated(t *testing.T) {
+	encoded := decodeEncode(t, "sample-playlists/media-playlist-with-key.m3u8")
+	count := strings.Count(encoded, "#EXT-X-KEY")
+	if count != 1 {
+		t.Errorf("Expected number of EXT-X-KEY: 1 actual: %d", count)
+	}
+}
+
+func decodeEncode(t *testing.T, fileName string) string {
+	f, err := os.Open(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, _, err := DecodeFrom(bufio.NewReader(f), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pp := p.(*MediaPlaylist)
+	return pp.Encode().String()
+}
+
 /****************
  *  Benchmarks  *
  ****************/
