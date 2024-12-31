@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Renditions were not properly distributed to Variants
 - EXT-X-KEY was written twice before first segment
+- FORCED attribute had quotes
 
 ## v0.1.0 - cleaned grafov/m3u8 code
 
