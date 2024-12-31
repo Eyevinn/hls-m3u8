@@ -1073,6 +1073,35 @@ func TestDecodeMasterChannels(t *testing.T) {
 	}
 }
 
+func TestDecodeRenditionsAndIframes(t *testing.T) {
+	f, err := os.Open("sample-playlists/master-groups-and-iframe.m3u8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if listType != MASTER {
+		t.Error("Input not recognized as master playlist.")
+	}
+	pp := p.(*MasterPlaylist)
+
+	for _, v := range pp.Variants {
+		switch v.Iframe {
+		case true:
+			if len(v.Alternatives) != 0 {
+				t.Error("Expected no alternatives in I-frame variant")
+			}
+		case false:
+			if len(v.Alternatives) != 1 {
+				t.Error("Expected 1 alternative in each video variant")
+			}
+		}
+	}
+}
+
 /****************
  *  Benchmarks  *
  ****************/
