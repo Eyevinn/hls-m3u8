@@ -312,37 +312,10 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 	case line == "#EXT-X-INDEPENDENT-SEGMENTS":
 		p.SetIndependentSegments(true)
 	case strings.HasPrefix(line, "#EXT-X-MEDIA:"):
-		var alt Alternative
 		state.listType = MASTER
-		for k, v := range decodeParamsLine(line[13:]) {
-			switch k {
-			case "TYPE":
-				alt.Type = v
-			case "GROUP-ID":
-				alt.GroupId = v
-			case "LANGUAGE":
-				alt.Language = v
-			case "NAME":
-				alt.Name = v
-			case "DEFAULT":
-				value, err := yesOrNo(v, strict)
-				if err != nil {
-					return fmt.Errorf("%s:%s %w", k, v, ErrNotYesOrNo)
-				}
-				alt.Default = value
-			case "AUTOSELECT":
-				alt.Autoselect = v
-			case "FORCED":
-				alt.Forced = v
-			case "CHARACTERISTICS":
-				alt.Characteristics = v
-			case "SUBTITLES":
-				alt.Subtitles = v
-			case "URI":
-				alt.URI = v
-			case "CHANNELS":
-				alt.Channels = v
-			}
+		alt, err := parseExtXMedia(line, strict)
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-MEDIA: %w", err)
 		}
 		state.alternatives = append(state.alternatives, &alt)
 	case !state.tagStreamInf && strings.HasPrefix(line, "#EXT-X-STREAM-INF:"):
@@ -448,6 +421,66 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		// unknown TAG
 	}
 	return err
+}
+
+func parseExtXMedia(line string, strict bool) (Alternative, error) {
+	var alt Alternative
+	if !strings.HasPrefix(line, "#EXT-X-MEDIA:") {
+		return alt, fmt.Errorf("invalid line: %q", line)
+	}
+	var err error
+	for k, v := range decodeParamsLine(line[13:]) {
+		switch k {
+		case "TYPE":
+			alt.Type = v
+		case "URI":
+			alt.URI = v
+		case "GROUP-ID":
+			alt.GroupId = v
+		case "LANGUAGE":
+			alt.Language = v
+		case "ASSOC-LANGUAGE":
+			alt.AssocLanguage = v
+		case "NAME":
+			alt.Name = v
+		case "STABLE-RENDITION-ID":
+			alt.StableRenditionId = v
+		case "DEFAULT":
+			alt.Default, err = yesOrNo(v, strict)
+			if err != nil {
+				return alt, fmt.Errorf("%s:%s %w", k, v, ErrNotYesOrNo)
+			}
+		case "AUTOSELECT":
+			alt.Autoselect, err = yesOrNo(v, strict)
+			if err != nil {
+				return alt, fmt.Errorf("%s:%s %w", k, v, ErrNotYesOrNo)
+			}
+		case "FORCED":
+			alt.Forced, err = yesOrNo(v, strict)
+			if err != nil {
+				return alt, fmt.Errorf("%s:%s %w", k, v, ErrNotYesOrNo)
+			}
+		case "INSTREAM-ID":
+			alt.InstreamId = v
+		case "BIT-DEPTH":
+			bitDepth, err := strconv.Atoi(v)
+			if err != nil {
+				return alt, fmt.Errorf("invalid BIT-DEPTH: %w", err)
+			}
+			alt.BitDepth = byte(bitDepth)
+		case "SAMPLE-RATE":
+			sampleRate, err := strconv.Atoi(v)
+			if err != nil {
+				return alt, fmt.Errorf("invalid SAMPLE-RATE: %w", err)
+			}
+			alt.SampleRate = uint32(sampleRate)
+		case "CHARACTERISTICS":
+			alt.Characteristics = v
+		case "CHANNELS":
+			alt.Channels = v
+		}
+	}
+	return alt, nil
 }
 
 // Parse one line of media playlist.

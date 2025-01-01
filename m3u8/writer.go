@@ -98,62 +98,8 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 				if altsWritten[altKey] {
 					continue
 				}
+				writeExtXMedia(&p.buf, alt)
 				altsWritten[altKey] = true
-
-				p.buf.WriteString("#EXT-X-MEDIA:")
-				if alt.Type != "" {
-					p.buf.WriteString("TYPE=") // Type should not be quoted
-					p.buf.WriteString(alt.Type)
-				}
-				if alt.GroupId != "" {
-					p.buf.WriteString(",GROUP-ID=\"")
-					p.buf.WriteString(alt.GroupId)
-					p.buf.WriteRune('"')
-				}
-				if alt.Name != "" {
-					p.buf.WriteString(",NAME=\"")
-					p.buf.WriteString(alt.Name)
-					p.buf.WriteRune('"')
-				}
-				p.buf.WriteString(",DEFAULT=")
-				if alt.Default {
-					p.buf.WriteString("YES")
-				} else {
-					p.buf.WriteString("NO")
-				}
-				if alt.Autoselect != "" {
-					p.buf.WriteString(",AUTOSELECT=")
-					p.buf.WriteString(alt.Autoselect)
-				}
-				if alt.Language != "" {
-					p.buf.WriteString(",LANGUAGE=\"")
-					p.buf.WriteString(alt.Language)
-					p.buf.WriteRune('"')
-				}
-				if alt.Forced != "" {
-					p.buf.WriteString(alt.Forced)
-				}
-				if alt.Characteristics != "" {
-					p.buf.WriteString(",CHARACTERISTICS=\"")
-					p.buf.WriteString(alt.Characteristics)
-					p.buf.WriteRune('"')
-				}
-				if alt.Subtitles != "" {
-					p.buf.WriteString(",SUBTITLES=\"")
-					p.buf.WriteString(alt.Subtitles)
-					p.buf.WriteRune('"')
-				}
-				if alt.URI != "" {
-					p.buf.WriteString(",URI=\"")
-					p.buf.WriteString(alt.URI)
-					p.buf.WriteRune('"')
-				}
-				if alt.Channels != "" {
-					p.buf.WriteString(",CHANNELS=\"")
-					p.buf.WriteString(alt.Channels)
-					p.buf.WriteRune('"')
-				}
-				p.buf.WriteRune('\n')
 			}
 		}
 		if pl.Iframe {
@@ -269,6 +215,73 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	}
 
 	return &p.buf
+}
+
+// writeExtXMedia writes an EXT-X-MEDIA tag line includiing \n to the buffer.
+// No checks are done that the date is valid.
+func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
+	buf.WriteString("#EXT-X-MEDIA:")
+	buf.WriteString("TYPE=")
+	buf.WriteString(alt.Type)                 // Mandatory enumerated string
+	writeQuoted(buf, "GROUP-ID", alt.GroupId) // Mandatory quoted-string
+	writeQuoted(buf, "NAME", alt.Name)        // Mandatory quoted-string
+	if alt.Language != "" {
+		writeQuoted(buf, "LANGUAGE", alt.Language)
+	}
+	if alt.AssocLanguage != "" {
+		writeQuoted(buf, "ASSOC-LANGUAGE", alt.AssocLanguage)
+	}
+	if alt.StableRenditionId != "" {
+		writeQuoted(buf, "STABLE-RENDITION-ID", alt.StableRenditionId)
+	}
+	buf.WriteString(",DEFAULT=")
+	if alt.Default {
+		buf.WriteString("YES")
+	} else {
+		buf.WriteString("NO")
+	}
+	if alt.Autoselect {
+		buf.WriteString(",AUTOSELECT=YES")
+	}
+	if alt.Forced {
+		buf.WriteString(",FORCED=YES")
+	}
+	if alt.InstreamId != "" {
+		writeQuoted(buf, "INSTREAM-ID", alt.InstreamId)
+	}
+	if alt.BitDepth != 0 {
+		writeUint(buf, "BIT-DEPTH", uint(alt.BitDepth))
+	}
+	if alt.SampleRate != 0 {
+		writeUint(buf, "SAMPLE-RATE", uint(alt.SampleRate))
+	}
+	if alt.Characteristics != "" {
+		writeQuoted(buf, "CHARACTERISTICS", alt.Characteristics)
+	}
+	if alt.Channels != "" {
+		writeQuoted(buf, "CHANNELS", alt.Channels)
+	}
+	if alt.URI != "" {
+		writeQuoted(buf, "URI", alt.URI)
+	}
+	buf.WriteRune('\n')
+}
+
+// writeQuoted writes a quoted key-value pair to the buffer preceeded by a comma.
+func writeQuoted(buf *bytes.Buffer, key, value string) {
+	buf.WriteRune(',')
+	buf.WriteString(key)
+	buf.WriteString(`="`)
+	buf.WriteString(value)
+	buf.WriteRune('"')
+}
+
+// writeUint writes a key-value pair to the buffer preceeded by a comma.
+func writeUint(buf *bytes.Buffer, key string, value uint) {
+	buf.WriteRune(',')
+	buf.WriteString(key)
+	buf.WriteRune('=')
+	buf.WriteString(strconv.FormatUint(uint64(value), 10))
 }
 
 // SetCustomTag sets the provided tag on the master playlist for its TagName

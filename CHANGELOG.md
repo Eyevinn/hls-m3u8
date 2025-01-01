@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- FORCED and AUTOSELECT types changed from string to bool
+- Removed SUBTITLES from EXT-X-MEDIA since not in [rfc8216bis-16]
+
 ### Added
 
-- CHANNELS attribute to EXT-X-MEDIA
+- Complete list of EXT-X-MEDIA attributes: ASSOC-LANGUAGE, STABLE-RENDITION-ID, INSTREAM-ID, BIT-DEPTH, SAMPLE-RATE
 - GetAllAlternatives() method to MasterPlaylist
 - Improved playlist type detection
 
@@ -35,3 +40,4 @@ The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 
 [Unreleased]: https://github.com/Eyevinn/mp4ff/compare/v0.1.0...HEAD
 [grafov]: https://github.com/grafov/m3u8
+[rfc8216bis-16]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16

@@ -178,18 +178,24 @@ type VariantParams struct {
 }
 
 // Alternative structure represents EXT-X-MEDIA tag in variants.
+// Listed as in same order as in specification for easy
+// comparison.
 type Alternative struct {
-	GroupId         string
-	URI             string
-	Type            string
-	Language        string
-	Name            string
-	Default         bool
-	Autoselect      string
-	Forced          string
-	Characteristics string
-	Subtitles       string
-	Channels        string
+	Type              string
+	URI               string
+	GroupId           string
+	Language          string
+	AssocLanguage     string
+	Name              string
+	StableRenditionId string
+	Default           bool
+	Autoselect        bool
+	Forced            bool
+	InstreamId        string
+	BitDepth          byte
+	SampleRate        uint32
+	Characteristics   string
+	Channels          string
 }
 
 // MediaSegment structure represents a media segment included in a
