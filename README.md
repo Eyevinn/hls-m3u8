@@ -10,17 +10,37 @@ HLS (HTTP Live Streaming) is an evolving protocol with multiple versions.
 Versions 1-7 are described in [IETF RFC8216][rfc8216], but the protocol has continued
 to evolve with new features and versions in a
 series of [Internet Drafts rfc8216bis][rfc8216bis].
-The current version (Dec. 27 2024) is [rfc8216bis-16][rfc8216bis].
+The current version (Jan 3 2025) is [rfc8216bis-16][rfc8216bis].
 
 One of the major libraries in Go for parsing and generating HLS playlists,
 aka m3u8 files, has been the Github project [grafov/m3u8][grafov].
-However, the majority of that code was written up to version 5, and
-the library has hardly been updated in a long time. It was finally archived in Dec. 2024.
+However, the majority of that code was written up to version 5,
+It was finally archived in Dec. 2024.
 
-The goal of this library, hls-m3u8,  is to provide an up-to-date replacement and improvement
+The goal of this library, `hls-m3u8`,  is to provide an up-to-date replacement and improvement
 of  the [m3u8][grafov] library. The aim is to follow the HLS specification
 as it evolves and add all new elements and do other updates in order that
 all m3u8 documents (from version 3 and forward) can be parsed and generated.
+
+## Structure and design of the code
+
+There are two types of m3u8 playlists: `Master` or `Multivariant` playlists, and `Media` playlists.
+These are represented as two different structs, but they have a common interface `Playlist`.
+
+There is a function `Decode`, that decodes and autodetects the type of playlist, by decoding
+both in parallel, and stopping one, once the type is known.
+
+For generating playlists, one starts by calling either `NewMasterPlaylist` or `NewMediaPlaylist`.
+One can then `Set` or `Append` extra data.
+
+For live media playlists with a fixed sliding window, one
+can set a `winsize` and it will be used to always output
+the latest segments.
+
+For VOD or EVENT media playlists, the `winsize` should be 0.
+
+
+For writing, there are `Encode` methods that return a `*bytes.Buffer`. This buffer serves as a cache.
 
 ## Installation / Usage
 
@@ -32,11 +52,29 @@ To enable it in your Go project, run
 go get github.com/Eyevinn/hls-m3u8/m3u8
 ```
 
+To use the code add 
+
+```go
+import github.com/Eyevinn/hls-m3u8/m3u8
+```
+
+to your source files.
+
 ## Development
 
 There are tests and sample-playlists available.
 There is also a `Makefile` that runs test, checks coverage, and the license
 of dependencies.
+
+For tests, the [is][is] package is used. It outputs failing tests with
+line numbers and colors, but colors do not work properly in VisualStudio Code.
+To turn them off in VSC, add the following configuration:
+
+```json
+    "go.testEnvVars": {
+        "NO_COLOR" : "YES"
+    },
+```
 
 ### pre-commit checks
 
@@ -52,18 +90,16 @@ to set up the automatic tests.
 
 This project tries to align to the archived library [grafov/m3u8][grafov] to make the transition from that library relatively simple.
 
-As a first release (v0.1.0), the code should be a cleaned version of [grafov/m3u8][grafov],
-but later versions will probably have some non-compatible changes.
+The first release (v0.1.0), is essentially a cleaned
+and slightly bug-fixed  version of [grafov/m3u8][grafov]
 
-Some notable changes in the HLS specification are:
+Replace `import github.com/grafov/m3u8` with
+`import github.com/Eyevinn/hls-m3u8/m3u8` and you should
+hopefully be fine to go.
 
-* the introduction of Low-Latency HLS and
-partial segments in [rfc8216bis-07][rfc8216bis-07]
-* change of name of the top-level multi-variant playlist from `Master Playlist` to `Multivariant Playlist`[rfc8216bis-10][rfc8216bis-10]
+Later versions do more changes and additions.
 
-There area also plenty of new tags and use cases.
-
-The aim is to provide upgrade instructions, when the library API changes.
+See [CHANGELOG](CHANGELOG) for a list of changes.
 
 ## Contributing
 
@@ -103,3 +139,4 @@ Want to know more about Eyevinn and how it is to work here. Contact us at work@e
 [grafov]: https://github.com/grafov/m3u8
 [issues]: https://github.com/Eyevinn/hls-m3u8/issues
 [discussions]: https://github.com/Eyevinn/hls-m3u8/discussions
+[is]: https://github.com/matryer/is

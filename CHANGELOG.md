@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - FORCED and AUTOSELECT types changed from string to bool
 - Removed SUBTITLES from EXT-X-MEDIA since not in [rfc8216bis-16]
+- Changed tests to use matryer.is for conciseness
+- Improved documentation of functions
 
 ### Added
 

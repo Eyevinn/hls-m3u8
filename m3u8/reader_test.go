@@ -13,161 +13,114 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/matryer/is"
 )
 
 func TestDecodeMasterPlaylist(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	// check parsed values
-	if p.ver != 3 {
-		t.Errorf("Version of parsed playlist = %d (must = 3)", p.ver)
-	}
-	if len(p.Variants) != 5 {
-		t.Error("Not all variants in master playlist parsed.")
-	}
+	is.Equal(p.ver, uint8(3))    // version must be 3
+	is.Equal(len(p.Variants), 5) // must be 5 variants
 	// TODO check other values
 	// fmt.Println(p.Encode().String())
 }
 
 func TestDecodeMasterPlaylistWithMultipleCodecs(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-multiple-codecs.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	// check parsed values
-	if p.ver != 3 {
-		t.Errorf("Version of parsed playlist = %d (must = 3)", p.ver)
-	}
-	if len(p.Variants) != 5 {
-		t.Error("Not all variants in master playlist parsed.")
-	}
+	is.Equal(p.ver, uint8(3))    // version must be 3
+	is.Equal(len(p.Variants), 5) // must be 5 variants
 	for _, v := range p.Variants {
-		if v.Codecs != "avc1.42c015,mp4a.40.2" {
-			t.Error("Codec string is wrong")
-		}
+		is.Equal(v.Codecs, "avc1.42c015,mp4a.40.2") // codecs must be combined
 	}
 	// TODO check other values
 	// fmt.Println(p.Encode().String())
 }
 
 func TestDecodeMasterPlaylistWithAlternatives(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-alternatives.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	// check parsed values
-	if p.ver != 3 {
-		t.Errorf("Version of parsed playlist = %d (must = 3)", p.ver)
-	}
-	if len(p.Variants) != 4 {
-		t.Fatal("not all variants in master playlist parsed")
-	}
+	is.Equal(p.ver, uint8(3))    // version must be 3
+	is.Equal(len(p.Variants), 4) // must be 4 variants
 	// TODO check other values
 	for i, v := range p.Variants {
-		if i == 0 && len(v.Alternatives) != 3 {
-			t.Fatalf("not all alternatives from #EXT-X-MEDIA parsed (has %d but should be 3", len(v.Alternatives))
-		}
-		if i == 1 && len(v.Alternatives) != 3 {
-			t.Fatalf("not all alternatives from #EXT-X-MEDIA parsed (has %d but should be 3", len(v.Alternatives))
-		}
-		if i == 2 && len(v.Alternatives) != 3 {
-			t.Fatalf("not all alternatives from #EXT-X-MEDIA parsed (has %d but should be 3", len(v.Alternatives))
-		}
-		if i == 3 && len(v.Alternatives) > 0 {
-			t.Fatal("should not be alternatives for this variant")
+		switch i {
+		case 0, 1, 2:
+			is.Equal(len(v.Alternatives), 3) // not all alternatives from #EXT-X-MEDIA parsed
+		case 3:
+			is.Equal(len(v.Alternatives), 0) // should not be alternatives for this variant
+		default:
+			t.Errorf("unexpected variant index: %d", i)
 		}
 	}
 	// fmt.Println(p.Encode().String())
 }
 
 func TestDecodeMasterPlaylistWithAlternativesB(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-alternatives-b.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	// check parsed values
-	if p.ver != 3 {
-		t.Errorf("Version of parsed playlist = %d (must = 3)", p.ver)
-	}
-	if len(p.Variants) != 4 {
-		t.Fatal("not all variants in master playlist parsed")
-	}
+	is.Equal(p.ver, uint8(3))    // version must be 3
+	is.Equal(len(p.Variants), 4) // must be 4 variants
 	// TODO check other values
 	for i, v := range p.Variants {
-		if i == 0 && len(v.Alternatives) != 3 {
-			t.Fatalf("not all alternatives from #EXT-X-MEDIA parsed (has %d but should be 3", len(v.Alternatives))
-		}
-		if i == 1 && len(v.Alternatives) != 3 {
-			t.Fatalf("not all alternatives from #EXT-X-MEDIA parsed (has %d but should be 3", len(v.Alternatives))
-		}
-		if i == 2 && len(v.Alternatives) != 3 {
-			t.Fatalf("not all alternatives from #EXT-X-MEDIA parsed (has %d but should be 3", len(v.Alternatives))
-		}
-		if i == 3 && len(v.Alternatives) > 0 {
-			t.Fatal("should not be alternatives for this variant")
+		switch i {
+		case 0, 1, 2:
+			is.Equal(len(v.Alternatives), 3) // not all alternatives from #EXT-X-MEDIA parsed
+		case 3:
+			is.Equal(len(v.Alternatives), 0) // should not be alternatives for this variant
+		default:
+			t.Errorf("unexpected variant index: %d", i)
 		}
 	}
 	// fmt.Println(p.Encode().String())
 }
 
 func TestDecodeMasterPlaylistWithClosedCaptionEqNone(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-closed-captions-eq-none.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 
-	if len(p.Variants) != 3 {
-		t.Fatal("not all variants in master playlist parsed")
-	}
+	// check parsed values
+	is.Equal(p.ver, uint8(4)) // version must be 4
 	for _, v := range p.Variants {
-		if v.Captions != "NONE" {
-			t.Fatal("variant field for CLOSED-CAPTIONS should be equal to NONE but it equals", v.Captions)
-		}
+		is.Equal(v.Captions, "NONE") // all variants must have CLOSED-CAPTIONS=NONE
 	}
 }
 
 // Decode a master playlist with Name tag in EXT-X-STREAM-INF
 func TestDecodeMasterPlaylistWithStreamInfName(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-stream-inf-name.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	for _, variant := range p.Variants {
-		if variant.Name == "" {
-			t.Errorf("Empty name tag on variant URI: %s", variant.URI)
-		}
+		is.True(variant.Name != "") // name tag must not be empty
 	}
 }
 
@@ -189,15 +142,12 @@ func TestDecodeMediaPlaylistByteRange(t *testing.T) {
 
 // Decode a master playlist with i-frame-stream-inf
 func TestDecodeMasterPlaylistWithIFrameStreamInf(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-i-frame-stream-inf.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	expected := map[int]*Variant{
 		86000: {URI: "low/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 86000, ProgramId: 1, Codecs: "c1",
 			Resolution: "1x1", Video: "1", Iframe: true}},
@@ -219,64 +169,46 @@ func TestDecodeMasterPlaylistWithIFrameStreamInf(t *testing.T) {
 }
 
 func TestDecodeMasterPlaylistWithStreamInfAverageBandwidth(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-stream-inf-1.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	for _, variant := range p.Variants {
-		if variant.AverageBandwidth == 0 {
-			t.Errorf("Empty average bandwidth tag on variant URI: %s", variant.URI)
-		}
+		is.True(variant.AverageBandwidth > 0) // average bandwidth must be greater than 0
 	}
 }
 
 func TestDecodeMasterPlaylistWithStreamInfFrameRate(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-stream-inf-1.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	for _, variant := range p.Variants {
-		if variant.FrameRate == 0 {
-			t.Errorf("Empty frame rate tag on variant URI: %s", variant.URI)
-		}
+		is.True(variant.VariantParams.FrameRate > 0) // frame rate must be greater than 0
 	}
 }
 
 func TestDecodeMasterPlaylistWithIndependentSegments(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-independent-segments.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !p.IndependentSegments() {
-		t.Error("Expected independent segments to be true")
-	}
+	is.NoErr(err)                    // must decode playlist
+	is.True(p.IndependentSegments()) // independent segments must be true
 }
 
 func TestDecodeMasterWithHLSV7(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-hlsv7.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
 	err = p.DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	var unexpected []*Variant
 	expected := map[string]VariantParams{
 		"sdr_720/prog_index.m3u8": {Bandwidth: 3971374, AverageBandwidth: 2778321, Codecs: "hvc1.2.4.L123.B0",
@@ -344,52 +276,36 @@ func TestDecodeMasterWithHLSV7(t *testing.T) {
  ****************************/
 
 func TestDecodeMediaPlaylist(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/wowza-vod-chunklist.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, err := NewMediaPlaylist(5, 798)
-	if err != nil {
-		t.Fatalf("Create media playlist failed: %s", err)
-	}
+	is.NoErr(err) // must create playlist
 	err = p.DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	//fmt.Printf("Playlist object: %+v\n", p)
+	is.NoErr(err) // must decode playlist
+
 	// check parsed values
-	if p.ver != 3 {
-		t.Errorf("Version of parsed playlist = %d (must = 3)", p.ver)
-	}
-	if p.TargetDuration != 12 {
-		t.Errorf("TargetDuration of parsed playlist = %f (must = 12.0)", p.TargetDuration)
-	}
-	if !p.Closed {
-		t.Error("This is a closed (VOD) playlist but Close field = false")
-	}
+	is.Equal(p.ver, uint8(3))        // version must be 3
+	is.Equal(p.TargetDuration, 12.0) // target duration must be 12.0
+	is.True(p.Closed)                // closed (VOD) playlist but Close field = false")
 	titles := []string{"Title 1", "Title 2", ""}
 	for i, s := range p.Segments {
 		if i > len(titles)-1 {
 			break
 		}
-		if s.Title != titles[i] {
-			t.Errorf("Segment %v's title = %v (must = %q)", i, s.Title, titles[i])
-		}
+		is.Equal(s.Title, titles[i]) // title must be "Title 1", "Title 2", ""
 	}
-	if p.Count() != 522 {
-		t.Errorf("Excepted segments quantity: 522, got: %v", p.Count())
-	}
+	is.Equal(p.Count(), uint(522)) // segment count must be 522
 	var seqId, idx uint
 	for seqId, idx = 1, 0; idx < p.Count(); seqId, idx = seqId+1, idx+1 {
-		if p.Segments[idx].SeqId != uint64(seqId) {
-			t.Errorf("Excepted SeqId for %vth segment: %v, got: %v", idx+1, seqId, p.Segments[idx].SeqId)
-		}
+		is.Equal(p.Segments[idx].SeqId, uint64(seqId)) // SeqId must match
 	}
 	// TODO check other values…
 	//fmt.Println(p.Encode().String()), stream.Name}
 }
 
 func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
+	is := is.New(t)
 	header := `#EXTM3U
 #EXT-X-TARGETDURATION:10
 #EXT-X-VERSION:3
@@ -420,20 +336,15 @@ func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
 
 	for _, test := range tests {
 		p, err := NewMediaPlaylist(1, 1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		is.NoErr(err) // create playlist
+
 		reader := bytes.NewBufferString(fmt.Sprintf(header, test.extInf))
 		err = p.DecodeFrom(reader, test.strict)
 		if test.wantError {
-			if err == nil {
-				t.Errorf("expected error but have: %v", err)
-			}
+			is.True(err != nil) // must return an error
 			continue
 		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+		is.NoErr(err) // must decode playlist
 		if !reflect.DeepEqual(p.Segments[0], test.wantSegment) {
 			t.Errorf("\nhave: %+v\nwant: %+v", p.Segments[0], test.wantSegment)
 		}
@@ -441,17 +352,12 @@ func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
 }
 
 func TestDecodeMasterPlaylistWithAutodetection(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	m, listType, err := DecodeFrom(bufio.NewReader(f), false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if listType != MASTER {
-		t.Error("Sample not recognized as master playlist.")
-	}
+	is.NoErr(err)              // must decode playlist
+	is.Equal(listType, MASTER) // must be master playlist
 	mp := m.(*MasterPlaylist)
 	// fmt.Printf(">%+v\n", mp)
 	// for _, v := range mp.Variants {
@@ -462,30 +368,18 @@ func TestDecodeMasterPlaylistWithAutodetection(t *testing.T) {
 }
 
 func TestDecodeMediaPlaylistWithAutodetection(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/wowza-vod-chunklist.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
-	if listType != MEDIA {
-		t.Error("Sample not recognized as media playlist.")
-	}
+	is.Equal(listType, MEDIA) // must be media playlist
 	// check parsed values
-	if pp.TargetDuration != 12 {
-		t.Errorf("TargetDuration of parsed playlist = %f (must = 12.0)", pp.TargetDuration)
-	}
-
-	if !pp.Closed {
-		t.Error("This is a closed (VOD) playlist but Close field = false")
-	}
-	if pp.winsize != 0 {
-		t.Errorf("Media window size %v != 0", pp.winsize)
-	}
+	is.Equal(pp.TargetDuration, 12.0) // target duration must be 12.0
+	is.True(pp.Closed)                // closed (VOD) playlist but Close field = false")
+	is.Equal(pp.winsize, uint(0))     // window size must be 0
 	// TODO check other values…
 	// fmt.Println(pp.Encode().String())
 }
@@ -493,23 +387,16 @@ func TestDecodeMediaPlaylistWithAutodetection(t *testing.T) {
 // TestDecodeMediaPlaylistAutoDetectExtend tests a very large playlist auto
 // extends to the appropriate size.
 func TestDecodeMediaPlaylistAutoDetectExtend(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
-	if listType != MEDIA {
-		t.Error("Sample not recognized as media playlist.")
-	}
+	is.Equal(listType, MEDIA) // must be media playlist
 	var exp uint = 40001
-	if pp.Count() != exp {
-		t.Errorf("Media segment count %v != %v", pp.Count(), exp)
-	}
+	is.Equal(pp.Count(), exp) // segment count must be 40001
 }
 
 // Test for FullTimeParse of EXT-X-PROGRAM-DATE-TIME
@@ -565,14 +452,11 @@ func TestStrictTimeParse(t *testing.T) {
 }
 
 func TestMediaPlaylistWithOATCLSSCTE35Tag(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-oatcls-scte35.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, _, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 
 	expect := map[int]*SCTE{
@@ -592,28 +476,17 @@ func TestMediaPlaylistWithOATCLSSCTE35Tag(t *testing.T) {
 }
 
 func TestDecodeMediaPlaylistWithDiscontinuitySeq(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-discontinuity-seq.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
-	if listType != MEDIA {
-		t.Error("Sample not recognized as media playlist.")
-	}
-	if pp.DiscontinuitySeq == 0 {
-		t.Error("Empty discontinuity sequenece tag")
-	}
-	if pp.Count() != 4 {
-		t.Errorf("Excepted segments quantity: 4, got: %v", pp.Count())
-	}
-	if pp.SeqNo != 0 {
-		t.Errorf("Excepted SeqNo: 0, got: %v", pp.SeqNo)
-	}
+	is.Equal(listType, MEDIA)         // must be media playlist
+	is.True(pp.DiscontinuitySeq != 0) // discontinuity sequence must be non-zeo
+	is.Equal(pp.Count(), uint(4))     // segment count must be 4
+	is.Equal(pp.SeqNo, uint64(0))     // sequence number must be 0
 	var seqId, idx uint
 	for seqId, idx = 0, 0; idx < pp.Count(); seqId, idx = seqId+1, idx+1 {
 		if pp.Segments[idx].SeqId != uint64(seqId) {
@@ -623,16 +496,17 @@ func TestDecodeMediaPlaylistWithDiscontinuitySeq(t *testing.T) {
 }
 
 func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
+	is := is.New(t)
 	cases := []struct {
 		src                  string
 		customDecoders       []CustomDecoder
-		expectedError        error
+		expectedError        string
 		expectedPlaylistTags []string
 	}{
 		{
 			src:                  "sample-playlists/master-playlist-with-custom-tags.m3u8",
 			customDecoders:       nil,
-			expectedError:        nil,
+			expectedError:        "",
 			expectedPlaylistTags: nil,
 		},
 		{
@@ -640,12 +514,12 @@ func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
 			customDecoders: []CustomDecoder{
 				&MockCustomTag{
 					name:          "#CUSTOM-PLAYLIST-TAG:",
-					err:           errors.New("Error decoding tag"),
+					err:           fmt.Errorf("Error decoding tag"),
 					segment:       false,
 					encodedString: "#CUSTOM-PLAYLIST-TAG:42",
 				},
 			},
-			expectedError:        errors.New("Error decoding tag"),
+			expectedError:        "Error decoding tag",
 			expectedPlaylistTags: nil,
 		},
 		{
@@ -658,7 +532,7 @@ func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
 					encodedString: "#CUSTOM-PLAYLIST-TAG:42",
 				},
 			},
-			expectedError: nil,
+			expectedError: "",
 			expectedPlaylistTags: []string{
 				"#CUSTOM-PLAYLIST-TAG:",
 			},
@@ -667,29 +541,20 @@ func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
 
 	for _, testCase := range cases {
 		f, err := os.Open(testCase.src)
-
-		if err != nil {
-			t.Fatal(err)
-		}
+		is.NoErr(err) // must open file
 
 		p, listType, err := DecodeWith(bufio.NewReader(f), true, testCase.customDecoders)
 
-		if !reflect.DeepEqual(err, testCase.expectedError) {
-			t.Fatal(err)
-		}
-
-		if testCase.expectedError != nil {
-			// No need to make other assertions if we were expecting an error
+		if testCase.expectedError != "" {
+			is.True(err != nil) // must return an error
+			is.Equal(err.Error(), testCase.expectedError)
 			continue
 		}
 
 		pp := p.(*MasterPlaylist)
 
 		CheckType(t, pp)
-
-		if listType != MASTER {
-			t.Error("Sample not recognized as master playlist.")
-		}
+		is.Equal(listType, MASTER) // must be master playlist
 
 		if len(pp.Custom) != len(testCase.expectedPlaylistTags) {
 			t.Errorf("Did not parse expected number of custom tags. Got: %d Expected: %d", len(pp.Custom),
@@ -706,10 +571,11 @@ func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
 }
 
 func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
+	is := is.New(t)
 	cases := []struct {
 		src                  string
 		customDecoders       []CustomDecoder
-		expectedError        error
+		expectedError        string
 		expectedPlaylistTags []string
 		expectedSegmentTags  []*struct {
 			index int
@@ -719,7 +585,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 		{
 			src:                  "sample-playlists/media-playlist-with-custom-tags.m3u8",
 			customDecoders:       nil,
-			expectedError:        nil,
+			expectedError:        "",
 			expectedPlaylistTags: nil,
 			expectedSegmentTags:  nil,
 		},
@@ -733,7 +599,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 					encodedString: "#CUSTOM-PLAYLIST-TAG:42",
 				},
 			},
-			expectedError:        errors.New("Error decoding tag"),
+			expectedError:        "Error decoding tag",
 			expectedPlaylistTags: nil,
 			expectedSegmentTags:  nil,
 		},
@@ -759,7 +625,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 					encodedString: "#CUSTOM-SEGMENT-TAG-B",
 				},
 			},
-			expectedError: nil,
+			expectedError: "",
 			expectedPlaylistTags: []string{
 				"#CUSTOM-PLAYLIST-TAG:",
 			},
@@ -775,19 +641,12 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 
 	for _, testCase := range cases {
 		f, err := os.Open(testCase.src)
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		is.NoErr(err) // must open file
 		p, listType, err := DecodeWith(bufio.NewReader(f), true, testCase.customDecoders)
 
-		if !reflect.DeepEqual(err, testCase.expectedError) {
-			t.Fatal(err)
-		}
-
-		if testCase.expectedError != nil {
-			// No need to make other assertions if we were expecting an error
+		if testCase.expectedError != "" {
+			is.True(err != nil) // must return an error
+			is.Equal(err.Error(), testCase.expectedError)
 			continue
 		}
 
@@ -795,9 +654,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 
 		CheckType(t, pp)
 
-		if listType != MEDIA {
-			t.Error("Sample not recognized as master playlist.")
-		}
+		is.Equal(listType, MEDIA) // must be media playlist
 
 		if len(pp.Custom) != len(testCase.expectedPlaylistTags) {
 			t.Errorf("Did not parse expected number of custom tags. Got: %d Expected: %d", len(pp.Custom),
@@ -864,7 +721,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
  *  Code parsing examples  *
  ***************************/
 
-// Example of parsing a playlist with EXT-X-DISCONTINIUTY tag
+// Example of parsing a playlist with EXT-X-DISCONTINUITY tag
 // and output it with integer segment durations.
 func ExampleMediaPlaylist_DurationAsInt() {
 	f, _ := os.Open("sample-playlists/media-playlist-with-discontinuity.m3u8")
@@ -937,31 +794,18 @@ func TestMediaPlaylistWithSCTE35Tag(t *testing.T) {
 }
 
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-program-date-time.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
-	if listType != MEDIA {
-		t.Error("Sample not recognized as media playlist.")
-	}
+	is.Equal(listType, MEDIA) // must be media playlist
 	// check parsed values
-	if pp.TargetDuration != 15 {
-		t.Errorf("TargetDuration of parsed playlist = %f (must = 15.0)", pp.TargetDuration)
-	}
-
-	if !pp.Closed {
-		t.Error("VOD sample media playlist, closed should be true.")
-	}
-
-	if pp.SeqNo != 0 {
-		t.Error("Media sequence defined in sample playlist is 0")
-	}
+	is.Equal(pp.TargetDuration, 15.0) // target duration must be 15.0
+	is.True(pp.Closed)                // closed (VOD) playlist but Close field = false")
+	is.Equal(pp.SeqNo, uint64(0))     // sequence number must be 0
 
 	segNames := []string{"20181231/0555e0c371ea801726b92512c331399d_00000000.ts",
 		"20181231/0555e0c371ea801726b92512c331399d_00000001.ts",
@@ -986,124 +830,72 @@ func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
 }
 
 func TestDecodeMediaPlaylistStartTime(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-start-time.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
-	if listType != MEDIA {
-		t.Error("Sample not recognized as media playlist.")
-	}
-	if pp.StartTime != float64(8.0) {
-		t.Errorf("Media segment StartTime != 8: %f", pp.StartTime)
-	}
+	is.Equal(listType, MEDIA)            // must be media playlist
+	is.Equal(pp.StartTime, float64(8.0)) // start time must be 8.0
 }
 
 func TestDecodeMediaPlaylistWithCueOutCueIn(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-cue-out-in-without-oatcls.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
-	if listType != MEDIA {
-		t.Error("Sample not recognized as media playlist.")
-	}
+	is.Equal(listType, MEDIA) // must be media playlist)
 
-	if pp.Segments[5].SCTE.CueType != SCTE35Cue_Start {
-		t.Errorf("EXT-CUE-OUT must result in SCTE35Cue_Start")
-	}
-	if pp.Segments[5].SCTE.Time != 0 {
-		t.Errorf("EXT-CUE-OUT without duration must not have Time set")
-	}
-	if pp.Segments[9].SCTE.CueType != SCTE35Cue_End {
-		t.Errorf("EXT-CUE-IN must result in SCTE35Cue_End")
-	}
-	if pp.Segments[30].SCTE.CueType != SCTE35Cue_Start {
-		t.Errorf("EXT-CUE-OUT must result in SCTE35Cue_Start")
-	}
-	if pp.Segments[30].SCTE.Time != 180 {
-		t.Errorf("EXT-CUE-OUT:180.0 must have time set to 180")
-	}
-	if pp.Segments[60].SCTE.CueType != SCTE35Cue_End {
-		t.Errorf("EXT-CUE-IN must result in SCTE35Cue_End")
-	}
+	is.Equal(pp.Segments[5].SCTE.CueType, SCTE35Cue_Start)  // EXT-CUE-OUT must result in SCTE35Cue_Start
+	is.Equal(pp.Segments[5].SCTE.Time, float64(0))          // EXT-CUE-OUT without duration must not have Time set
+	is.Equal(pp.Segments[9].SCTE.CueType, SCTE35Cue_End)    // EXT-CUE-IN must result in SCTE35Cue_End
+	is.Equal(pp.Segments[30].SCTE.CueType, SCTE35Cue_Start) // EXT-CUE-OUT must result in SCTE35Cue_Start
+	is.Equal(pp.Segments[30].SCTE.Time, float64(180))       // EXT-CUE-OUT:180.0 must have time set to 180
+	is.Equal(pp.Segments[60].SCTE.CueType, SCTE35Cue_End)   // EXT-CUE-IN must result in SCTE35Cue_End
 }
 
 func TestDecodeMasterChannels(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-channels.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if listType != MASTER {
-		t.Error("Input not recognized as master playlist.")
-	}
+	is.NoErr(err)              // must decode playlist
+	is.Equal(listType, MASTER) // must be master playlist
 	pp := p.(*MasterPlaylist)
 
 	alt0 := pp.Variants[0].Alternatives[0]
-	if alt0.Type != "AUDIO" {
-		t.Error("Expected AUDIO track in test input Alternatives[0]")
-	}
-
-	if alt0.Channels != "2" {
-		t.Error("Expected 2 channels track in test input Alternatives[0]")
-	}
+	is.Equal(alt0.Type, "AUDIO") // Expected AUDIO track in test input Alternatives[0]
+	is.Equal(alt0.Channels, "2") // Expected 2 channels track in test input Alternatives[0]
 
 	alt1 := pp.Variants[1].Alternatives[0]
-	if alt1.Type != "AUDIO" {
-		t.Error("Expected AUDIO track in test input Alternatives[1]")
-	}
-
-	if alt1.Channels != "6" {
-		t.Error("Expected 6 channels track in test input Alternatives[1]")
-	}
+	is.Equal(alt1.Type, "AUDIO") // Expected AUDIO track in test input Alternatives[1]
+	is.Equal(alt1.Channels, "6") // Expected 6 channels track in test input Alternatives[1]
 }
 
 func TestDecodeRenditionsAndIframes(t *testing.T) {
+	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-groups-and-iframe.m3u8")
-	if err != nil {
-		t.Fatal(err)
-	}
+	is.NoErr(err) // must open file
 	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if listType != MASTER {
-		t.Error("Input not recognized as master playlist.")
-	}
+	is.NoErr(err)              // must decode playlist
+	is.Equal(listType, MASTER) // must be master playlist
 	pp := p.(*MasterPlaylist)
 
 	for _, v := range pp.Variants {
 		switch v.Iframe {
 		case true:
-			if len(v.Alternatives) != 0 {
-				t.Error("Expected no alternatives in I-frame variant")
-			}
+			is.Equal(len(v.Alternatives), 0) // Expected no alternatives in I-frame varian
 		case false:
-			if len(v.Alternatives) != 1 {
-				t.Error("Expected 1 alternative in each video variant")
-			}
+			is.True(len(v.Alternatives) > 0) // Expected at least one alternative in each video variant
 		}
 	}
 	allRenditions := pp.GetAllAlternatives()
-	if len(allRenditions) != 2 {
-		t.Error("Expected 2 renditions in the master playlist")
-	}
+	is.Equal(len(allRenditions), 2) // Expected 2 renditions
 }
 
 /****************

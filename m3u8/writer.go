@@ -19,27 +19,25 @@ var ErrPlaylistFull = errors.New("playlist is full")
 var ErrPlaylistEmpty = errors.New("playlist is empty")
 var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
 
-// Set version of the playlist accordingly with section 7
-func version(ver *uint8, newver uint8) {
-	if *ver < newver {
-		*ver = newver
+// updateVersion updates the version if it is higher than before.
+func updateVersion(ver *uint8, newVer uint8) {
+	if *ver < newVer {
+		*ver = newVer
 	}
 }
 
-func strver(ver uint8) string {
+func strVer(ver uint8) string {
 	return strconv.FormatUint(uint64(ver), 10)
 }
 
-// NewMasterPlaylist creates a new empty master playlist. Master
-// playlist consists of variants.
+// NewMasterPlaylist creates a new empty master playlist.
 func NewMasterPlaylist() *MasterPlaylist {
 	p := new(MasterPlaylist)
-	p.ver = minver
+	p.ver = minVer
 	return p
 }
 
-// Append appends a variant to master playlist. This operation does
-// reset playlist cache.
+// Append appends a variant to master playlist. This operation resets the cache.
 func (p *MasterPlaylist) Append(uri string, chunklist *MediaPlaylist, params VariantParams) {
 	v := new(Variant)
 	v.URI = uri
@@ -47,31 +45,27 @@ func (p *MasterPlaylist) Append(uri string, chunklist *MediaPlaylist, params Var
 	v.VariantParams = params
 	p.Variants = append(p.Variants, v)
 	if len(v.Alternatives) > 0 {
-		// From section 7:
-		// The EXT-X-MEDIA tag and the AUDIO, VIDEO and SUBTITLES attributes of
-		// the EXT-X-STREAM-INF tag are backward compatible to protocol version
-		// 1, but playback on older clients may not be desirable.  A server MAY
-		// consider indicating a EXT-X-VERSION of 4 or higher in the Master
-		// Playlist but is not required to do so.
-		version(&p.ver, 4) // so it is optional and in theory may be set to ver.1
-		// but more tests required
+		// This is not needed according to [Protocol Version Compatibility]
+		// but remains for backwards compatibility reasons. Set the version
+		// manually by using SerVersion.
+		updateVersion(&p.ver, 4)
 	}
 	p.buf.Reset()
 }
 
-// ResetCache resetes the playlist' cache.
+// ResetCache resets the playlist's cache (its buffer).
 func (p *MasterPlaylist) ResetCache() {
 	p.buf.Reset()
 }
 
-// Encode generates the output in M3U8 format.
+// Encode generates the output in M3U8 format and provides a pointer to its buffer.
 func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	if p.buf.Len() > 0 {
 		return &p.buf
 	}
 
 	p.buf.WriteString("#EXTM3U\n#EXT-X-VERSION:")
-	p.buf.WriteString(strver(p.ver))
+	p.buf.WriteString(strVer(p.ver))
 	p.buf.WriteRune('\n')
 
 	if p.IndependentSegments() {
@@ -267,7 +261,7 @@ func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 	buf.WriteRune('\n')
 }
 
-// writeQuoted writes a quoted key-value pair to the buffer preceeded by a comma.
+// writeQuoted writes a quoted key-value pair to the buffer preceded by a comma.
 func writeQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteRune(',')
 	buf.WriteString(key)
@@ -276,7 +270,7 @@ func writeQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteRune('"')
 }
 
-// writeUint writes a key-value pair to the buffer preceeded by a comma.
+// writeUint writes a key-value pair to the buffer preceded by a comma.
 func writeUint(buf *bytes.Buffer, key string, value uint) {
 	buf.WriteRune(',')
 	buf.WriteString(key)
@@ -310,15 +304,12 @@ func (p *MasterPlaylist) IndependentSegments() bool {
 	return p.independentSegments
 }
 
-// SetIndependentSegments sets whether all media samples in a segment can be
-// decoded without information from other buf.
+// SetIndependentSegments sets the master playlist #EXT-X--INDEPENDENT-SEGMENTS tag.
 func (p *MasterPlaylist) SetIndependentSegments(b bool) {
 	p.independentSegments = b
 }
 
-// String here for compatibility with Stringer interface. For example
-// fmt.Printf("%s", sampleMediaList) will encode playist and print its
-// string representation.
+// String provides the playlist fulfilling the Stringer interface.
 func (p *MasterPlaylist) String() string {
 	return p.Encode().String()
 }
@@ -348,12 +339,13 @@ func (p *MasterPlaylist) GetAllAlternatives() []*Alternative {
 	return alts
 }
 
-// NewMediaPlaylist creates a new media playlist structure. Winsize
-// defines how much items will displayed on playlist generation.
-// Capacity is total size of a playlist.
+// NewMediaPlaylist creates a new media playlist structure.
+// Winsize defines live window for playlist generation. Set to zero for VOD or EVENT
+// playlists.  Capacity is the total size of the backing segment list..
+// For VOD playlists, call Close() after the last segment is added.
 func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 	p := new(MediaPlaylist)
-	p.ver = minver
+	p.ver = minVer
 	p.capacity = capacity
 	if err := p.SetWinSize(winsize); err != nil {
 		return nil, err
@@ -371,7 +363,7 @@ func (p *MediaPlaylist) last() uint {
 }
 
 // Remove current segment from the head of chunk slice form a media playlist. Useful for sliding playlists.
-// This operation does reset playlist cache.
+// This operation resets playlist cache.
 func (p *MediaPlaylist) Remove() (err error) {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
@@ -386,7 +378,7 @@ func (p *MediaPlaylist) Remove() (err error) {
 }
 
 // Append general chunk to the tail of chunk slice for a media playlist.
-// This operation does reset playlist cache.
+// This operation resets playlist cache.
 func (p *MediaPlaylist) Append(uri string, duration float64, title string) error {
 	seg := new(MediaSegment)
 	seg.URI = uri
@@ -396,7 +388,7 @@ func (p *MediaPlaylist) Append(uri string, duration float64, title string) error
 }
 
 // AppendSegment appends a MediaSegment to the tail of chunk slice for
-// a media playlist.  This operation does reset playlist cache.
+// a media playlist.  This operation resets playlist cache.
 func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	if p.head == p.tail && p.count > 0 {
 		return ErrPlaylistFull
@@ -415,10 +407,10 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	return nil
 }
 
-// Slide combines two operations: firstly it removes one chunk from
+// Slide combines two operations: first it removes one chunk from
 // the head of chunk slice and move pointer to next chunk. Secondly it
 // appends one chunk to the tail of chunk slice. Useful for sliding
-// playlists.  This operation does reset cache.
+// playlists.  This operation resets the cache.
 func (p *MediaPlaylist) Slide(uri string, duration float64, title string) {
 	if !p.Closed && p.count >= p.winsize {
 		_ = p.Remove()
@@ -426,21 +418,24 @@ func (p *MediaPlaylist) Slide(uri string, duration float64, title string) {
 	_ = p.Append(uri, duration, title)
 }
 
-// ResetCache resets playlist cache. Next called Encode() will
-// regenerate playlist from the chunk slice.
+// ResetCache resets playlist cache (internal buffer).
+// Next call to Encode() fills buffer/cache again.
 func (p *MediaPlaylist) ResetCache() {
 	p.buf.Reset()
 }
 
-// Encode generates output in M3U8 format. Marshal `winsize` elements
-// from bottom of the `buf` queue.
+// Encode generates output and returns a pointer to an internal buffer.
+// If winsize > 0, encoded the last `winsize` segments, otherwise encode all segments.
+// If already encoded, and not changed, the cached buffer will be returned.
+// Don't change the buffer externally, e.g. by using the Write() method
+// if you want to use the cached value. Instead use the String() or Bytes() methods.
 func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	if p.buf.Len() > 0 {
 		return &p.buf
 	}
 
 	p.buf.WriteString("#EXTM3U\n#EXT-X-VERSION:")
-	p.buf.WriteString(strver(p.ver))
+	p.buf.WriteString(strVer(p.ver))
 	p.buf.WriteRune('\n')
 
 	// Write any custom master tags
@@ -453,7 +448,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 
-	// default key (workaround for Widevine). Is this needed when no Widevine?
+	// default key before any segment
 	if p.Key != nil {
 		p.buf.WriteString("#EXT-X-KEY:")
 		p.buf.WriteString("METHOD=")
@@ -479,6 +474,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 		p.buf.WriteRune('\n')
 	}
+	// default MAP before any segment
 	if p.Map != nil {
 		p.buf.WriteString("#EXT-X-MAP:")
 		p.buf.WriteString("URI=\"")
@@ -506,7 +502,9 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
 	p.buf.WriteRune('\n')
 	p.buf.WriteString("#EXT-X-TARGETDURATION:")
-	// due section 3.4.2 of M3U8 specs EXT-X-TARGETDURATION must be integer
+	// EXT-X-TARGETDURATION must be integer, but is calculated differently
+	// from version 6 of the standard.
+	//
 	p.buf.WriteString(strconv.FormatInt(int64(math.Ceil(p.TargetDuration)), 10))
 	p.buf.WriteRune('\n')
 	if p.StartTime > 0.0 {
@@ -680,9 +678,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	return &p.buf
 }
 
-// String here for compatibility with Stringer interface For example
-// fmt.Printf("%s", sampleMediaList) will encode playist and print its
-// string representation.
+// String provides the playlist fulfilling the Stringer interface.
 func (p *MediaPlaylist) String() string {
 	return p.Encode().String()
 }
@@ -691,18 +687,17 @@ func (p *MediaPlaylist) String() string {
 func (p *MediaPlaylist) DurationAsInt(yes bool) {
 	if yes {
 		// duration must be integers if protocol version is less than 3
-		version(&p.ver, 3)
+		updateVersion(&p.ver, 3)
 	}
 	p.durationAsInt = yes
 }
 
-// Count tells us the number of items that are currently in the media
-// playlist.
+// Count tells us the number of items that are currently in the media playlist.
 func (p *MediaPlaylist) Count() uint {
 	return p.count
 }
 
-// Close sliding playlist and make them fixed.
+// Close sliding playlist and by setting the EXT-X-ENDLIST tag and setting the Closed flag.
 func (p *MediaPlaylist) Close() {
 	if p.buf.Len() > 0 {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
@@ -710,85 +705,71 @@ func (p *MediaPlaylist) Close() {
 	p.Closed = true
 }
 
-// SetDefaultKey sets encryption key appeared once in header of the
-// playlist (pointer to MediaPlaylist.Key). It useful when keys not
-// changed during playback.  Set tag for the whole list.
+// SetDefaultKey sets encryption key to appear before segmetns in the media playlist.
 func (p *MediaPlaylist) SetDefaultKey(method, uri, iv, keyformat, keyformatversions string) error {
-	// A Media Playlist MUST indicate a EXT-X-VERSION of 5 or higher if it
-	// contains:
-	//   - The KEYFORMAT and KEYFORMATVERSIONS attributes of the EXT-X-KEY tag.
 	if keyformat != "" || keyformatversions != "" {
-		version(&p.ver, 5)
+		updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	}
 	p.Key = &Key{method, uri, iv, keyformat, keyformatversions}
-
 	return nil
 }
 
-// SetDefaultMap sets default Media Initialization Section values for
-// playlist (pointer to MediaPlaylist.Map). Set EXT-X-MAP tag for the
-// whole playlist.
+// SetDefaultMap sets default Media Initialization Section (EXT-X-MAP)
+// at start of playlist. May be overridden by individual segments.
 func (p *MediaPlaylist) SetDefaultMap(uri string, limit, offset int64) {
-	version(&p.ver, 5) // due section 4
+	updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	p.Map = &Map{uri, limit, offset}
 }
 
-// SetIframeOnly marks medialist as consists of only I-frames (Intra
-// frames).  Set tag for the whole list.
+// SetIframeOnly marks medialist of only I-frames (Intra frames).
 func (p *MediaPlaylist) SetIframeOnly() {
-	version(&p.ver, 4) // due section 4.3.3
+	updateVersion(&p.ver, 4) // [Protocol Version Compatibility]
 	p.Iframe = true
 }
 
-// SetKey sets encryption key for the current segment of media playlist
-// (pointer to Segment.Key).
+// SetKey sets encryption key for the current (and following) segment of media playlist
 func (p *MediaPlaylist) SetKey(method, uri, iv, keyformat, keyformatversions string) error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
 	}
 
-	// A Media Playlist MUST indicate a EXT-X-VERSION of 5 or higher if it
-	// contains:
-	//   - The KEYFORMAT and KEYFORMATVERSIONS attributes of the EXT-X-KEY tag.
 	if keyformat != "" || keyformatversions != "" {
-		version(&p.ver, 5)
+		updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	}
 
 	p.Segments[p.last()].Key = &Key{method, uri, iv, keyformat, keyformatversions}
 	return nil
 }
 
-// SetMap sets map for the current segment of media playlist (pointer
-// to Segment.Map).
+// SetMap sets map for the currently last segment of media playlist.
 func (p *MediaPlaylist) SetMap(uri string, limit, offset int64) error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
 	}
-	version(&p.ver, 5) // due section 4
+	updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	p.Segments[p.last()].Map = &Map{uri, limit, offset}
 	return nil
 }
 
-// SetRange sets limit and offset for the current media segment
-// (EXT-X-BYTERANGE support for protocol version 4).
+// SetRange sets byte range limit and offset for the currently last media segment.
 func (p *MediaPlaylist) SetRange(limit, offset int64) error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
 	}
-	version(&p.ver, 4) // due section 3.4.1
+	updateVersion(&p.ver, 4) // [Protocol Version Compatibility]
 	p.Segments[p.last()].Limit = limit
 	p.Segments[p.last()].Offset = offset
 	return nil
 }
 
-// SetSCTE sets the SCTE cue format for the current media segment.
+// SetSCTE sets the SCTE cue format for the currently last media segment.
 //
 // Deprecated: Use SetSCTE35 instead.
 func (p *MediaPlaylist) SetSCTE(cue string, id string, time float64) error {
 	return p.SetSCTE35(&SCTE{Syntax: SCTE35_67_2014, Cue: cue, ID: id, Time: time})
 }
 
-// SetSCTE35 sets the SCTE cue format for the current media segment
+// SetSCTE35 sets the SCTE cue format for the currently last media segment.
 func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
@@ -797,11 +778,9 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 	return nil
 }
 
-// SetDiscontinuity sets discontinuity flag for the current media
-// segment. EXT-X-DISCONTINUITY indicates an encoding discontinuity
-// between the media segment that follows it and the one that preceded
-// it (i.e. file format, number and type of tracks, encoding
-// parameters, encoding sequence, timestamp sequence).
+// SetDiscontinuity sets discontinuity flag for the currently last media segment.
+// EXT-X-DISCONTINUITY indicates an encoding discontinuity
+// between the media segment that follows it and the one that preceded it.
 func (p *MediaPlaylist) SetDiscontinuity() error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
@@ -810,8 +789,8 @@ func (p *MediaPlaylist) SetDiscontinuity() error {
 	return nil
 }
 
-// SetProgramDateTime sets program date and time for the current media
-// segment. EXT-X-PROGRAM-DATE-TIME tag associates the first sample of
+// SetProgramDateTime sets program date and time for the currently last media segment.
+// EXT-X-PROGRAM-DATE-TIME tag associates the first sample of
 // a media segment with an absolute date and/or time. It applies only
 // to the current media segment.  Date/time format is
 // YYYY-MM-DDThh:mm:ssZ (ISO8601) and includes time zone.
@@ -823,8 +802,7 @@ func (p *MediaPlaylist) SetProgramDateTime(value time.Time) error {
 	return nil
 }
 
-// SetCustomTag sets the provided tag on the media playlist for its
-// TagName.
+// SetCustomTag sets the provided tag on the media playlist for its TagName.
 func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 	if p.Custom == nil {
 		p.Custom = make(map[string]CustomTag)
@@ -833,8 +811,7 @@ func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 	p.Custom[tag.TagName()] = tag
 }
 
-// SetCustomSegmentTag sets the provided tag on the current media
-// segment for its TagName.
+// SetCustomSegmentTag sets the provided tag on the current media segment for its TagName.
 func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
@@ -851,13 +828,13 @@ func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	return nil
 }
 
-// Version returns the current playlist version number
+// Version returns playlist's version number.
 func (p *MediaPlaylist) Version() uint8 {
 	return p.ver
 }
 
-// SetVersion sets the playlist version number, note the version maybe changed
-// automatically by other Set methods.
+// SetVersion sets the playlist version number, note the version
+// have increased automatically by other Set methods.
 func (p *MediaPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
 }
@@ -876,8 +853,8 @@ func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 	return nil
 }
 
-// GetAllSegments could get all segments currently added to
-// playlist.
+// GetAllSegments could get all segments currently added to playlist.
+// Winsize is ignored.
 func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
 	if p.count == 0 {
 		return nil
@@ -897,3 +874,7 @@ func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
 	}
 	return buf
 }
+
+/*
+[Protocol Version Compatibility]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16#section-8
+*/

@@ -33,9 +33,8 @@ func (p *MasterPlaylist) Decode(data bytes.Buffer, strict bool) error {
 	return p.decode(&data, strict)
 }
 
-// DecodeFrom parses a master playlist passed from the io.Reader
-// stream.  If `strict` parameter is true then it returns first syntax
-// error.
+// DecodeFrom parses a master playlist passed from an io.Reader.
+// If strict parameter is true then it returns first syntax error.
 func (p *MasterPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(reader)
@@ -110,15 +109,14 @@ func (p *MasterPlaylist) attachRenditionsToVariants(alternatives []*Alternative)
 	}
 }
 
-// Decode parses a media playlist passed from the buffer. If `strict`
+// Decode parses a media playlist passed from the buffer. If strict
 // parameter is true then return first syntax error.
 func (p *MediaPlaylist) Decode(data bytes.Buffer, strict bool) error {
 	return p.decode(&data, strict)
 }
 
-// DecodeFrom parses a media playlist passed from the io.Reader
-// stream. If `strict` parameter is true then it returns first syntax
-// error.
+// DecodeFrom parses a media playlist passed from the io.Reader stream.
+// If strict parameter is true then it returns first syntax error.
 func (p *MediaPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(reader)
@@ -128,7 +126,7 @@ func (p *MediaPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
 	return p.decode(buf, strict)
 }
 
-// WithCustomDecoders adds custom tag decoders to the media playlist for decoding
+// WithCustomDecoders adds custom tag decoders to the media playlist for decoding.
 func (p *MediaPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Playlist {
 	// Create the map if it doesn't already exist
 	if p.Custom == nil {
@@ -165,14 +163,12 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 	return nil
 }
 
-// Decode detects type of playlist and decodes it. It accepts bytes
-// buffer as input.
+// Decode detects type of playlist and decodes it.
 func Decode(data bytes.Buffer, strict bool) (Playlist, ListType, error) {
 	return decode(&data, strict, nil)
 }
 
-// DecodeFrom detects type of playlist and decodes it. It accepts data
-// conformed with io.Reader.
+// DecodeFrom detects type of playlist and decodes it.
 func DecodeFrom(reader io.Reader, strict bool) (Playlist, ListType, error) {
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(reader)
@@ -267,8 +263,9 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	return nil, state.listType, ErrCannotDetectPlaylistType
 }
 
-// DecodeAttributeList turns an attribute list into a key, value map. You should trim
-// any characters not part of the attribute list, such as the tag and ':'.
+// DecodeAttributeList turns an attribute list into a key, value map
+// by trimming quotes and space around each value.
+// You should trim any characters not part of the attribute list, such as the tag and ':'.
 func DecodeAttributeList(line string) map[string]string {
 	return decodeParamsLine(line)
 }
@@ -483,7 +480,7 @@ func parseExtXMedia(line string, strict bool) (Alternative, error) {
 	return alt, nil
 }
 
-// Parse one line of media playlist.
+// Parse one line of a media playlist.
 func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line string, strict bool) error {
 	var err error
 
@@ -533,7 +530,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			if err == ErrPlaylistFull {
 				// Extend playlist by doubling size, reset internal state, try again.
 				// If the second Append fails, the if err block will handle it.
-				// Retrying instead of being recursive was chosen as the state maybe
+				// Retrying instead of being recursive was chosen as the state may be
 				// modified non-idempotently.
 				p.Segments = append(p.Segments, make([]*MediaSegment, p.Count())...)
 				p.capacity = uint(len(p.Segments))
