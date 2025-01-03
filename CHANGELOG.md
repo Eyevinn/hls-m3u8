@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EXT-X-KEY was written twice before first segment
 - FORCED attribute had quotes
 
+### Removed
+
+- Removed HLSv2 support (integer EXTINF durations)
+
 ## v0.1.0 - cleaned grafov/m3u8 code
 
 ### Changed

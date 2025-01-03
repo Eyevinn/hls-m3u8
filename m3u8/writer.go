@@ -211,7 +211,7 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	return &p.buf
 }
 
-// writeExtXMedia writes an EXT-X-MEDIA tag line includiing \n to the buffer.
+// writeExtXMedia writes an EXT-X-MEDIA tag line including \n to the buffer.
 // No checks are done that the date is valid.
 func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 	buf.WriteString("#EXT-X-MEDIA:")
@@ -653,13 +653,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		if str, ok := durationCache[seg.Duration]; ok {
 			p.buf.WriteString(str)
 		} else {
-			if p.durationAsInt {
-				// Old Android players has problems with non integer Duration.
-				durationCache[seg.Duration] = strconv.FormatInt(int64(math.Ceil(seg.Duration)), 10)
-			} else {
-				// Wowza Mediaserver and some others prefer floats.
-				durationCache[seg.Duration] = strconv.FormatFloat(seg.Duration, 'f', 3, 32)
-			}
+			durationCache[seg.Duration] = strconv.FormatFloat(seg.Duration, 'f', 3, 32)
 			p.buf.WriteString(durationCache[seg.Duration])
 		}
 		p.buf.WriteRune(',')
@@ -683,15 +677,6 @@ func (p *MediaPlaylist) String() string {
 	return p.Encode().String()
 }
 
-// DurationAsInt represents the duration as the integer in encoded playlist.
-func (p *MediaPlaylist) DurationAsInt(yes bool) {
-	if yes {
-		// duration must be integers if protocol version is less than 3
-		updateVersion(&p.ver, 3)
-	}
-	p.durationAsInt = yes
-}
-
 // Count tells us the number of items that are currently in the media playlist.
 func (p *MediaPlaylist) Count() uint {
 	return p.count
@@ -705,7 +690,7 @@ func (p *MediaPlaylist) Close() {
 	p.Closed = true
 }
 
-// SetDefaultKey sets encryption key to appear before segmetns in the media playlist.
+// SetDefaultKey sets encryption key to appear before segments in the media playlist.
 func (p *MediaPlaylist) SetDefaultKey(method, uri, iv, keyformat, keyformatversions string) error {
 	if keyformat != "" || keyformatversions != "" {
 		updateVersion(&p.ver, 5) // [Protocol Version Compatibility]

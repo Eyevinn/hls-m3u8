@@ -108,7 +108,6 @@ type MediaPlaylist struct {
 	DiscontinuitySeq uint64 // EXT-X-DISCONTINUITY-SEQUENCE
 	StartTime        float64
 	StartTimePrecise bool
-	durationAsInt    bool         // output durations as integers of floats?
 	winsize          uint         // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT
 	capacity         uint         // total capacity of slice used for the playlist
 	head             uint         // head of FIFO, we add segments to head

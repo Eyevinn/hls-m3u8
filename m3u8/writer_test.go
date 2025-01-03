@@ -353,12 +353,11 @@ func TestEncodeMediaPlaylist(t *testing.T) {
 	is.NoErr(e) // Create media playlist should be successful
 	e = p.Append("test01.ts", 5.0, "")
 	is.NoErr(e) // Add 1st segment to a media playlist should be successful
-	p.DurationAsInt(true)
 	expected := `#EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-TARGETDURATION:5
-#EXTINF:5,
+#EXTINF:5.000,
 test01.ts
 `
 	out := p.String()
@@ -376,9 +375,8 @@ func TestLoopSegmentsOfMediaPlaylist(t *testing.T) {
 		e = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	p.DurationAsInt(true)
 	out := p.String()
-	is.Equal(strings.Count(out, `#EXTINF:5,`), 3) // EXTINF not set to 5 on all segments
+	is.Equal(strings.Count(out, `#EXTINF:5.000,`), 3) // EXTINF not set to 5 on all segments
 }
 
 // Create new media playlist with capacity 5
@@ -429,13 +427,8 @@ func TestMediaPlaylistWithIntegerDurations(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.6, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	p.DurationAsInt(false)
 	out := p.String()
 	is.Equal(strings.Count(out, `#EXTINF:5.600,`), 3) // EXTINF not set to 5.600 on all segments
-	p.ResetCache()
-	p.durationAsInt = true
-	out = p.String()
-	is.Equal(strings.Count(out, `#EXTINF:6,`), 3) // EXTINF not set to 6 on all segments
 }
 
 // Create new media playlist

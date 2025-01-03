@@ -693,7 +693,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 				continue
 			}
 
-			// We are now checking the segment corresponding to exepectedSegmentTag
+			// We are now checking the segment corresponding to expectedSegmentTag
 			// increase our expectedIndex for next iteration
 			expectedIndex++
 
@@ -715,34 +715,6 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 				expectedIndex, len(testCase.expectedSegmentTags))
 		}
 	}
-}
-
-/***************************
- *  Code parsing examples  *
- ***************************/
-
-// Example of parsing a playlist with EXT-X-DISCONTINUITY tag
-// and output it with integer segment durations.
-func ExampleMediaPlaylist_DurationAsInt() {
-	f, _ := os.Open("sample-playlists/media-playlist-with-discontinuity.m3u8")
-	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
-	pp := p.(*MediaPlaylist)
-	pp.DurationAsInt(true)
-	fmt.Printf("%s", pp)
-	// Output:
-	// #EXTM3U
-	// #EXT-X-VERSION:3
-	// #EXT-X-MEDIA-SEQUENCE:0
-	// #EXT-X-TARGETDURATION:10
-	// #EXTINF:10,
-	// ad0.ts
-	// #EXTINF:8,
-	// ad1.ts
-	// #EXT-X-DISCONTINUITY
-	// #EXTINF:10,
-	// movieA.ts
-	// #EXTINF:10,
-	// movieB.ts
 }
 
 func TestMediaPlaylistWithSCTE35Tag(t *testing.T) {
@@ -896,6 +868,31 @@ func TestDecodeRenditionsAndIframes(t *testing.T) {
 	}
 	allRenditions := pp.GetAllAlternatives()
 	is.Equal(len(allRenditions), 2) // Expected 2 renditions
+}
+
+/***************************
+ *  Code parsing examples  *
+ ***************************/
+
+func ExampleDecodeFrom_withDiscontinuityAndOutput() {
+	f, _ := os.Open("sample-playlists/media-playlist-with-discontinuity.m3u8")
+	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
+	pp := p.(*MediaPlaylist)
+	fmt.Printf("%s", pp)
+	// Output:
+	// #EXTM3U
+	// #EXT-X-VERSION:3
+	// #EXT-X-MEDIA-SEQUENCE:0
+	// #EXT-X-TARGETDURATION:10
+	// #EXTINF:10.000,
+	// ad0.ts
+	// #EXTINF:8.000,
+	// ad1.ts
+	// #EXT-X-DISCONTINUITY
+	// #EXTINF:10.000,
+	// movieA.ts
+	// #EXTINF:10.000,
+	// movieB.ts
 }
 
 /****************
