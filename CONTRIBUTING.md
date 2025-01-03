@@ -15,7 +15,7 @@ We follow the [GitHub Flow](https://guides.github.com/introduction/flow/index.ht
 2. If you've added code that should be tested, add tests.
 3. If you've changed APIs, update the documentation.
 4. Ensure the test suite passes.
-5. Add youself to the AUTHORS list, if not already there
+5. Add yourself to the AUTHORS list, if not already there
 6. Issue that pull request!
 
 When submitting code changes your submissions are understood to be under the same MIT License that covers the project. Feel free to contact Eyevinn Technology if that's a concern.

@@ -52,7 +52,7 @@ To enable it in your Go project, run
 go get github.com/Eyevinn/hls-m3u8/m3u8
 ```
 
-To use the code add 
+To use the code add
 
 ```go
 import github.com/Eyevinn/hls-m3u8/m3u8
@@ -81,7 +81,7 @@ To turn them off in VSC, add the following configuration:
 To run checks before any commit is accepted, install [pre-commit][pre-commit] and then run
 
 ```sh
-> pre-commit install --hook-type commit-msg
+> pre-commit install
 ```
 
 to set up the automatic tests.
