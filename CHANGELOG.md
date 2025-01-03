@@ -10,15 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - FORCED and AUTOSELECT types changed from string to bool
-- Removed SUBTITLES from EXT-X-MEDIA since not in [rfc8216bis-16]
+- Removed SUBTITLES from EXT-X-MEDIA since not in [rfc8216bis-16][rfc8216-bis]
 - Changed tests to use matryer.is for conciseness
-- Improved documentation of functions
+- Improved documentation
 
 ### Added
 
 - Complete list of EXT-X-MEDIA attributes: ASSOC-LANGUAGE, STABLE-RENDITION-ID, INSTREAM-ID, BIT-DEPTH, SAMPLE-RATE
 - GetAllAlternatives() method to MasterPlaylist
 - Improved playlist type detection
+- Support for SCTE-35 signaling using EXT-X-DATERANGE (following [rfc8216-bis][rfc8216-bis])
+- Support for full EXT-X-DATERANGE parsing and writing
 
 ### Fixed
 

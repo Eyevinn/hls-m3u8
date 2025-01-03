@@ -6,6 +6,8 @@ package m3u8
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -48,7 +50,7 @@ func (p *MasterPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
 func (p *MasterPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Playlist {
 	// Create the map if it doesn't already exist
 	if p.Custom == nil {
-		p.Custom = make(map[string]CustomTag)
+		p.Custom = make(CustomMap)
 	}
 
 	p.customDecoders = customDecoders
@@ -130,7 +132,7 @@ func (p *MediaPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
 func (p *MediaPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Playlist {
 	// Create the map if it doesn't already exist
 	if p.Custom == nil {
-		p.Custom = make(map[string]CustomTag)
+		p.Custom = make(CustomMap)
 	}
 
 	p.customDecoders = customDecoders
@@ -218,7 +220,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	if customDecoders != nil {
 		media = media.WithCustomDecoders(customDecoders).(*MediaPlaylist)
 		master = master.WithCustomDecoders(customDecoders).(*MasterPlaylist)
-		state.custom = make(map[string]CustomTag)
+		state.custom = make(CustomMap)
 	}
 
 	for !eof {
@@ -263,20 +265,27 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	return nil, state.listType, ErrCannotDetectPlaylistType
 }
 
-// DecodeAttributeList turns an attribute list into a key, value map
-// by trimming quotes and space around each value.
-// You should trim any characters not part of the attribute list, such as the tag and ':'.
-func DecodeAttributeList(line string) map[string]string {
-	return decodeParamsLine(line)
-}
-
-func decodeParamsLine(line string) map[string]string {
+// decodeAndTrimAttributes decodes a line of attributes into a map.
+// It removes any quotes and spaces around the values.
+func decodeAndTrimAttributes(line string) map[string]string {
 	out := make(map[string]string)
 	for _, kv := range reKeyValue.FindAllStringSubmatch(line, -1) {
 		k, v := kv[1], kv[2]
 		out[k] = strings.Trim(v, ` "`)
 	}
 	return out
+}
+
+// decodeAttributes decodes a line containing attributes.
+// The values are left as verbatim strings, including quotes if present.
+func decodeAttributes(line string) []Attribute {
+	matches := reKeyValue.FindAllStringSubmatch(line, -1)
+	attrs := make([]Attribute, 0, len(matches))
+	for _, kv := range matches {
+		k, v := kv[1], kv[2]
+		attrs = append(attrs, Attribute{Key: k, Val: v})
+	}
+	return attrs
 }
 
 // Parse one line of master playlist.
@@ -292,7 +301,6 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 				if strict && err != nil {
 					return err
 				}
-
 				p.Custom[t.TagName()] = t
 			}
 		}
@@ -320,7 +328,7 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		state.listType = MASTER
 		state.variant = new(Variant)
 		p.Variants = append(p.Variants, state.variant)
-		for k, v := range decodeParamsLine(line[18:]) {
+		for k, v := range decodeAndTrimAttributes(line[18:]) {
 			switch k {
 			case "PROGRAM-ID":
 				var val int
@@ -375,7 +383,7 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		state.variant = new(Variant)
 		state.variant.Iframe = true
 		p.Variants = append(p.Variants, state.variant)
-		for k, v := range decodeParamsLine(line[26:]) {
+		for k, v := range decodeAndTrimAttributes(line[26:]) {
 			switch k {
 			case "URI":
 				state.variant.URI = v
@@ -426,7 +434,7 @@ func parseExtXMedia(line string, strict bool) (Alternative, error) {
 		return alt, fmt.Errorf("invalid line: %q", line)
 	}
 	var err error
-	for k, v := range decodeParamsLine(line[13:]) {
+	for k, v := range decodeAndTrimAttributes(line[13:]) {
 		switch k {
 		case "TYPE":
 			alt.Type = v
@@ -478,6 +486,85 @@ func parseExtXMedia(line string, strict bool) (Alternative, error) {
 		}
 	}
 	return alt, nil
+}
+
+func parseDateRange(line string) (*DateRange, error) {
+	var dr DateRange
+	if !strings.HasPrefix(line, "#EXT-X-DATERANGE:") {
+		return nil, fmt.Errorf("invalid date-range line: %q", line)
+	}
+	for _, attr := range decodeAttributes(line[17:]) {
+		switch attr.Key {
+		case "ID":
+			dr.ID = DeQuote(attr.Val)
+		case "CLASS":
+			dr.Class = DeQuote(attr.Val)
+		case "START-DATE":
+			startDate, err := time.Parse(DATETIME, DeQuote(attr.Val))
+			if err != nil {
+				return nil, fmt.Errorf("invalid START-DATE: %w", err)
+			}
+			dr.StartDate = startDate
+		case "END-DATE":
+			endDate, err := time.Parse(DATETIME, DeQuote(attr.Val))
+			if err != nil {
+				return nil, fmt.Errorf("invalid END-DATE: %w", err)
+			}
+			dr.EndDate = &endDate
+		case "CUE":
+			dr.Cue = attr.Val
+		case "DURATION":
+			dur, err := strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid DURATION: %w", err)
+			}
+			dr.Duration = &dur
+		case "PLANNED-DURATION":
+			plannedDur, err := strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid PLANNED-DURATION: %w", err)
+			}
+			dr.PlannedDuration = &plannedDur
+		case "SCTE35-CMD":
+			if len(attr.Val) <= 4 || attr.Val[:2] != "0x" {
+				return nil, fmt.Errorf("invalid SCTE35-CMD: %s", attr.Val)
+			}
+			dr.SCTE35Cmd = attr.Val
+		case "SCTE35-OUT":
+			if len(attr.Val) <= 4 || attr.Val[:2] != "0x" {
+				return nil, fmt.Errorf("invalid SCTE35-OUT: %s", attr.Val)
+			}
+			dr.SCTE35Out = attr.Val
+		case "SCTE35-IN":
+			if len(attr.Val) <= 4 || attr.Val[:2] != "0x" {
+				return nil, fmt.Errorf("invalid SCTE35-IN: %s", attr.Val)
+			}
+			dr.SCTE35In = attr.Val
+		case "END-ON-NEXT":
+			dr.EndOnNext = attr.Val == "YES"
+		default:
+			if strings.HasPrefix(attr.Key, "X-") {
+				dr.XAttrs = append(dr.XAttrs, attr)
+			}
+		}
+	}
+	return &dr, nil
+}
+
+// DeQuote removes quotes from a string.
+func DeQuote(s string) string {
+	if len(s) < 2 {
+		return s
+	}
+	if s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+// Quote returns a quoted string.
+func Quote(s string) string {
+	return `"` + s + `"`
 }
 
 // Parse one line of a media playlist.
@@ -592,7 +679,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		// if segment custom tag appeared before EXTINF then it links to this segment
 		if state.tagCustom {
 			p.Segments[p.last()].Custom = state.custom
-			state.custom = make(map[string]CustomTag)
+			state.custom = make(CustomMap)
 			state.tagCustom = false
 		}
 	// start tag first
@@ -638,7 +725,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case strings.HasPrefix(line, "#EXT-X-START:"):
 		state.listType = MEDIA
-		for k, v := range decodeParamsLine(line[13:]) {
+		for k, v := range decodeAndTrimAttributes(line[13:]) {
 			switch k {
 			case "TIME-OFFSET":
 				st, err := strconv.ParseFloat(v, 64)
@@ -653,7 +740,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA
 		state.xkey = new(Key)
-		for k, v := range decodeParamsLine(line[11:]) {
+		for k, v := range decodeAndTrimAttributes(line[11:]) {
 			switch k {
 			case "METHOD":
 				state.xkey.Method = v
@@ -671,7 +758,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-MAP:"):
 		state.listType = MEDIA
 		state.xmap = new(Map)
-		for k, v := range decodeParamsLine(line[11:]) {
+		for k, v := range decodeAndTrimAttributes(line[11:]) {
 			switch k {
 			case "URI":
 				state.xmap.URI = v
@@ -706,7 +793,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.listType = MEDIA
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_67_2014
-		for attribute, value := range decodeParamsLine(line[12:]) {
+		for attribute, value := range decodeAndTrimAttributes(line[12:]) {
 			switch attribute {
 			case "CUE":
 				state.scte.Cue = value
@@ -731,7 +818,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_OATCLS
 		state.scte.CueType = SCTE35Cue_Mid
-		for attribute, value := range decodeParamsLine(line[20:]) {
+		for attribute, value := range decodeAndTrimAttributes(line[20:]) {
 			switch attribute {
 			case "SCTE35":
 				state.scte.Cue = value
@@ -755,6 +842,42 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_OATCLS
 		state.scte.CueType = SCTE35Cue_End
+	case strings.HasPrefix(line, "#EXT-X-DATERANGE:"):
+		dr, err := parseDateRange(line)
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-DATERANGE: %w", err)
+		}
+		isSCTE35 := dr.SCTE35Cmd != "" || dr.SCTE35Out != "" || dr.SCTE35In != ""
+		if isSCTE35 {
+			scte := new(SCTE)
+			scte.Syntax = SCTE35_DATERANGE
+			scte.ID = DeQuote(dr.ID)
+			var scteHex string
+			switch {
+			case dr.SCTE35Cmd != "":
+				scte.CueType = SCTE35Cue_Cmd
+				scteHex = dr.SCTE35Cmd
+			case dr.SCTE35Out != "":
+				scte.CueType = SCTE35Cue_Start
+				scteHex = dr.SCTE35Out
+			default:
+				scte.CueType = SCTE35Cue_End
+				scteHex = dr.SCTE35In
+			}
+			buf, err := hex.DecodeString(strings.TrimLeft(scteHex, "0x"))
+			if err != nil {
+				return fmt.Errorf("cannot decode SCTE35 cmd %w", err)
+			}
+			scte.Cue = base64.StdEncoding.EncodeToString(buf)
+			scte.StartDate = &dr.StartDate
+			scte.EndDate = dr.EndDate
+			scte.Duration = dr.Duration
+			scte.PlannedDuration = dr.PlannedDuration
+			state.tagSCTE35 = true
+			state.scte = scte
+		} else { // Other EXT-X-DATERANGE
+			p.DateRanges = append(p.DateRanges, dr)
+		}
 	case !state.tagDiscontinuity && strings.HasPrefix(line, "#EXT-X-DISCONTINUITY"):
 		state.tagDiscontinuity = true
 		state.listType = MEDIA

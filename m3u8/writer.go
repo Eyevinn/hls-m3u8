@@ -6,6 +6,8 @@ package m3u8
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -261,6 +263,47 @@ func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 	buf.WriteRune('\n')
 }
 
+// writeDateRange writes an EXT-X-DATERANGE tag line including \n to the buffer.
+func writeDateRange(buf *bytes.Buffer, dr *DateRange) {
+	buf.WriteString(`#EXT-X-DATERANGE:ID="`)
+	buf.WriteString(dr.ID)
+	buf.WriteRune('"')
+	if dr.Class != "" {
+		writeQuoted(buf, "CLASS", dr.Class)
+	}
+	str := dr.StartDate.Format(DATETIME)
+	writeQuoted(buf, "START-DATE", str)
+	if dr.Cue != "" {
+		writeUnQuoted(buf, "CUE", dr.Cue)
+	}
+	if dr.EndDate != nil {
+		str = dr.EndDate.Format(DATETIME)
+		writeQuoted(buf, "END-DATE", str)
+	}
+	if dr.Duration != nil {
+		writeFloat(buf, "DURATION", *dr.Duration)
+	}
+	if dr.PlannedDuration != nil {
+		writeFloat(buf, "PLANNED-DURATION", *dr.PlannedDuration)
+	}
+	if dr.SCTE35Cmd != "" {
+		writeUnQuoted(buf, "SCTE35-CMD", dr.SCTE35Cmd)
+	}
+	if dr.SCTE35Out != "" {
+		writeUnQuoted(buf, "SCTE35-OUT", dr.SCTE35Out)
+	}
+	if dr.SCTE35In != "" {
+		writeUnQuoted(buf, "SCTE35-IN", dr.SCTE35In)
+	}
+	if dr.EndOnNext {
+		buf.WriteString(",END-ON-NEXT=YES")
+	}
+	for _, xa := range dr.XAttrs {
+		writeUnQuoted(buf, xa.Key, xa.Val)
+	}
+	buf.WriteRune('\n')
+}
+
 // writeQuoted writes a quoted key-value pair to the buffer preceded by a comma.
 func writeQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteRune(',')
@@ -268,6 +311,13 @@ func writeQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteString(`="`)
 	buf.WriteString(value)
 	buf.WriteRune('"')
+}
+
+func writeUnQuoted(buf *bytes.Buffer, key, value string) {
+	buf.WriteRune(',')
+	buf.WriteString(key)
+	buf.WriteString(`=`)
+	buf.WriteString(value)
 }
 
 // writeUint writes a key-value pair to the buffer preceded by a comma.
@@ -278,10 +328,17 @@ func writeUint(buf *bytes.Buffer, key string, value uint) {
 	buf.WriteString(strconv.FormatUint(uint64(value), 10))
 }
 
+func writeFloat(buf *bytes.Buffer, key string, value float64) {
+	buf.WriteRune(',')
+	buf.WriteString(key)
+	buf.WriteRune('=')
+	buf.WriteString(strconv.FormatFloat(value, 'f', 3, 64))
+}
+
 // SetCustomTag sets the provided tag on the master playlist for its TagName
 func (p *MasterPlaylist) SetCustomTag(tag CustomTag) {
 	if p.Custom == nil {
-		p.Custom = make(map[string]CustomTag)
+		p.Custom = make(CustomMap)
 	}
 
 	p.Custom[tag.TagName()] = tag
@@ -581,6 +638,27 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 					p.buf.WriteString("#EXT-X-CUE-IN")
 					p.buf.WriteRune('\n')
 				}
+			case SCTE35_DATERANGE:
+				dateRange := DateRange{
+					ID:              seg.SCTE.ID,
+					StartDate:       *seg.SCTE.StartDate,
+					EndDate:         seg.SCTE.EndDate,
+					Duration:        seg.SCTE.Duration,
+					PlannedDuration: seg.SCTE.PlannedDuration,
+				}
+				cue, _ := base64.StdEncoding.DecodeString(seg.SCTE.Cue)
+				cueHex := hex.EncodeToString(cue)
+				cueVal := fmt.Sprintf("0x%s", cueHex)
+
+				switch seg.SCTE.CueType {
+				case SCTE35Cue_Start:
+					dateRange.SCTE35Out = cueVal
+				case SCTE35Cue_End:
+					dateRange.SCTE35In = cueVal
+				case SCTE35Cue_Cmd:
+					dateRange.SCTE35Cmd = cueVal
+				}
+				writeDateRange(&p.buf, &dateRange)
 			}
 		}
 		// check for key change
@@ -668,6 +746,9 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	}
 	if p.Closed {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
+	}
+	for _, dr := range p.DateRanges {
+		writeDateRange(&p.buf, dr)
 	}
 	return &p.buf
 }
@@ -790,7 +871,7 @@ func (p *MediaPlaylist) SetProgramDateTime(value time.Time) error {
 // SetCustomTag sets the provided tag on the media playlist for its TagName.
 func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 	if p.Custom == nil {
-		p.Custom = make(map[string]CustomTag)
+		p.Custom = make(CustomMap)
 	}
 
 	p.Custom[tag.TagName()] = tag
@@ -805,7 +886,7 @@ func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	last := p.Segments[p.last()]
 
 	if last.Custom == nil {
-		last.Custom = make(map[string]CustomTag)
+		last.Custom = make(CustomMap)
 	}
 
 	last.Custom[tag.TagName()] = tag

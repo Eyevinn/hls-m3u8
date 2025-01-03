@@ -39,7 +39,6 @@ the latest segments.
 
 For VOD or EVENT media playlists, the `winsize` should be 0.
 
-
 For writing, there are `Encode` methods that return a `*bytes.Buffer`. This buffer serves as a cache.
 
 ## Installation / Usage
