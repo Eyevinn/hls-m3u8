@@ -2,6 +2,7 @@
 
 ![Test](https://github.com/Eyevinn/hls-m3u8/workflows/Go/badge.svg)
 ![golangci-lint](https://github.com/Eyevinn/hls-m3u8/workflows/golangci-lint/badge.svg?branch=main)
+[![Coverage Status](https://coveralls.io/repos/github/Eyevinn/hls-m3u8/badge.svg?branch=main)](https://coveralls.io/github/Eyevinn/hls-m3u8?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Eyevinn/hls-m3u8)](https://goreportcard.com/report/github.com/Eyevinn/hls-m3u8)
 [![license](https://img.shields.io/github/license/Eyevinn/hls-m3u8.svg)](https://github.com/Eyevinn/hls-m3u8/blob/main/LICENSE)
 
