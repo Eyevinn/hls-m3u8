@@ -1,9 +1,9 @@
 # hls-m3u8 - HLS m3u8 playlist library
 
 ![Test](https://github.com/Eyevinn/hls-m3u8/workflows/Go/badge.svg)
-![golangci-lint](https://github.com/Eyevinn/mp4ff/workflows/golangci-lint/badge.svg?branch=master)
+![golangci-lint](https://github.com/Eyevinn/hls-m3u8/workflows/golangci-lint/badge.svg?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Eyevinn/hls-m3u8)](https://goreportcard.com/report/github.com/Eyevinn/hls-m3u8)
-[![license](https://img.shields.io/github/license/Eyevinn/hls-m3u8.svg)](https://github.com/Eyevinn/hls-m3u8/blob/master/LICENSE)
+[![license](https://img.shields.io/github/license/Eyevinn/hls-m3u8.svg)](https://github.com/Eyevinn/hls-m3u8/blob/main/LICENSE)
 
 hls-m3u8 implements parsing and generation of HLS m3u8 playlists.
 HLS (HTTP Live Streaming) is an evolving protocol with multiple versions.
