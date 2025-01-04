@@ -9,7 +9,8 @@
 *.test
 
 # Output of the make coverage target
-coverage.*
+coverage.html
+coverage.out
 
 # Dependency directories (remove the comment below to include it)
 vendor/
