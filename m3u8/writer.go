@@ -457,8 +457,8 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	p.Segments[p.tail] = seg
 	p.tail = (p.tail + 1) % p.capacity
 	p.count++
-	if p.TargetDuration < seg.Duration {
-		p.TargetDuration = math.Ceil(seg.Duration)
+	if !p.targetDurLocked {
+		p.TargetDuration = calcNewTargetDuration(seg.Duration, p.ver, p.TargetDuration)
 	}
 	p.buf.Reset()
 	return nil
@@ -559,10 +559,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
 	p.buf.WriteRune('\n')
 	p.buf.WriteString("#EXT-X-TARGETDURATION:")
-	// EXT-X-TARGETDURATION must be integer, but is calculated differently
-	// from version 6 of the standard.
-	//
-	p.buf.WriteString(strconv.FormatInt(int64(math.Ceil(p.TargetDuration)), 10))
+	p.buf.WriteString(strconv.FormatInt(int64(p.TargetDuration), 10))
 	p.buf.WriteRune('\n')
 	if p.StartTime > 0.0 {
 		p.buf.WriteString("#EXT-X-START:TIME-OFFSET=")
@@ -769,6 +766,57 @@ func (p *MediaPlaylist) Close() {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
 	}
 	p.Closed = true
+}
+
+// CalculateTargetDuration calculates the target duration for the playlist.
+// For HLS v5 and earlier, it is the maximum segment duration as rounded up.
+// For HLS v6 and later, it is the maximum segment duration as rounded to the nearest integer.
+// It is not allowed to change when the playlist is updated.
+func (p *MediaPlaylist) CalculateTargetDuration(hlsVer uint8) uint {
+	if p.count == 0 {
+		return 0
+	}
+	var max float64
+	if p.tail >= p.head {
+		for i := p.head; i < p.tail; i++ {
+			if p.Segments[i].Duration > max {
+				max = p.Segments[i].Duration
+			}
+		}
+	} else {
+		for i := p.head; i < p.capacity; i++ {
+			if p.Segments[i].Duration > max {
+				max = p.Segments[i].Duration
+			}
+		}
+		for i := uint(0); i < p.tail; i++ {
+			if p.Segments[i].Duration > max {
+				max = p.Segments[i].Duration
+			}
+		}
+	}
+	return calcNewTargetDuration(max, hlsVer, 0)
+}
+
+// calcNewTargetDuration calculates a new target duration based on a segment duration.
+func calcNewTargetDuration(segDur float64, hlsVer uint8, oldTargetDuration uint) uint {
+	var new uint
+	if hlsVer < 6 {
+		new = uint(math.Ceil(segDur))
+	} else {
+		new = uint(math.Round(segDur))
+	}
+	if new > oldTargetDuration {
+		return new
+	}
+	return oldTargetDuration
+}
+
+// SetTargetDuration sets the target duration for the playlist and stops automatic calculation.
+// Since the target duration is not allowed to change, it is locked after the first call.
+func (p *MediaPlaylist) SetTargetDuration(duration uint) {
+	p.TargetDuration = duration
+	p.targetDurLocked = true
 }
 
 // SetDefaultKey sets encryption key to appear before segments in the media playlist.

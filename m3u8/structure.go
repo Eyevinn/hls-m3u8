@@ -101,7 +101,7 @@ const (
 // It is used for both VOD, EVENT and sliding window live media playlists with window size.
 // URI lines in the Playlist point to media segments.
 type MediaPlaylist struct {
-	TargetDuration   float64         // TargetDuration is the maximum media segment duration in seconds (an integer)
+	TargetDuration   uint            // TargetDuration is max media segment duration. Rounding depends on version.
 	SeqNo            uint64          // EXT-X-MEDIA-SEQUENCE
 	Segments         []*MediaSegment // List of segments in the playlist. Output may be limited by winsize.
 	Args             string          // optional query placed after URIs (URI?Args)
@@ -123,6 +123,7 @@ type MediaPlaylist struct {
 	count            uint            // number of segments added to the playlist
 	buf              bytes.Buffer    // buffer used for encoding and caching playlist output
 	ver              uint8           // protocol version of the playlist, 3 or higher
+	targetDurLocked  bool            // target duration is locked and cannot be changed
 
 }
 

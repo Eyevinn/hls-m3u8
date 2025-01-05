@@ -285,9 +285,9 @@ func TestDecodeMediaPlaylist(t *testing.T) {
 	is.NoErr(err) // must decode playlist
 
 	// check parsed values
-	is.Equal(p.ver, uint8(3))        // version must be 3
-	is.Equal(p.TargetDuration, 12.0) // target duration must be 12.0
-	is.True(p.Closed)                // closed (VOD) playlist but Close field = false")
+	is.Equal(p.ver, uint8(3))            // version must be 3
+	is.Equal(p.TargetDuration, uint(12)) // target duration must be 12
+	is.True(p.Closed)                    // closed (VOD) playlist but Close field = false")
 	titles := []string{"Title 1", "Title 2", ""}
 	for i, s := range p.Segments {
 		if i > len(titles)-1 {
@@ -377,9 +377,9 @@ func TestDecodeMediaPlaylistWithAutodetection(t *testing.T) {
 	CheckType(t, pp)
 	is.Equal(listType, MEDIA) // must be media playlist
 	// check parsed values
-	is.Equal(pp.TargetDuration, 12.0) // target duration must be 12.0
-	is.True(pp.Closed)                // closed (VOD) playlist but Close field = false")
-	is.Equal(pp.winsize, uint(0))     // window size must be 0
+	is.Equal(pp.TargetDuration, uint(12)) // target duration must be 12
+	is.True(pp.Closed)                    // closed (VOD) playlist but Close field = false")
+	is.Equal(pp.winsize, uint(0))         // window size must be 0
 	// TODO check other values…
 	// fmt.Println(pp.Encode().String())
 }
@@ -829,9 +829,9 @@ func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
 	CheckType(t, pp)
 	is.Equal(listType, MEDIA) // must be media playlist
 	// check parsed values
-	is.Equal(pp.TargetDuration, 15.0) // target duration must be 15.0
-	is.True(pp.Closed)                // closed (VOD) playlist but Close field = false")
-	is.Equal(pp.SeqNo, uint64(0))     // sequence number must be 0
+	is.Equal(pp.TargetDuration, uint(15)) // target duration must be 15
+	is.True(pp.Closed)                    // closed (VOD) playlist but Close field = false")
+	is.Equal(pp.SeqNo, uint64(0))         // sequence number must be 0
 
 	segNames := []string{"20181231/0555e0c371ea801726b92512c331399d_00000000.ts",
 		"20181231/0555e0c371ea801726b92512c331399d_00000001.ts",

@@ -64,8 +64,8 @@ func TestAppendSegmentToMediaPlaylist(t *testing.T) {
 	is := is.New(t)
 	p, _ := NewMediaPlaylist(2, 2)
 	e := p.AppendSegment(&MediaSegment{Duration: 10})
-	is.NoErr(e)                      // Add 1st segment to a media playlist should be successful
-	is.Equal(p.TargetDuration, 10.0) // target duration should be set to 10
+	is.NoErr(e)                          // Add 1st segment to a media playlist should be successful
+	is.Equal(p.TargetDuration, uint(10)) // target duration should be set to 10
 	e = p.AppendSegment(&MediaSegment{Duration: 10})
 	is.NoErr(e) // Add 2nd segment to a media playlist should be successful
 	e = p.AppendSegment(&MediaSegment{Duration: 10})
@@ -116,20 +116,6 @@ func TestProgramDateTimeForMediaPlaylist(t *testing.T) {
 	e = p.Append("test03.ts", 6.0, "")
 	is.NoErr(e) // Add 3nd segment to a media playlist should be successful
 	// fmt.Println(p.Encode().String())
-}
-
-// Create new media playlist
-// Add two segments to media playlist with duration 9.0 and 9.1.
-// Target duration must be set to nearest greater integer (= 10).
-func TestTargetDurationForMediaPlaylist(t *testing.T) {
-	is := is.New(t)
-	p, e := NewMediaPlaylist(1, 2)
-	is.NoErr(e) // Create media playlist should be successful
-	e = p.Append("test01.ts", 9.0, "")
-	is.NoErr(e) // Add 1st segment to a media playlist should be successful
-	e = p.Append("test02.ts", 9.1, "")
-	is.NoErr(e)                      // Add 2nd segment to a media playlist should be successful
-	is.Equal(p.TargetDuration, 10.0) // target duration should be set to 10, nearest greater integer 9.1)
 }
 
 // Create new media playlist with capacity 10 elements
@@ -783,6 +769,48 @@ func decodeEncode(t *testing.T, fileName string) string {
 	}
 	pp := p.(*MediaPlaylist)
 	return pp.Encode().String()
+}
+
+// TestCalculateTargetDuration tests the calculation of the target duration.
+// It should be rounded up to an integer if the version is 5 or lower.
+// If should be rounded to nearest integer if the version is 6 or higher.
+// With nrSlides, we check that it works when the circular buffer has wrapped around.
+// With lockedTargetDur, we check that it works when the target duration is locked.
+func TestCalculateTargetDuration(t *testing.T) {
+	is := is.New(t)
+	cases := []struct {
+		desc            string
+		hlsVersion      uint8
+		segDur          float64
+		nrSlides        uint
+		lockedTargetDur uint
+		wantedTargetDur uint
+	}{
+		{desc: "HLSv5Locked", hlsVersion: 5, segDur: 5.1, nrSlides: 1, lockedTargetDur: 4, wantedTargetDur: 4},
+		{desc: "HLSv5", hlsVersion: 5, segDur: 5.1, nrSlides: 2, wantedTargetDur: 6},
+		{desc: "HLSv6", hlsVersion: 6, segDur: 5.1, nrSlides: 2, wantedTargetDur: 5},
+		{desc: "HLSv5Wrap", hlsVersion: 5, segDur: 5.1, nrSlides: 6, wantedTargetDur: 6},
+		{desc: "HLSv6Wrap", hlsVersion: 6, segDur: 5.1, nrSlides: 6, wantedTargetDur: 6},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			p, err := NewMediaPlaylist(3, 5)
+			if c.lockedTargetDur != 0 {
+				p.SetTargetDuration(c.lockedTargetDur)
+			}
+			is.NoErr(err) // Create media playlist should be successful
+			p.ver = c.hlsVersion
+			for i := 0; i < int(c.nrSlides); i++ {
+				segDur := c.segDur + 0.1*float64(i)
+				p.Slide(fmt.Sprintf("test%d.ts", i), segDur, "")
+			}
+			is.Equal(p.TargetDuration, c.wantedTargetDur) // Target duration does not match expected
+			if c.lockedTargetDur == 0 {
+				calcTargetDur := p.CalculateTargetDuration(c.hlsVersion)
+				is.Equal(calcTargetDur, c.wantedTargetDur) // Calculate target duration does not match expected
+			}
+		})
+	}
 }
 
 /******************************

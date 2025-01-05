@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed SUBTITLES from EXT-X-MEDIA since not in [rfc8216bis-16][rfc8216-bis]
 - Changed tests to use matryer.is for conciseness
 - Improved documentation
+- TargetDuration is now an uint
 
 ### Added
 
@@ -21,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved playlist type detection
 - Support for SCTE-35 signaling using EXT-X-DATERANGE (following [rfc8216-bis][rfc8216-bis])
 - Support for full EXT-X-DATERANGE parsing and writing
+- TARGETDURATION calculation depends on HLS version
+- New function CalculateTargetDuration
+- New method MediaPlaylist.SetTargetDuration that sets and locks the value
 
 ### Fixed
 
