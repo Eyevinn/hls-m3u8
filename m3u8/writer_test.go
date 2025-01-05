@@ -791,6 +791,7 @@ func TestCalculateTargetDuration(t *testing.T) {
 		{desc: "HLSv6", hlsVersion: 6, segDur: 5.1, nrSlides: 2, wantedTargetDur: 5},
 		{desc: "HLSv5Wrap", hlsVersion: 5, segDur: 5.1, nrSlides: 6, wantedTargetDur: 6},
 		{desc: "HLSv6Wrap", hlsVersion: 6, segDur: 5.1, nrSlides: 6, wantedTargetDur: 6},
+		{desc: "Zero segments", hlsVersion: 5, segDur: 5.1, nrSlides: 0, wantedTargetDur: 0},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
