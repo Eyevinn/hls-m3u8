@@ -142,29 +142,36 @@ type MasterPlaylist struct {
 
 // Variant structure represents media playlist variants in master playlists.
 type Variant struct {
-	URI       string         // URI is the path to the media playlist.
+	URI       string         // URI is the path to the media playlist. Parameter for I-frame playlist.
 	Chunklist *MediaPlaylist // Chunklist is the media playlist for the variant.
 	VariantParams
 }
 
 // VariantParams represents parameters for a Variant.
 // Used in EXT-X-STREAM-INF and EXT-X-I-FRAME-STREAM-INF.
+// URI parameter for EXT-X-I-FRAME-STREAM-INF is in Variant.
 type VariantParams struct {
-	ProgramId        uint32         // PROGRAM-ID parameter. Removed in version 6
-	Bandwidth        uint32         // BANDWIDTH parameter
-	AverageBandwidth uint32         // AVERAGE-BANDWIDTH parameter
-	Codecs           string         // CODECS parameter
-	Resolution       string         // RESOLUTION parameter
-	Audio            string         // AUDIO parameter. EXT-X-STREAM-INF only
-	Video            string         // VIDEO parameter. EXT-X-STREAM-INF only
-	Subtitles        string         // SUBTITLES parameter. EXT-X-STREAM-INF only
-	Captions         string         // CLOSED-CAPTIONS parameter. EXT-X-STREAM-INF only
-	Name             string         // NAME parameter. EXT-X-STREAM-INF only. Non-standard Wowza/JWPlayer extension
-	Iframe           bool           // EXT-X-I-FRAME-STREAM-INF flag.
-	VideoRange       string         // VIDEO-RANGE parameter
-	HDCPLevel        string         // HDCP-LEVEL parameter
-	FrameRate        float64        // FRAME-RATE parameter. EXT-X-STREAM-INF only
-	Alternatives     []*Alternative // EXT-X-MEDIA parameters
+	Bandwidth          uint32         // BANDWIDTH parameter
+	AverageBandwidth   uint32         // AVERAGE-BANDWIDTH parameter
+	Score              float64        // SCORE parameter
+	Codecs             string         // CODECS parameter
+	SupplementalCodecs string         // SUPPLEMENTAL-CODECS parameter
+	Resolution         string         // RESOLUTION parameter (WxH)
+	FrameRate          float64        // FRAME-RATE parameter.
+	HDCPLevel          string         // HDCP-LEVEL parameter: NONE, TYPE-0, TYPE-1
+	AllowedCPC         string         // ALLOWED-CPC parameter
+	VideoRange         string         // VIDEO-RANGE parameter: SDR, HLG, PQ
+	ReqVideoLayout     string         // REQ-VIDEO-LAYOUT parameter
+	StableVariantId    string         // STABLE-VARIANT-ID parameter
+	Audio              string         // AUDIO alternative renditions group ID. EXT-X-STREAM-INF only
+	Video              string         // VIDEO alternative renditions group ID. EXT-X-STREAM-INF only
+	Subtitles          string         // SUBTITLESalternative renditions group ID. EXT-X-STREAM-INF only
+	Captions           string         // CLOSED-CAPTIONS parameter, NONE or Quoted String
+	PathwayId          string         // PATHWAY-ID parameter for Content Steering
+	Name               string         // NAME parameter. EXT-X-STREAM-INF only. Non-standard Wowza/JWPlayer extension
+	ProgramId          *int           // PROGRAM-ID parameter. Removed in version 6
+	Iframe             bool           // EXT-X-I-FRAME-STREAM-INF flag.
+	Alternatives       []*Alternative // EXT-X-MEDIA parameters
 }
 
 // Alternative represents an EXT-X-MEDIA tag.

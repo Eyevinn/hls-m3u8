@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed tests to use matryer.is for conciseness
 - Improved documentation
 - TargetDuration is now an uint
+- PROGRAM-ID parameter is obsolete from version 6. Changed from uin32 to *int.
+- Only remove quotes on Quoted-String parameters, and not in general.
 
 ### Added
 
@@ -25,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TARGETDURATION calculation depends on HLS version
 - New function CalculateTargetDuration
 - New method MediaPlaylist.SetTargetDuration that sets and locks the value
+- Full parsing and rendering of EXT-X-STREAM-INF parameters
+' FUll parsing and writing of EXT-X-I-FRAME-STREAM-INF parameters
 
 ### Fixed
 

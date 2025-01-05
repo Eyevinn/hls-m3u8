@@ -326,104 +326,24 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 	case !state.tagStreamInf && strings.HasPrefix(line, "#EXT-X-STREAM-INF:"):
 		state.tagStreamInf = true
 		state.listType = MASTER
-		state.variant = new(Variant)
-		p.Variants = append(p.Variants, state.variant)
-		for k, v := range decodeAndTrimAttributes(line[18:]) {
-			switch k {
-			case "PROGRAM-ID":
-				var val int
-				val, err = strconv.Atoi(v)
-				if strict && err != nil {
-					return err
-				}
-				state.variant.ProgramId = uint32(val)
-			case "BANDWIDTH":
-				var val int
-				val, err = strconv.Atoi(v)
-				if strict && err != nil {
-					return err
-				}
-				state.variant.Bandwidth = uint32(val)
-			case "CODECS":
-				state.variant.Codecs = v
-			case "RESOLUTION":
-				state.variant.Resolution = v
-			case "AUDIO":
-				state.variant.Audio = v
-			case "VIDEO":
-				state.variant.Video = v
-			case "SUBTITLES":
-				state.variant.Subtitles = v
-			case "CLOSED-CAPTIONS":
-				state.variant.Captions = v
-			case "NAME":
-				state.variant.Name = v
-			case "AVERAGE-BANDWIDTH":
-				var val int
-				val, err = strconv.Atoi(v)
-				if strict && err != nil {
-					return err
-				}
-				state.variant.AverageBandwidth = uint32(val)
-			case "FRAME-RATE":
-				if state.variant.FrameRate, err = strconv.ParseFloat(v, 64); strict && err != nil {
-					return err
-				}
-			case "VIDEO-RANGE":
-				state.variant.VideoRange = v
-			case "HDCP-LEVEL":
-				state.variant.HDCPLevel = v
-			}
+		variant, err := parseExtXStreamInf(line, strict)
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-STREAM-INF: %w", err)
 		}
+		state.variant = variant
+		p.Variants = append(p.Variants, variant)
 	case state.tagStreamInf && !strings.HasPrefix(line, "#"):
 		state.tagStreamInf = false
 		state.variant.URI = line
 	case strings.HasPrefix(line, "#EXT-X-I-FRAME-STREAM-INF:"):
 		state.listType = MASTER
-		state.variant = new(Variant)
+		variant, err := parseExtXStreamInf(line, strict)
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-I-FRAME-STREAM-INF: %w", err)
+		}
+		state.variant = variant
 		state.variant.Iframe = true
 		p.Variants = append(p.Variants, state.variant)
-		for k, v := range decodeAndTrimAttributes(line[26:]) {
-			switch k {
-			case "URI":
-				state.variant.URI = v
-			case "PROGRAM-ID":
-				var val int
-				val, err = strconv.Atoi(v)
-				if strict && err != nil {
-					return err
-				}
-				state.variant.ProgramId = uint32(val)
-			case "BANDWIDTH":
-				var val int
-				val, err = strconv.Atoi(v)
-				if strict && err != nil {
-					return err
-				}
-				state.variant.Bandwidth = uint32(val)
-			case "CODECS":
-				state.variant.Codecs = v
-			case "RESOLUTION":
-				state.variant.Resolution = v
-			case "AUDIO":
-				state.variant.Audio = v
-			case "VIDEO":
-				state.variant.Video = v
-			case "AVERAGE-BANDWIDTH":
-				var val int
-				val, err = strconv.Atoi(v)
-				if strict && err != nil {
-					return err
-				}
-				state.variant.AverageBandwidth = uint32(val)
-			case "VIDEO-RANGE":
-				state.variant.VideoRange = v
-			case "HDCP-LEVEL":
-				state.variant.HDCPLevel = v
-			}
-		}
-		//case strings.HasPrefix(line, "#"):
-		// unknown TAG
 	}
 	return err
 }
@@ -434,7 +354,7 @@ func parseExtXMedia(line string, strict bool) (Alternative, error) {
 		return alt, fmt.Errorf("invalid line: %q", line)
 	}
 	var err error
-	for k, v := range decodeAndTrimAttributes(line[13:]) {
+	for k, v := range decodeAndTrimAttributes(line[len("#EXT-X-MEDIA:"):]) {
 		switch k {
 		case "TYPE":
 			alt.Type = v
@@ -486,6 +406,89 @@ func parseExtXMedia(line string, strict bool) (Alternative, error) {
 		}
 	}
 	return alt, nil
+}
+
+func parseExtXStreamInf(line string, strict bool) (*Variant, error) {
+	variant := Variant{}
+	var tagLen int
+	switch {
+	case strings.HasPrefix(line, "#EXT-X-STREAM-INF:"):
+		tagLen = len("#EXT-X-STREAM-INF:")
+	case strings.HasPrefix(line, "#EXT-X-I-FRAME-STREAM-INF:"):
+		tagLen = len("#EXT-X-I-FRAME-STREAM-INF:")
+	default:
+		return nil, fmt.Errorf("invalid line: %q", line)
+	}
+	attrs := decodeAttributes(line[tagLen:])
+	for _, a := range attrs {
+		switch a.Key {
+		case "BANDWIDTH":
+			val, err := strconv.Atoi(a.Val)
+			if strict && err != nil {
+				return nil, err
+			}
+			variant.Bandwidth = uint32(val)
+		case "AVERAGE-BANDWIDTH":
+			val, err := strconv.Atoi(a.Val)
+			if strict && err != nil {
+				return nil, err
+			}
+			variant.AverageBandwidth = uint32(val)
+		case "SCORE":
+			val, err := strconv.ParseFloat(a.Val, 64)
+			if strict && err != nil {
+				return nil, err
+			}
+			variant.Score = val
+		case "CODECS":
+			variant.Codecs = DeQuote(a.Val)
+		case "SUPPLEMENTAL-CODECS":
+			variant.SupplementalCodecs = DeQuote(a.Val)
+		case "RESOLUTION": // decimal-resolution WxH
+			variant.Resolution = a.Val
+		case "FRAME-RATE":
+			val, err := strconv.ParseFloat(a.Val, 64)
+			if strict && err != nil {
+				return nil, err
+			}
+			variant.FrameRate = val
+		case "HDCP-LEVEL": // NONE, TYPE-0, TYPE-1
+			variant.HDCPLevel = a.Val
+		case "ALLOWED-CPC":
+			variant.AllowedCPC = DeQuote(a.Val)
+		case "VIDEO-RANGE": // SDR, HLG, PQ
+			variant.VideoRange = a.Val
+		case "REQ-VIDEO-LAYOUT":
+			variant.ReqVideoLayout = DeQuote(a.Val)
+		case "STABLE-VARIANT-ID":
+			variant.StableVariantId = DeQuote(a.Val)
+		case "AUDIO": // Alternative renditions group ID
+			variant.Audio = DeQuote(a.Val)
+		case "VIDEO": // Alternative renditions group ID
+			variant.Video = DeQuote(a.Val)
+		case "SUBTITLES": // Alternative renditions group ID
+			variant.Subtitles = DeQuote(a.Val)
+		case "CLOSED-CAPTIONS":
+			if a.Val == "NONE" {
+				variant.Captions = "NONE"
+			} else {
+				variant.Captions = DeQuote(a.Val)
+			}
+		case "PATHWAY-ID": // Content steering pathway ID
+			variant.PathwayId = DeQuote(a.Val)
+		case "URI":
+			variant.URI = DeQuote(a.Val)
+		case "PROGRAM-ID": // Deprecated from version 6
+			val, err := strconv.Atoi(a.Val)
+			if strict && err != nil {
+				return nil, err
+			}
+			variant.ProgramId = &val
+		case "NAME":
+			variant.Name = DeQuote(a.Val)
+		}
+	}
+	return &variant, nil
 }
 
 func parseDateRange(line string) (*DateRange, error) {
@@ -560,11 +563,6 @@ func DeQuote(s string) string {
 		return s[1 : len(s)-1]
 	}
 	return s
-}
-
-// Quote returns a quoted string.
-func Quote(s string) string {
-	return `"` + s + `"`
 }
 
 // Parse one line of a media playlist.

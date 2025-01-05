@@ -3,6 +3,7 @@ package m3u8
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -214,4 +215,88 @@ func TestReadWriteSCTE35DateRange(t *testing.T) {
 	inStr := string(inData)
 	inStr = trimLineEnd(strings.Replace(inStr, "\r\n", "\n", -1))
 	is.Equal(inStr, out) // output must match input
+}
+
+func TestReadWriteExtXStreamInf(t *testing.T) {
+	is := is.New(t)
+	cases := []struct {
+		desc   string
+		line   string
+		strict bool
+		error  bool
+	}{
+		{
+			desc:  "minimal",
+			line:  `#EXT-X-STREAM-INF:BANDWIDTH=128000`,
+			error: false,
+		},
+		{
+			desc: "max",
+			line: `#EXT-X-STREAM-INF:BANDWIDTH=128000,AVERAGE-BANDWIDTH=128000,SCORE=5.000,CODECS="avc1.4d400d,mp4a.40.2",` +
+				`SUPPLEMENTAL-CODECS="mp4a.40.5",RESOLUTION=320x240,FRAME-RATE=25.000,HDCP-LEVEL=NONE,` +
+				`ALLOWED-CPC="com.example.drm1:SMART-TV/PC",VIDEO-RANGE=SDR,REQ-VIDEO-LAYOUT="CH-MONO",` +
+				`STABLE-VARIANT-ID="a_0",AUDIO="audio",VIDEO="video",SUBTITLES="subs",CLOSED-CAPTIONS="cc",PATHWAY-ID="X",` +
+				`PROGRAM-ID=1,NAME="prop"`,
+			error: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			vnt, err := parseExtXStreamInf(c.line, c.strict)
+			if c.error {
+				is.Equal(err != nil, true) // must return an error
+				return
+			}
+			is.NoErr(err)
+			out := bytes.Buffer{}
+			writeExtXStreamInf(&out, vnt)
+			outStr := trimLineEnd(out.String())
+			fmt.Println(outStr)
+			fmt.Println(c.line)
+			is.Equal(c.line, outStr) // EXT-X-STREAM-INF line must match
+		})
+	}
+}
+
+func TestReadWriteExtXIFrameStreamInf(t *testing.T) {
+	is := is.New(t)
+	cases := []struct {
+		desc   string
+		line   string
+		strict bool
+		error  bool
+	}{
+		{
+			desc:  "minimal",
+			line:  `#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=128000,URI="iframe.m3u8"`,
+			error: false,
+		},
+		{
+			desc: "max",
+			line: `#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=128000,AVERAGE-BANDWIDTH=128000,SCORE=5.000,CODECS="avc1.4d400d,mp4a.40.2",` +
+				`SUPPLEMENTAL-CODECS="mp4a.40.5",RESOLUTION=320x240,HDCP-LEVEL=NONE,` +
+				`ALLOWED-CPC="com.example.drm1:SMART-TV/PC",VIDEO-RANGE=SDR,REQ-VIDEO-LAYOUT="CH-MONO",` +
+				`STABLE-VARIANT-ID="a_0",VIDEO="video",PATHWAY-ID="X",` +
+				`PROGRAM-ID=1,NAME="prop",URI="iframe.m3u8"`,
+			error: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			vnt, err := parseExtXStreamInf(c.line, c.strict)
+			if c.error {
+				is.Equal(err != nil, true) // must return an error
+				return
+			}
+			is.NoErr(err)
+			out := bytes.Buffer{}
+			writeExtXIFrameStreamInf(&out, vnt)
+			outStr := trimLineEnd(out.String())
+			fmt.Println(outStr)
+			fmt.Println(c.line)
+			is.Equal(c.line, outStr) // EXT-X-STREAM-INF line must match
+		})
+	}
 }

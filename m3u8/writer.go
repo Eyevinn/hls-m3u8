@@ -84,122 +84,19 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 
-	altsWritten := make(map[string]bool)
+	alts := p.GetAllAlternatives()
+	for _, alt := range alts {
+		writeExtXMedia(&p.buf, alt)
+	}
 
-	for _, pl := range p.Variants {
-		if pl.Alternatives != nil {
-			for _, alt := range pl.Alternatives {
-				// Make sure that we only write out an alternative once
-				altKey := fmt.Sprintf("%s-%s-%s-%s", alt.Type, alt.GroupId, alt.Name, alt.Language)
-				if altsWritten[altKey] {
-					continue
-				}
-				writeExtXMedia(&p.buf, alt)
-				altsWritten[altKey] = true
-			}
-		}
-		if pl.Iframe {
-			p.buf.WriteString("#EXT-X-I-FRAME-STREAM-INF:PROGRAM-ID=")
-			p.buf.WriteString(strconv.FormatUint(uint64(pl.ProgramId), 10))
-			p.buf.WriteString(",BANDWIDTH=")
-			p.buf.WriteString(strconv.FormatUint(uint64(pl.Bandwidth), 10))
-			if pl.AverageBandwidth != 0 {
-				p.buf.WriteString(",AVERAGE-BANDWIDTH=")
-				p.buf.WriteString(strconv.FormatUint(uint64(pl.AverageBandwidth), 10))
-			}
-			if pl.Codecs != "" {
-				p.buf.WriteString(",CODECS=\"")
-				p.buf.WriteString(pl.Codecs)
-				p.buf.WriteRune('"')
-			}
-			if pl.Resolution != "" {
-				p.buf.WriteString(",RESOLUTION=") // Resolution should not be quoted
-				p.buf.WriteString(pl.Resolution)
-			}
-			if pl.Video != "" {
-				p.buf.WriteString(",VIDEO=\"")
-				p.buf.WriteString(pl.Video)
-				p.buf.WriteRune('"')
-			}
-			if pl.VideoRange != "" {
-				p.buf.WriteString(",VIDEO-RANGE=")
-				p.buf.WriteString(pl.VideoRange)
-			}
-			if pl.HDCPLevel != "" {
-				p.buf.WriteString(",HDCP-LEVEL=")
-				p.buf.WriteString(pl.HDCPLevel)
-			}
-			if pl.URI != "" {
-				p.buf.WriteString(",URI=\"")
-				p.buf.WriteString(pl.URI)
-				p.buf.WriteRune('"')
-			}
-			p.buf.WriteRune('\n')
+	for _, vnt := range p.Variants {
+		if vnt.Iframe {
+			writeExtXIFrameStreamInf(&p.buf, vnt)
 		} else {
-			p.buf.WriteString("#EXT-X-STREAM-INF:PROGRAM-ID=")
-			p.buf.WriteString(strconv.FormatUint(uint64(pl.ProgramId), 10))
-			p.buf.WriteString(",BANDWIDTH=")
-			p.buf.WriteString(strconv.FormatUint(uint64(pl.Bandwidth), 10))
-			if pl.AverageBandwidth != 0 {
-				p.buf.WriteString(",AVERAGE-BANDWIDTH=")
-				p.buf.WriteString(strconv.FormatUint(uint64(pl.AverageBandwidth), 10))
-			}
-			if pl.Codecs != "" {
-				p.buf.WriteString(",CODECS=\"")
-				p.buf.WriteString(pl.Codecs)
-				p.buf.WriteRune('"')
-			}
-			if pl.Resolution != "" {
-				p.buf.WriteString(",RESOLUTION=") // Resolution should not be quoted
-				p.buf.WriteString(pl.Resolution)
-			}
-			if pl.Audio != "" {
-				p.buf.WriteString(",AUDIO=\"")
-				p.buf.WriteString(pl.Audio)
-				p.buf.WriteRune('"')
-			}
-			if pl.Video != "" {
-				p.buf.WriteString(",VIDEO=\"")
-				p.buf.WriteString(pl.Video)
-				p.buf.WriteRune('"')
-			}
-			if pl.Captions != "" {
-				p.buf.WriteString(",CLOSED-CAPTIONS=")
-				if pl.Captions == "NONE" {
-					p.buf.WriteString(pl.Captions) // CC should not be quoted when eq NONE
-				} else {
-					p.buf.WriteRune('"')
-					p.buf.WriteString(pl.Captions)
-					p.buf.WriteRune('"')
-				}
-			}
-			if pl.Subtitles != "" {
-				p.buf.WriteString(",SUBTITLES=\"")
-				p.buf.WriteString(pl.Subtitles)
-				p.buf.WriteRune('"')
-			}
-			if pl.Name != "" {
-				p.buf.WriteString(",NAME=\"")
-				p.buf.WriteString(pl.Name)
-				p.buf.WriteRune('"')
-			}
-			if pl.FrameRate != 0 {
-				p.buf.WriteString(",FRAME-RATE=")
-				p.buf.WriteString(strconv.FormatFloat(pl.FrameRate, 'f', 3, 64))
-			}
-			if pl.VideoRange != "" {
-				p.buf.WriteString(",VIDEO-RANGE=")
-				p.buf.WriteString(pl.VideoRange)
-			}
-			if pl.HDCPLevel != "" {
-				p.buf.WriteString(",HDCP-LEVEL=")
-				p.buf.WriteString(pl.HDCPLevel)
-			}
-
-			p.buf.WriteRune('\n')
-			p.buf.WriteString(pl.URI)
+			writeExtXStreamInf(&p.buf, vnt)
+			p.buf.WriteString(vnt.URI)
 			if p.Args != "" {
-				if strings.Contains(pl.URI, "?") {
+				if strings.Contains(vnt.URI, "?") {
 					p.buf.WriteRune('&')
 				} else {
 					p.buf.WriteRune('?')
@@ -260,6 +157,123 @@ func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 	if alt.URI != "" {
 		writeQuoted(buf, "URI", alt.URI)
 	}
+	buf.WriteRune('\n')
+}
+
+func writeExtXStreamInf(buf *bytes.Buffer, vnt *Variant) {
+	buf.WriteString("#EXT-X-STREAM-INF:BANDWIDTH=")
+	buf.WriteString(strconv.FormatUint(uint64(vnt.Bandwidth), 10))
+	if vnt.AverageBandwidth != 0 {
+		buf.WriteString(",AVERAGE-BANDWIDTH=")
+		buf.WriteString(strconv.FormatUint(uint64(vnt.AverageBandwidth), 10))
+	}
+	if vnt.Score > 0 {
+		writeFloat(buf, "SCORE", vnt.Score)
+	}
+	if vnt.Codecs != "" {
+		writeQuoted(buf, "CODECS", vnt.Codecs)
+	}
+	if vnt.SupplementalCodecs != "" {
+		writeQuoted(buf, "SUPPLEMENTAL-CODECS", vnt.SupplementalCodecs)
+	}
+	if vnt.Resolution != "" {
+		writeUnQuoted(buf, "RESOLUTION", vnt.Resolution)
+	}
+	if vnt.FrameRate != 0 {
+		writeFloat(buf, "FRAME-RATE", vnt.FrameRate)
+	}
+	if vnt.HDCPLevel != "" {
+		writeUnQuoted(buf, "HDCP-LEVEL", vnt.HDCPLevel)
+	}
+	if vnt.AllowedCPC != "" {
+		writeQuoted(buf, "ALLOWED-CPC", vnt.AllowedCPC)
+	}
+	if vnt.VideoRange != "" {
+		writeUnQuoted(buf, "VIDEO-RANGE", vnt.VideoRange)
+	}
+	if vnt.ReqVideoLayout != "" {
+		writeQuoted(buf, "REQ-VIDEO-LAYOUT", vnt.ReqVideoLayout)
+	}
+	if vnt.StableVariantId != "" {
+		writeQuoted(buf, "STABLE-VARIANT-ID", vnt.StableVariantId)
+	}
+	if vnt.Audio != "" {
+		writeQuoted(buf, "AUDIO", vnt.Audio)
+	}
+	if vnt.Video != "" {
+		writeQuoted(buf, "VIDEO", vnt.Video)
+	}
+	if vnt.Subtitles != "" {
+		writeQuoted(buf, "SUBTITLES", vnt.Subtitles)
+	}
+	if vnt.Captions != "" {
+		if vnt.Captions == "NONE" {
+			writeUnQuoted(buf, "CLOSED-CAPTIONS", vnt.Captions)
+		} else {
+			writeQuoted(buf, "CLOSED-CAPTIONS", vnt.Captions)
+		}
+	}
+	if vnt.PathwayId != "" {
+		writeQuoted(buf, "PATHWAY-ID", vnt.PathwayId)
+	}
+	if vnt.ProgramId != nil { // Removed in version 6
+		buf.WriteString(",PROGRAM-ID=")
+		buf.WriteString(strconv.FormatUint(uint64(*vnt.ProgramId), 10))
+	}
+	if vnt.Name != "" {
+		writeQuoted(buf, "NAME", vnt.Name)
+	}
+	buf.WriteRune('\n')
+}
+
+func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant) {
+	buf.WriteString("#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=")
+	buf.WriteString(strconv.FormatUint(uint64(vnt.Bandwidth), 10))
+	if vnt.AverageBandwidth != 0 {
+		buf.WriteString(",AVERAGE-BANDWIDTH=")
+		buf.WriteString(strconv.FormatUint(uint64(vnt.AverageBandwidth), 10))
+	}
+	if vnt.Score > 0 {
+		writeFloat(buf, "SCORE", vnt.Score)
+	}
+	if vnt.Codecs != "" {
+		writeQuoted(buf, "CODECS", vnt.Codecs)
+	}
+	if vnt.SupplementalCodecs != "" {
+		writeQuoted(buf, "SUPPLEMENTAL-CODECS", vnt.SupplementalCodecs)
+	}
+	if vnt.Resolution != "" {
+		writeUnQuoted(buf, "RESOLUTION", vnt.Resolution)
+	}
+	if vnt.HDCPLevel != "" {
+		writeUnQuoted(buf, "HDCP-LEVEL", vnt.HDCPLevel)
+	}
+	if vnt.AllowedCPC != "" {
+		writeQuoted(buf, "ALLOWED-CPC", vnt.AllowedCPC)
+	}
+	if vnt.VideoRange != "" {
+		writeUnQuoted(buf, "VIDEO-RANGE", vnt.VideoRange)
+	}
+	if vnt.ReqVideoLayout != "" {
+		writeQuoted(buf, "REQ-VIDEO-LAYOUT", vnt.ReqVideoLayout)
+	}
+	if vnt.StableVariantId != "" {
+		writeQuoted(buf, "STABLE-VARIANT-ID", vnt.StableVariantId)
+	}
+	if vnt.Video != "" {
+		writeQuoted(buf, "VIDEO", vnt.Video)
+	}
+	if vnt.PathwayId != "" {
+		writeQuoted(buf, "PATHWAY-ID", vnt.PathwayId)
+	}
+	if vnt.ProgramId != nil { // Removed in version 6
+		buf.WriteString(",PROGRAM-ID=")
+		buf.WriteString(strconv.FormatInt(int64(*vnt.ProgramId), 10))
+	}
+	if vnt.Name != "" {
+		writeQuoted(buf, "NAME", vnt.Name)
+	}
+	writeQuoted(buf, "URI", vnt.URI) // Mandatory
 	buf.WriteRune('\n')
 }
 

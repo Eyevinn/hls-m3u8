@@ -149,16 +149,16 @@ func TestDecodeMasterPlaylistWithIFrameStreamInf(t *testing.T) {
 	err = p.DecodeFrom(bufio.NewReader(f), false)
 	is.NoErr(err) // must decode playlist
 	expected := map[int]*Variant{
-		86000: {URI: "low/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 86000, ProgramId: 1, Codecs: "c1",
+		86000: {URI: "low/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 86000, Codecs: "c1",
 			Resolution: "1x1", Video: "1", Iframe: true}},
-		150000: {URI: "mid/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 150000, ProgramId: 1, Codecs: "c2",
+		150000: {URI: "mid/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 150000, Codecs: "c2",
 			Resolution: "2x2", Video: "2", Iframe: true}},
-		550000: {URI: "hi/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 550000, ProgramId: 1, Codecs: "c2",
+		550000: {URI: "hi/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 550000, Codecs: "c2",
 			Resolution: "2x2", Video: "2", Iframe: true}},
 	}
 	for _, variant := range p.Variants {
 		for k, expect := range expected {
-			if reflect.DeepEqual(variant, expect) {
+			if reflect.DeepEqual(*variant, *expect) {
 				delete(expected, k)
 			}
 		}

@@ -643,7 +643,6 @@ func TestNewMasterPlaylistWithClosedCaptionEqNone(t *testing.T) {
 	m := NewMasterPlaylist()
 
 	vp := &VariantParams{
-		ProgramId:  0,
 		Bandwidth:  8000,
 		Codecs:     "avc1",
 		Resolution: "1280x720",
@@ -674,7 +673,7 @@ func TestNewMasterPlaylistWithParams(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, Resolution: "576x480"})
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 1500000, Resolution: "576x480"})
 	is.Equal(len(m.Variants), 1) // Number of variants does not match expected 1
 }
 
@@ -689,7 +688,7 @@ func TestEncodeMasterPlaylistWithExistingQuery(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8?k1=v1&k2=v2", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, Resolution: "576x480"})
+	m.Append("chunklist1.m3u8?k1=v1&k2=v2", p, VariantParams{Bandwidth: 1500000, Resolution: "576x480"})
 	m.Args = "k3=v3"
 	is.True(strings.Contains(m.String(), `chunklist1.m3u8?k1=v1&k2=v2&k3=v3`)) //
 }
@@ -705,8 +704,8 @@ func TestEncodeMasterPlaylist(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, Resolution: "576x480"})
-	m.Append("chunklist2.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, Resolution: "576x480"})
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 1500000, Resolution: "576x480"})
+	m.Append("chunklist2.m3u8", p, VariantParams{Bandwidth: 1500000, Resolution: "576x480"})
 	nrVariants := len(m.Variants)
 	is.Equal(nrVariants, 2) // Number of variants does not match expected 2
 }
@@ -720,7 +719,7 @@ func TestEncodeMasterPlaylistWithStreamInfName(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 3000000, Resolution: "1152x960", Name: "HD 960p"})
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000000, Resolution: "1152x960", Name: "HD 960p"})
 
 	is.Equal(m.Variants[0].Name, "HD 960p")                 //  Bad variant name
 	is.True(strings.Contains(m.String(), `NAME="HD 960p"`)) // Master playlist does not contain Name in EXT-X-STREAM-INF
@@ -884,17 +883,17 @@ func ExampleNewMasterPlaylist_string() {
 	for i := 0; i < 5; i++ {
 		_ = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, AverageBandwidth: 1500000,
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 1500000, AverageBandwidth: 1500000,
 		Resolution: "576x480", FrameRate: 25.000})
-	m.Append("chunklist2.m3u8", p, VariantParams{ProgramId: 123, Bandwidth: 1500000, AverageBandwidth: 1500000,
+	m.Append("chunklist2.m3u8", p, VariantParams{Bandwidth: 1500000, AverageBandwidth: 1500000,
 		Resolution: "576x480", FrameRate: 25.000})
 	fmt.Printf("%s", m)
 	// Output:
 	// #EXTM3U
 	// #EXT-X-VERSION:3
-	// #EXT-X-STREAM-INF:PROGRAM-ID=123,BANDWIDTH=1500000,AVERAGE-BANDWIDTH=1500000,RESOLUTION=576x480,FRAME-RATE=25.000
+	// #EXT-X-STREAM-INF:BANDWIDTH=1500000,AVERAGE-BANDWIDTH=1500000,RESOLUTION=576x480,FRAME-RATE=25.000
 	// chunklist1.m3u8
-	// #EXT-X-STREAM-INF:PROGRAM-ID=123,BANDWIDTH=1500000,AVERAGE-BANDWIDTH=1500000,RESOLUTION=576x480,FRAME-RATE=25.000
+	// #EXT-X-STREAM-INF:BANDWIDTH=1500000,AVERAGE-BANDWIDTH=1500000,RESOLUTION=576x480,FRAME-RATE=25.000
 	// chunklist2.m3u8
 }
 
@@ -910,9 +909,9 @@ func ExampleNewMasterPlaylist_stringWithHLSv7() {
 	// #EXTM3U
 	// #EXT-X-VERSION:7
 	// #EXT-X-INDEPENDENT-SEGMENTS
-	// #EXT-X-STREAM-INF:PROGRAM-ID=0,BANDWIDTH=12886714,AVERAGE-BANDWIDTH=7964551,CODECS="hvc1.2.4.L123.B0",RESOLUTION=1920x1080,CLOSED-CAPTIONS=NONE,FRAME-RATE=23.976,VIDEO-RANGE=PQ,HDCP-LEVEL=TYPE-0
+	// #EXT-X-STREAM-INF:BANDWIDTH=12886714,AVERAGE-BANDWIDTH=7964551,CODECS="hvc1.2.4.L123.B0",RESOLUTION=1920x1080,FRAME-RATE=23.976,HDCP-LEVEL=TYPE-0,VIDEO-RANGE=PQ,CLOSED-CAPTIONS=NONE
 	// hdr10_1080/prog_index.m3u8
-	// #EXT-X-I-FRAME-STREAM-INF:PROGRAM-ID=0,BANDWIDTH=905053,AVERAGE-BANDWIDTH=364552,CODECS="hvc1.2.4.L123.B0",RESOLUTION=1920x1080,VIDEO-RANGE=PQ,HDCP-LEVEL=TYPE-0,URI="hdr10_1080/iframe_index.m3u8"
+	// #EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=905053,AVERAGE-BANDWIDTH=364552,CODECS="hvc1.2.4.L123.B0",RESOLUTION=1920x1080,HDCP-LEVEL=TYPE-0,VIDEO-RANGE=PQ,URI="hdr10_1080/iframe_index.m3u8"
 }
 
 func ExampleDecode_mediaPlaylistSegmentsSCTE35OATCLS() {
