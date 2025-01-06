@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New function CalculateTargetDuration
 - New method MediaPlaylist.SetTargetDuration that sets and locks the value
 - Full parsing and rendering of EXT-X-STREAM-INF parameters
-' FUll parsing and writing of EXT-X-I-FRAME-STREAM-INF parameters
+- FUll parsing and writing of EXT-X-I-FRAME-STREAM-INF parameters
+- EXT-X-ALLOW-CACHE support in MediaPlaylist (obsolete since version 7)
 
 ### Fixed
 

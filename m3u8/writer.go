@@ -128,11 +128,7 @@ func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 		writeQuoted(buf, "STABLE-RENDITION-ID", alt.StableRenditionId)
 	}
 	buf.WriteString(",DEFAULT=")
-	if alt.Default {
-		buf.WriteString("YES")
-	} else {
-		buf.WriteString("NO")
-	}
+	writeYESorNO(buf, alt.Default)
 	if alt.Autoselect {
 		buf.WriteString(",AUTOSELECT=YES")
 	}
@@ -349,6 +345,14 @@ func writeFloat(buf *bytes.Buffer, key string, value float64) {
 	buf.WriteString(strconv.FormatFloat(value, 'f', 3, 64))
 }
 
+func writeYESorNO(buf *bytes.Buffer, b bool) {
+	if b {
+		buf.WriteString("YES")
+	} else {
+		buf.WriteString("NO")
+	}
+}
+
 // SetCustomTag sets the provided tag on the master playlist for its TagName
 func (p *MasterPlaylist) SetCustomTag(tag CustomTag) {
 	if p.Custom == nil {
@@ -519,6 +523,12 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 
+	if p.AllowCache != nil {
+		p.buf.WriteString("#EXT-X-ALLOW-CACHE:")
+		writeYESorNO(&p.buf, *p.AllowCache)
+		p.buf.WriteRune('\n')
+	}
+
 	// default key before any segment
 	if p.Key != nil {
 		p.buf.WriteString("#EXT-X-KEY:")
@@ -564,7 +574,6 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		switch p.MediaType {
 		case EVENT:
 			p.buf.WriteString("EVENT\n")
-			p.buf.WriteString("#EXT-X-ALLOW-CACHE:NO\n")
 		case VOD:
 			p.buf.WriteString("VOD\n")
 		}

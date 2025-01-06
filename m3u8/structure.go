@@ -114,6 +114,7 @@ type MediaPlaylist struct {
 	Key              *Key            // EXT-X-KEY is initial key tag for encrypted segments
 	Map              *Map            // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
 	DateRanges       []*DateRange    // EXT-X-DATERANGE tags not associated with SCTE-35
+	AllowCache       *bool           // EXT-X-ALLOW-CACHE tag YES/NO, removed in version 7
 	Custom           CustomMap       // Custom-provided tags for encoding
 	customDecoders   []CustomDecoder // customDecoders provides custom tags for decoding
 	winsize          uint            // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT

@@ -3,7 +3,6 @@ package m3u8
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -252,8 +251,6 @@ func TestReadWriteExtXStreamInf(t *testing.T) {
 			out := bytes.Buffer{}
 			writeExtXStreamInf(&out, vnt)
 			outStr := trimLineEnd(out.String())
-			fmt.Println(outStr)
-			fmt.Println(c.line)
 			is.Equal(c.line, outStr) // EXT-X-STREAM-INF line must match
 		})
 	}
@@ -294,9 +291,33 @@ func TestReadWriteExtXIFrameStreamInf(t *testing.T) {
 			out := bytes.Buffer{}
 			writeExtXIFrameStreamInf(&out, vnt)
 			outStr := trimLineEnd(out.String())
-			fmt.Println(outStr)
-			fmt.Println(c.line)
 			is.Equal(c.line, outStr) // EXT-X-STREAM-INF line must match
+		})
+	}
+}
+
+// TestReadWriteMediaPlaylist tests reading and writing media playlists from sample-playlists
+// Looks at verbatim match, so the order of tags and attributes must match.
+func TestReadWritePlaylists(t *testing.T) {
+	is := is.New(t)
+	files := []string{
+		"media-playlist-with-program-date-time.m3u8",
+		"master-groups-and-iframe.m3u8",
+	}
+
+	for _, fileName := range files {
+		t.Run(fileName, func(t *testing.T) {
+			f, err := os.Open("sample-playlists/" + fileName)
+			is.NoErr(err) // open file should succeed
+			p, _, err := DecodeFrom(bufio.NewReader(f), true)
+			is.NoErr(err) // decode playlist should succeed
+			f.Close()
+			out := trimLineEnd(p.String())
+			inData, err := os.ReadFile("sample-playlists/" + fileName)
+			is.NoErr(err) // read file should succeed
+			inStr := trimLineEnd(strings.Replace(string(inData), "\r\n", "\n", -1))
+			is.Equal(inStr, out) // output must match input
+
 		})
 	}
 }

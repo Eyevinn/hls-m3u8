@@ -882,6 +882,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-I-FRAMES-ONLY"):
 		state.listType = MEDIA
 		p.Iframe = true
+	case strings.HasPrefix(line, "#EXT-X-ALLOW-CACHE:"):
+		val := strings.TrimPrefix(line, "#EXT-X-ALLOW-CACHE:") == "YES"
+		p.AllowCache = &val
 	}
 	return err
 }
