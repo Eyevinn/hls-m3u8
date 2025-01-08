@@ -6,8 +6,6 @@ package m3u8
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -138,6 +136,11 @@ func (p *MediaPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Playl
 	p.customDecoders = customDecoders
 
 	return p
+}
+
+// SCTE35Syntax returns the SCTE35 syntax version detected as used in the playlist.
+func (p *MediaPlaylist) SCTE35Syntax() SCTE35Syntax {
+	return p.scte35Syntax
 }
 
 func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
@@ -636,8 +639,17 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		if state.tagSCTE35 {
 			state.tagSCTE35 = false
-			if err = p.SetSCTE35(state.scte); strict && err != nil {
-				return err
+			switch state.scte {
+			case nil:
+				p.Segments[p.last()].SCTE35DateRanges = state.scte35DateRanges
+				state.scte35DateRanges = nil
+				p.scte35Syntax = SCTE35_DATERANGE
+			default:
+				if err = p.SetSCTE35(state.scte); strict && err != nil {
+					return err
+				}
+				p.scte35Syntax = state.scte.Syntax
+				state.scte = nil
 			}
 		}
 		if state.tagDiscontinuity {
@@ -847,32 +859,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		isSCTE35 := dr.SCTE35Cmd != "" || dr.SCTE35Out != "" || dr.SCTE35In != ""
 		if isSCTE35 {
-			scte := new(SCTE)
-			scte.Syntax = SCTE35_DATERANGE
-			scte.ID = DeQuote(dr.ID)
-			var scteHex string
-			switch {
-			case dr.SCTE35Cmd != "":
-				scte.CueType = SCTE35Cue_Cmd
-				scteHex = dr.SCTE35Cmd
-			case dr.SCTE35Out != "":
-				scte.CueType = SCTE35Cue_Start
-				scteHex = dr.SCTE35Out
-			default:
-				scte.CueType = SCTE35Cue_End
-				scteHex = dr.SCTE35In
-			}
-			buf, err := hex.DecodeString(strings.TrimLeft(scteHex, "0x"))
-			if err != nil {
-				return fmt.Errorf("cannot decode SCTE35 cmd %w", err)
-			}
-			scte.Cue = base64.StdEncoding.EncodeToString(buf)
-			scte.StartDate = &dr.StartDate
-			scte.EndDate = dr.EndDate
-			scte.Duration = dr.Duration
-			scte.PlannedDuration = dr.PlannedDuration
 			state.tagSCTE35 = true
-			state.scte = scte
+			state.scte35DateRanges = append(state.scte35DateRanges, dr)
 		} else { // Other EXT-X-DATERANGE
 			p.DateRanges = append(p.DateRanges, dr)
 		}

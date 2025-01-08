@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing yet
+### Added
+
+- Support for multiple EXT-X-DATERANGE tags in a media playlist
+- SCTE-35 EXT-X-DATERANGE tags are attached to current segment
+- MediaPlaylist.SCTE35Syntax() method
+- SCTE35Syntax has String() method
+
+### Changed
+
+- EXT-X-DATERANGE for SCTE-35 are stored as slice in Segment
+- SCTE35Syntax type has a new default SCTE35_NONE
 
 ## [v0.2.0] 2025-01-07
 

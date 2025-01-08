@@ -492,32 +492,30 @@ func TestMediaPlaylistWithDateRangeSCTE35Tag(t *testing.T) {
 		return &f
 	}
 
-	expect := map[int]*SCTE{
+	expect := map[int]*DateRange{
 		0: {
-			Syntax:          SCTE35_DATERANGE,
-			CueType:         SCTE35Cue_Start,
-			Cue:             "/AAvAAAAAAD/AA==",
-			StartDate:       &startDateOut,
-			Duration:        ptr(60),
-			PlannedDuration: ptr(60),
-			ID:              "splice-6FFFFFF0",
+			ID:              "SPLICE-6FFFFFF0",
+			Class:           "",
+			StartDate:       startDateOut,
+			EndDate:         nil,
+			Duration:        ptr(60.0),
+			PlannedDuration: ptr(60.0),
+			SCTE35Out:       "0xFC002F0000000000FF00",
 		},
 		1: {
-			Syntax:          SCTE35_DATERANGE,
-			CueType:         SCTE35Cue_End,
-			Cue:             "/AAvAAAAAAD/EA==",
-			StartDate:       &startDateIn,
-			Duration:        ptr(60),
-			PlannedDuration: ptr(60),
-			ID:              "splice-6FFFFFF0",
+			ID:              "SPLICE-6FFFFFF0",
+			Class:           "",
+			StartDate:       startDateIn,
+			EndDate:         nil,
+			Duration:        ptr(60.0),
+			PlannedDuration: ptr(60.0),
+			SCTE35In:        "0xFC002F0000000000FF10",
 		},
 	}
 
-	actual := make([]*SCTE, 0, 2)
+	actual := make([]*DateRange, 0, 2)
 	for i := 0; i < int(pp.Count()); i++ {
-		if pp.Segments[i].SCTE != nil {
-			actual = append(actual, pp.Segments[i].SCTE)
-		}
+		actual = append(actual, pp.Segments[i].SCTE35DateRanges...)
 	}
 
 	for i := 0; i < len(expect); i++ {

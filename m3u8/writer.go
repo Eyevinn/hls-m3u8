@@ -6,8 +6,6 @@ package m3u8
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -478,6 +476,12 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	if !p.targetDurLocked {
 		p.TargetDuration = calcNewTargetDuration(seg.Duration, p.ver, p.TargetDuration)
 	}
+	if seg.SCTE != nil {
+		p.scte35Syntax = seg.SCTE.Syntax
+	}
+	if len(seg.SCTE35DateRanges) > 0 {
+		p.scte35Syntax = SCTE35_DATERANGE
+	}
 	p.buf.Reset()
 	return nil
 }
@@ -658,28 +662,10 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 					p.buf.WriteString("#EXT-X-CUE-IN")
 					p.buf.WriteRune('\n')
 				}
-			case SCTE35_DATERANGE:
-				dateRange := DateRange{
-					ID:              seg.SCTE.ID,
-					StartDate:       *seg.SCTE.StartDate,
-					EndDate:         seg.SCTE.EndDate,
-					Duration:        seg.SCTE.Duration,
-					PlannedDuration: seg.SCTE.PlannedDuration,
-				}
-				cue, _ := base64.StdEncoding.DecodeString(seg.SCTE.Cue)
-				cueHex := hex.EncodeToString(cue)
-				cueVal := fmt.Sprintf("0x%s", cueHex)
-
-				switch seg.SCTE.CueType {
-				case SCTE35Cue_Start:
-					dateRange.SCTE35Out = cueVal
-				case SCTE35Cue_End:
-					dateRange.SCTE35In = cueVal
-				case SCTE35Cue_Cmd:
-					dateRange.SCTE35Cmd = cueVal
-				}
-				writeDateRange(&p.buf, &dateRange)
 			}
+		}
+		for i := range seg.SCTE35DateRanges {
+			writeDateRange(&p.buf, seg.SCTE35DateRanges[i])
 		}
 		// check for key change
 		if seg.Key != nil && (p.Key == nil || *seg.Key != *p.Key) {

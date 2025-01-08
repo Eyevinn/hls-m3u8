@@ -81,11 +81,25 @@ const (
 type SCTE35Syntax uint
 
 const (
-	// SCTE35_67_2014 is the default due to backwards compatibility reasons.
-	SCTE35_67_2014   SCTE35Syntax = iota // SCTE35_67_2014 defined in [scte67]
+	SCTE35_NONE      SCTE35Syntax = iota // No SCTE markers set or seen
+	SCTE35_67_2014                       // SCTE35_67_2014 defined in [scte67]
 	SCTE35_OATCLS                        // SCTE35_OATCLS is a non-standard but common format
-	SCTE35_DATERANGE                     // SCTE35_DATERANGE is standard format for HLS
+	SCTE35_DATERANGE                     // SCTE35_DATERANGE is standard format for HLS. Stored separately
 )
+
+func (s SCTE35Syntax) String() string {
+	switch s {
+	case SCTE35_NONE:
+		return "None"
+	case SCTE35_67_2014:
+		return "SCTE35_67_2014"
+	case SCTE35_OATCLS:
+		return "SCTE35_OATCLS"
+	case SCTE35_DATERANGE:
+		return "SCTE35_DATERANGE"
+	}
+	return "Unknown"
+}
 
 // SCTE35CueType defines the type of cue point
 type SCTE35CueType uint
@@ -94,7 +108,6 @@ const (
 	SCTE35Cue_Start SCTE35CueType = iota // SCTE35Cue_Start indicates an cue-out point
 	SCTE35Cue_Mid                        // SCTE35Cue_Mid indicates a segment between start and end cue points
 	SCTE35Cue_End                        // SCTE35Cue_End indicates a cue-in point
-	SCTE35Cue_Cmd                        // Not in, out, or mid. Indicates a command for splice.
 )
 
 // MediaPlaylist represents a single bitrate playlist aka media playlist.
@@ -123,9 +136,9 @@ type MediaPlaylist struct {
 	tail             uint            // tail of FIFO, we remove segments from tail
 	count            uint            // number of segments added to the playlist
 	buf              bytes.Buffer    // buffer used for encoding and caching playlist output
+	scte35Syntax     SCTE35Syntax    // SCTE-35 syntax used in the playlist
 	ver              uint8           // protocol version of the playlist, 3 or higher
 	targetDurLocked  bool            // target duration is locked and cannot be changed
-
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which
@@ -198,32 +211,30 @@ type Alternative struct {
 // MediaSegment represents a media segment included in a
 // media playlist. Media segment may be encrypted.
 type MediaSegment struct {
-	SeqId           uint64    // SeqId is the sequence number of the segment. Should be unique and consecutive.
-	URI             string    // URI is the path to the media segment.
-	Duration        float64   // EXTINF first parameter. Duration in seconds.
-	Title           string    // EXTINF optional second parameter.
-	Limit           int64     // EXT-X-BYTERANGE <n> is length in bytes for the file under URI.
-	Offset          int64     // EXT-X-BYTERANGE [@o] is offset from the start of the file under URI.
-	Key             *Key      // EXT-X-KEY  changes the key for encryption until next EXT-X-KEY tag.
-	Map             *Map      // EXT-X-MAP changes the Media Initialization Section until next EXT-X-MAP tag.
-	Discontinuity   bool      // EXT-X-DISCONTINUITY signals a discontinuity between the surrounding segments.
-	SCTE            *SCTE     // SCTE-35 used for Ad signaling in HLS.
-	ProgramDateTime time.Time // EXT-X-PROGRAM-DATE-TIME associates the first sample with an absolute date and/or time.
-	Custom          CustomMap // Custom holds custom tags
+	SeqId            uint64       // SeqId is the sequence number of the segment. Should be unique and consecutive.
+	URI              string       // URI is the path to the media segment.
+	Duration         float64      // EXTINF first parameter. Duration in seconds.
+	Title            string       // EXTINF optional second parameter.
+	Limit            int64        // EXT-X-BYTERANGE <n> is length in bytes for the file under URI.
+	Offset           int64        // EXT-X-BYTERANGE [@o] is offset from the start of the file under URI.
+	Key              *Key         // EXT-X-KEY  changes the key for encryption until next EXT-X-KEY tag.
+	Map              *Map         // EXT-X-MAP changes the Media Initialization Section until next EXT-X-MAP tag.
+	Discontinuity    bool         // EXT-X-DISCONTINUITY signals a discontinuity between the surrounding segments.
+	SCTE             *SCTE        // SCTE-35 used for Ad signaling in HLS.
+	SCTE35DateRanges []*DateRange // SCTE-35 date-range tags preceeding this segment
+	ProgramDateTime  time.Time    // EXT-X-PROGRAM-DATE-TIME associates first sample with an absolute date and/or time.
+	Custom           CustomMap    // Custom holds custom tags
 }
 
-// SCTE holds both custom and EXT-X-DATERANGE SCTE-35 tags.
+// SCTE holds custom SCTE-35 tags.
 type SCTE struct {
-	Syntax          SCTE35Syntax  // Syntax defines the format of the SCTE-35 cue tag
-	CueType         SCTE35CueType // CueType defines whether the cue is a start, mid, end, cmd (as applicable)
-	Cue             string        // Base64 encoded SCTE-35 cue message
-	ID              string        // Unique ID
-	Time            float64       // TIME for SCTE-67 and OATCLS SCTE-35 signalling
-	Elapsed         float64       // ELAPSED for OATCLS SCTE-35 signalling
-	PlannedDuration *float64      // PLANNED-DURATION for DATERANGE SCTE-35 signalling
-	Duration        *float64      // DURATION in seconds for OATCLS and DATERANGE SCTE-35 signalling
-	StartDate       *time.Time    // START-DATE for DATERANGE SCTE-35 signalling
-	EndDate         *time.Time    // END-DATE for DATERANGE SCTE-35 signalling
+	Syntax   SCTE35Syntax  // Syntax defines the format of the SCTE-35 cue tag
+	CueType  SCTE35CueType // CueType defines whether the cue is a start, mid, end, cmd (as applicable)
+	Cue      string        // Base64 encoded SCTE-35 cue message
+	ID       string        // Unique ID
+	Time     float64       // TIME for SCTE-67 and OATCLS SCTE-35 signalling
+	Elapsed  float64       // ELAPSED for OATCLS SCTE-35 signalling
+	Duration *float64      // DURATION in seconds for OATCLS signalling
 }
 
 // Key structure represents information about stream encryption (EXT-X-KEY tag)
@@ -271,6 +282,7 @@ type decodingState struct {
 	xkey               *Key
 	xmap               *Map
 	scte               *SCTE
+	scte35DateRanges   []*DateRange
 	custom             CustomMap
 }
 
@@ -298,7 +310,7 @@ type Attribute struct {
 }
 
 /*
-[scte67]: http://www.scte.org/documents/pdf/standards/SCTE%2067%202014.pdf
+[scte67]: https://webstore.ansi.org/standards/scte/ansiscte672017
 [hls-spec]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16
 [ISO/IEC 8601:2004]:http://www.iso.org/iso/catalogue_detail?csnumber=40874
 [Protocol Version Compatibility]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16#section-8
