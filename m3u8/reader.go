@@ -382,8 +382,7 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 			defineType = QUERYPARAM
 			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:QUERYPARAM=%q", &name)
 		case strings.HasPrefix(line, "#EXT-X-DEFINE:IMPORT="):
-			defineType = IMPORT
-			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:IMPORT=%q", &name)
+			return fmt.Errorf("EXT-X-DEFINE IMPORT not allowed in master playlist")
 		default:
 			return fmt.Errorf("unknown EXT-X-DEFINE format: %s", line)
 		}

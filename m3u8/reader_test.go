@@ -959,7 +959,16 @@ func TestDecodeMasterPlaylistWithDefines(t *testing.T) {
 	is.Equal(p.Defines[1].Type, QUERYPARAM)
 	is.Equal(p.Defines[1].Value, "")
 }
-
+func TestDecodeMasterPlaylistWithInvalidDefines(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/master-with-defines-invalid.m3u8")
+	is.NoErr(err) // must open file
+	p := NewMasterPlaylist()
+	err = p.DecodeFrom(bufio.NewReader(f), false)
+	is.NoErr(err) // must decode playlist
+	// check parsed values
+	is.Equal(len(p.Defines), 0) // must be 0 defines
+}
 func TestDecodeMediaPlaylistWithDefines(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-defines.m3u8")
