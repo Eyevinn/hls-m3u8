@@ -21,6 +21,19 @@ func TestNewMediaPlaylist(t *testing.T) {
 	}
 }
 
+func TestSCTE35String(t *testing.T) {
+	data := []struct {
+		syntax   SCTE35Syntax
+		expected string
+	}{{SCTE35_NONE, "None"}, {SCTE35_67_2014, "SCTE35_67_2014"}, {SCTE35_OATCLS, "SCTE35_OATCLS"}, {SCTE35_DATERANGE, "SCTE35_DATERANGE"}}
+
+	for _, d := range data {
+		if d.syntax.String() != d.expected {
+			t.Fatalf("Expected %s, got %s", d.expected, d.syntax.String())
+		}
+	}
+}
+
 type MockCustomTag struct {
 	name          string
 	err           error
