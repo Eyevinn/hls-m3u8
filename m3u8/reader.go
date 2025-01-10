@@ -392,7 +392,10 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 			return fmt.Errorf("error parsing EXT-X-DEFINE: %w", err)
 		}
 
-		p.AppendDefine(Define{name, defineType, value})
+		err = p.AppendDefine(Define{name, defineType, value})
+		if err != nil {
+			return err
+		}
 	}
 	return err
 }
