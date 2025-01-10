@@ -813,6 +813,34 @@ func TestCalculateTargetDuration(t *testing.T) {
 	}
 }
 
+// Create new master and media playlist
+// Add define to playlists
+func TestAppendDefine(t *testing.T) {
+	is := is.New(t)
+	tests := []struct {
+		define   Define
+		Expected string
+	}{
+		{Define{Name: "Define1", Type: VALUE, Value: "Value1"}, `#EXT-X-DEFINE:NAME="Define1",VALUE="Value1"` + "\n"},
+		{Define{Name: "Define2", Type: IMPORT}, `#EXT-X-DEFINE:IMPORT="Define2"` + "\n"},
+		{Define{Name: "Define3", Type: QUERYPARAM}, `#EXT-X-DEFINE:QUERYPARAM="Define3"` + "\n"},
+	}
+
+	for _, test := range tests {
+		p := NewMasterPlaylist()
+		e := p.AppendDefine(test.define)
+		if test.define.Type != IMPORT {
+			is.NoErr(e)
+			is.True(strings.Contains(p.String(), test.Expected))
+		}
+
+		mp, e := NewMediaPlaylist(1, 1)
+		is.NoErr(e) // Create media playlist should be successful
+		mp.AppendDefine(test.define)
+		is.True(strings.Contains(mp.String(), test.Expected))
+	}
+}
+
 /******************************
  *  Code generation examples  *
  ******************************/

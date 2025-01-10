@@ -367,6 +367,32 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		state.variant = variant
 		state.variant.Iframe = true
 		p.Variants = append(p.Variants, state.variant)
+	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
+		var (
+			name       string
+			value      string
+			defineType DefineType
+		)
+
+		switch {
+		case strings.HasPrefix(line, "#EXT-X-DEFINE:NAME="):
+			defineType = VALUE
+			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:NAME=%q,VALUE=%q", &name, &value)
+		case strings.HasPrefix(line, "#EXT-X-DEFINE:QUERYPARAM="):
+			defineType = QUERYPARAM
+			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:QUERYPARAM=%q", &name)
+		case strings.HasPrefix(line, "#EXT-X-DEFINE:IMPORT="):
+			defineType = IMPORT
+			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:IMPORT=%q", &name)
+		default:
+			return fmt.Errorf("unknown EXT-X-DEFINE format: %s", line)
+		}
+
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-DEFINE: %w", err)
+		}
+
+		p.AppendDefine(Define{name, defineType, value})
 	}
 	return err
 }
@@ -734,6 +760,32 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
+		var (
+			name       string
+			value      string
+			defineType DefineType
+		)
+
+		switch {
+		case strings.HasPrefix(line, "#EXT-X-DEFINE:NAME="):
+			defineType = VALUE
+			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:NAME=%q,VALUE=%q", &name, &value)
+		case strings.HasPrefix(line, "#EXT-X-DEFINE:QUERYPARAM="):
+			defineType = QUERYPARAM
+			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:QUERYPARAM=%q", &name)
+		case strings.HasPrefix(line, "#EXT-X-DEFINE:IMPORT="):
+			defineType = IMPORT
+			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:IMPORT=%q", &name)
+		default:
+			return fmt.Errorf("unknown EXT-X-DEFINE format: %s", line)
+		}
+
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-DEFINE: %w", err)
+		}
+
+		p.AppendDefine(Define{name, defineType, value})
 	case strings.HasPrefix(line, "#EXT-X-PLAYLIST-TYPE:"):
 		state.listType = MEDIA
 		var playlistType string

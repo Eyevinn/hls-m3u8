@@ -118,6 +118,7 @@ type MediaPlaylist struct {
 	SeqNo               uint64          // EXT-X-MEDIA-SEQUENCE
 	Segments            []*MediaSegment // List of segments in the playlist. Output may be limited by winsize.
 	Args                string          // optional query placed after URIs (URI?Args)
+	Defines             []Define        // EXT-X-DEFINE tags
 	Iframe              bool            // EXT-X-I-FRAMES-ONLY
 	Closed              bool            // is this VOD/EVENT (closed) or Live (sliding) playlist?
 	MediaType           MediaType       // EXT-X-PLAYLIST-TYPE (EVENT, VOD or empty)
@@ -140,6 +141,7 @@ type MediaPlaylist struct {
 	ver                 uint8           // protocol version of the playlist, 3 or higher
 	targetDurLocked     bool            // target duration is locked and cannot be changed
 	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
+
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which
@@ -148,6 +150,7 @@ type MediaPlaylist struct {
 type MasterPlaylist struct {
 	Variants            []*Variant      // Variants is a list of media playlists
 	Args                string          // optional query placed after URI (URI?Args)
+	Defines             []Define        // EXT-X-DEFINE tags
 	buf                 bytes.Buffer    // buffer used for encoding and caching playlist
 	ver                 uint8           // protocol version of the playlist, 3 or higher
 	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
@@ -308,6 +311,21 @@ type DateRange struct {
 type Attribute struct {
 	Key string // Name of the attribute
 	Val string // Value including quotes if a quoted string, and 0x if hexadecimal value
+}
+
+type DefineType uint
+
+const (
+	VALUE DefineType = iota
+	IMPORT
+	QUERYPARAM
+)
+
+// The EXT-X-DEFINE tag provides a Playlist variable definition or declaration.
+type Define struct {
+	Name  string     // Specifies the Variable Name.
+	Type  DefineType // name-VALUE pair, QUERYPARAM or IMPORT.
+	Value string     // Only used if type is VALUE.
 }
 
 /*

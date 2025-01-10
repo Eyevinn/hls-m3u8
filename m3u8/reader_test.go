@@ -942,6 +942,46 @@ func TestDanglingScte35DateRange(t *testing.T) {
 	is.Equal(ErrDanglingSCTE35DateRange, err) // must return ErrDanglingSCTE35DateRange
 }
 
+func TestDecodeMasterPlaylistWithDefines(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/master-with-defines.m3u8")
+	is.NoErr(err) // must open file
+	p := NewMasterPlaylist()
+	err = p.DecodeFrom(bufio.NewReader(f), false)
+	is.NoErr(err) // must decode playlist
+	// check parsed values
+	is.Equal(len(p.Defines), 2) // must be 2 defines
+
+	is.Equal(p.Defines[0].Name, "Define1")
+	is.Equal(p.Defines[0].Type, VALUE)
+	is.Equal(p.Defines[0].Value, "Value1")
+	is.Equal(p.Defines[1].Name, "Define2")
+	is.Equal(p.Defines[1].Type, QUERYPARAM)
+	is.Equal(p.Defines[1].Value, "")
+}
+
+func TestDecodeMediaPlaylistWithDefines(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-with-defines.m3u8")
+	is.NoErr(err) // must open file
+	p, err := NewMediaPlaylist(1, 1)
+	is.NoErr(err) // must create playlist
+	err = p.DecodeFrom(bufio.NewReader(f), false)
+	is.NoErr(err) // must decode playlist
+	// check parsed values
+	is.Equal(len(p.Defines), 3) // must be 3 defines
+
+	is.Equal(p.Defines[0].Name, "Define1")
+	is.Equal(p.Defines[0].Type, VALUE)
+	is.Equal(p.Defines[0].Value, "Value1")
+	is.Equal(p.Defines[1].Name, "Define2")
+	is.Equal(p.Defines[1].Type, QUERYPARAM)
+	is.Equal(p.Defines[1].Value, "")
+	is.Equal(p.Defines[2].Name, "Define3")
+	is.Equal(p.Defines[2].Type, IMPORT)
+	is.Equal(p.Defines[2].Value, "")
+}
+
 /***************************
  *  Code parsing examples  *
  ***************************/

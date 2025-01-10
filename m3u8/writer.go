@@ -53,6 +53,14 @@ func (p *MasterPlaylist) Append(uri string, chunklist *MediaPlaylist, params Var
 	p.buf.Reset()
 }
 
+func (p *MasterPlaylist) AppendDefine(d Define) error {
+	if d.Type == IMPORT {
+		return errors.New("IMPORT not allowed in master playlist")
+	}
+	p.Defines = append(p.Defines, d)
+	return nil
+}
+
 // ResetCache resets the playlist's cache (its buffer).
 func (p *MasterPlaylist) ResetCache() {
 	p.buf.Reset()
@@ -70,6 +78,24 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 
 	if p.IndependentSegments() {
 		p.buf.WriteString("#EXT-X-INDEPENDENT-SEGMENTS\n")
+	}
+	if len(p.Defines) > 0 {
+		for _, d := range p.Defines {
+			p.buf.WriteString("#EXT-X-DEFINE:")
+			switch d.Type {
+			case VALUE:
+				p.buf.WriteString("NAME=\"")
+				p.buf.WriteString(d.Name)
+				p.buf.WriteString("\",VALUE=\"")
+				p.buf.WriteString(d.Value)
+				p.buf.WriteString("\"")
+			case QUERYPARAM:
+				p.buf.WriteString("QUERYPARAM=\"")
+				p.buf.WriteString(d.Name)
+				p.buf.WriteString("\"")
+			}
+			p.buf.WriteRune('\n')
+		}
 	}
 
 	// Write any custom master tags
@@ -494,6 +520,10 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	return nil
 }
 
+func (p *MediaPlaylist) AppendDefine(d Define) {
+	p.Defines = append(p.Defines, d)
+}
+
 // Slide combines two operations: first it removes one chunk from
 // the head of chunk slice and move pointer to next chunk. Secondly it
 // appends one chunk to the tail of chunk slice. Useful for sliding
@@ -570,6 +600,28 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			}
 		}
 		p.buf.WriteRune('\n')
+	}
+	if len(p.Defines) > 0 {
+		for _, d := range p.Defines {
+			p.buf.WriteString("#EXT-X-DEFINE:")
+			switch d.Type {
+			case VALUE:
+				p.buf.WriteString("NAME=\"")
+				p.buf.WriteString(d.Name)
+				p.buf.WriteString("\",VALUE=\"")
+				p.buf.WriteString(d.Value)
+				p.buf.WriteString("\"")
+			case IMPORT:
+				p.buf.WriteString("IMPORT=\"")
+				p.buf.WriteString(d.Name)
+				p.buf.WriteString("\"")
+			case QUERYPARAM:
+				p.buf.WriteString("QUERYPARAM=\"")
+				p.buf.WriteString(d.Name)
+				p.buf.WriteString("\"")
+			}
+			p.buf.WriteRune('\n')
+		}
 	}
 	// default MAP before any segment
 	if p.Map != nil {
