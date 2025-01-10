@@ -301,6 +301,7 @@ func TestReadWriteExtXIFrameStreamInf(t *testing.T) {
 func TestReadWritePlaylists(t *testing.T) {
 	is := is.New(t)
 	files := []string{
+		"master-with-closed-captions.m3u8",
 		"media-playlist-with-program-date-time.m3u8",
 		"master-groups-and-iframe.m3u8",
 		"media-playlist-with-multiple-dateranges.m3u8",
@@ -314,11 +315,11 @@ func TestReadWritePlaylists(t *testing.T) {
 			is.NoErr(err) // decode playlist should succeed
 			f.Close()
 			out := trimLineEnd(p.String())
+			// os.WriteFile("out.m3u8", []byte(out), 0644)
 			inData, err := os.ReadFile("sample-playlists/" + fileName)
 			is.NoErr(err) // read file should succeed
 			inStr := trimLineEnd(strings.Replace(string(inData), "\r\n", "\n", -1))
 			is.Equal(inStr, out) // output must match input
-
 		})
 	}
 }
