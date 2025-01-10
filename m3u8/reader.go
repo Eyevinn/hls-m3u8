@@ -593,6 +593,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	}
 
 	switch {
+	case line == "#EXT-X-INDEPENDENT-SEGMENTS":
+		p.SetIndependentSegments(true)
 	case !state.tagInf && strings.HasPrefix(line, "#EXTINF:"):
 		state.tagInf = true
 		state.listType = MEDIA
@@ -819,7 +821,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_OATCLS
 		state.scte.Cue = line[19:]
-	case state.tagSCTE35 && state.scte.Syntax == SCTE35_OATCLS && strings.HasPrefix(line, "#EXT-X-CUE-OUT:"):
+		// on the line below, state.scte.Syntax is a nil pointer
+	case state.tagSCTE35 && state.scte != nil &&
+		state.scte.Syntax == SCTE35_OATCLS && strings.HasPrefix(line, "#EXT-X-CUE-OUT:"):
 		// EXT-OATCLS-SCTE35 contains the SCTE35 tag, EXT-X-CUE-OUT contains duration
 		state.scte.Time, _ = strconv.ParseFloat(line[15:], 64)
 		state.scte.CueType = SCTE35Cue_Start

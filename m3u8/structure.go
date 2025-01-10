@@ -114,31 +114,32 @@ const (
 // It is used for both VOD, EVENT and sliding window live media playlists with window size.
 // URI lines in the Playlist point to media segments.
 type MediaPlaylist struct {
-	TargetDuration   uint            // TargetDuration is max media segment duration. Rounding depends on version.
-	SeqNo            uint64          // EXT-X-MEDIA-SEQUENCE
-	Segments         []*MediaSegment // List of segments in the playlist. Output may be limited by winsize.
-	Args             string          // optional query placed after URIs (URI?Args)
-	Iframe           bool            // EXT-X-I-FRAMES-ONLY
-	Closed           bool            // is this VOD/EVENT (closed) or Live (sliding) playlist?
-	MediaType        MediaType       // EXT-X-PLAYLIST-TYPE (EVENT, VOD or empty)
-	DiscontinuitySeq uint64          // EXT-X-DISCONTINUITY-SEQUENCE
-	StartTime        float64         // EXT-X-START:TIME-OFFSET=<n>
-	StartTimePrecise bool            // EXT-X-START:PRECISE=YES
-	Key              *Key            // EXT-X-KEY is initial key tag for encrypted segments
-	Map              *Map            // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
-	DateRanges       []*DateRange    // EXT-X-DATERANGE tags not associated with SCTE-35
-	AllowCache       *bool           // EXT-X-ALLOW-CACHE tag YES/NO, removed in version 7
-	Custom           CustomMap       // Custom-provided tags for encoding
-	customDecoders   []CustomDecoder // customDecoders provides custom tags for decoding
-	winsize          uint            // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT
-	capacity         uint            // total capacity of slice used for the playlist
-	head             uint            // head of FIFO, we add segments to head
-	tail             uint            // tail of FIFO, we remove segments from tail
-	count            uint            // number of segments added to the playlist
-	buf              bytes.Buffer    // buffer used for encoding and caching playlist output
-	scte35Syntax     SCTE35Syntax    // SCTE-35 syntax used in the playlist
-	ver              uint8           // protocol version of the playlist, 3 or higher
-	targetDurLocked  bool            // target duration is locked and cannot be changed
+	TargetDuration      uint            // TargetDuration is max media segment duration. Rounding depends on version.
+	SeqNo               uint64          // EXT-X-MEDIA-SEQUENCE
+	Segments            []*MediaSegment // List of segments in the playlist. Output may be limited by winsize.
+	Args                string          // optional query placed after URIs (URI?Args)
+	Iframe              bool            // EXT-X-I-FRAMES-ONLY
+	Closed              bool            // is this VOD/EVENT (closed) or Live (sliding) playlist?
+	MediaType           MediaType       // EXT-X-PLAYLIST-TYPE (EVENT, VOD or empty)
+	DiscontinuitySeq    uint64          // EXT-X-DISCONTINUITY-SEQUENCE
+	StartTime           float64         // EXT-X-START:TIME-OFFSET=<n>
+	StartTimePrecise    bool            // EXT-X-START:PRECISE=YES
+	Key                 *Key            // EXT-X-KEY is initial key tag for encrypted segments
+	Map                 *Map            // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
+	DateRanges          []*DateRange    // EXT-X-DATERANGE tags not associated with SCTE-35
+	AllowCache          *bool           // EXT-X-ALLOW-CACHE tag YES/NO, removed in version 7
+	Custom              CustomMap       // Custom-provided tags for encoding
+	customDecoders      []CustomDecoder // customDecoders provides custom tags for decoding
+	winsize             uint            // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT
+	capacity            uint            // total capacity of slice used for the playlist
+	head                uint            // head of FIFO, we add segments to head
+	tail                uint            // tail of FIFO, we remove segments from tail
+	count               uint            // number of segments added to the playlist
+	buf                 bytes.Buffer    // buffer used for encoding and caching playlist output
+	scte35Syntax        SCTE35Syntax    // SCTE-35 syntax used in the playlist
+	ver                 uint8           // protocol version of the playlist, 3 or higher
+	targetDurLocked     bool            // target duration is locked and cannot be changed
+	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which

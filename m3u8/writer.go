@@ -435,6 +435,14 @@ func (p *MediaPlaylist) last() uint {
 	return p.tail - 1
 }
 
+func (p *MediaPlaylist) SetIndependentSegments(b bool) {
+	p.independentSegments = b
+}
+
+func (p *MediaPlaylist) IndependentSegments() bool {
+	return p.independentSegments
+}
+
 // Remove current segment from the head of chunk slice form a media playlist. Useful for sliding playlists.
 // This operation resets playlist cache.
 func (p *MediaPlaylist) Remove() (err error) {
@@ -516,6 +524,10 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	p.buf.WriteString("#EXTM3U\n#EXT-X-VERSION:")
 	p.buf.WriteString(strVer(p.ver))
 	p.buf.WriteRune('\n')
+
+	if p.IndependentSegments() {
+		p.buf.WriteString("#EXT-X-INDEPENDENT-SEGMENTS\n")
+	}
 
 	// Write any custom master tags
 	if p.Custom != nil {
