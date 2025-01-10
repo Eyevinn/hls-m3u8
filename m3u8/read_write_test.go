@@ -296,6 +296,23 @@ func TestReadWriteExtXIFrameStreamInf(t *testing.T) {
 	}
 }
 
+func TestReadWriteMultipleExtXDateRange(t *testing.T) {
+	is := is.New(t)
+	asset := "sample-playlists/media-playlist-with-multiple-dateranges.m3u8"
+	f, err := os.Open(asset)
+	is.NoErr(err) // open file should succeed
+	p, _, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // decode playlist should succeed
+	mp := p.(*MediaPlaylist)
+	f.Close()
+	out := trimLineEnd(mp.String())
+	inData, err := os.ReadFile(asset)
+	is.NoErr(err) // read file should succeed
+	inStr := string(inData)
+	inStr = trimLineEnd(strings.Replace(inStr, "\r\n", "\n", -1))
+	is.Equal(inStr, out) // output must match input
+}
+
 // TestReadWriteMediaPlaylist tests reading and writing media playlists from sample-playlists
 // Looks at verbatim match, so the order of tags and attributes must match.
 func TestReadWritePlaylists(t *testing.T) {
