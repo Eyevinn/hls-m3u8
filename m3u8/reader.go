@@ -18,6 +18,7 @@ import (
 var ErrExtM3UAbsent = errors.New("#EXTM3U absent")
 var ErrNotYesOrNo = errors.New("value must be YES or NO")
 var ErrCannotDetectPlaylistType = errors.New("cannot detect playlist type")
+var ErrDanglingSCTE35DateRange = errors.New("dangling SCTE-35 DateRange tag after last segment not supported")
 
 var reKeyValue = regexp.MustCompile(`([a-zA-Z0-9_-]+)=("[^"]+"|[^",]+)`)
 
@@ -171,6 +172,11 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 	if strict && !state.m3u {
 		return ErrExtM3UAbsent
 	}
+	// SCTE-35 DATERANGE tags after last segment are not allowed
+	// since we associate each SCTE-35 tag with the next segment.
+	if len(state.scte35DateRanges) > 0 {
+		return ErrDanglingSCTE35DateRange
+	}
 	return nil
 }
 
@@ -271,6 +277,11 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		if media.Closed || media.MediaType == EVENT {
 			// VoD and Event's should show the entire playlist
 			_ = media.SetWinSize(0)
+		}
+		// SCTE-35 DATERANGE tags after last segment are not allowed
+		// since we associate each SCTE-35 tag with the next segment.
+		if len(state.scte35DateRanges) > 0 {
+			return nil, MEDIA, ErrDanglingSCTE35DateRange
 		}
 		return media, MEDIA, nil
 	}

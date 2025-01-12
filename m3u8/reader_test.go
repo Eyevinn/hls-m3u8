@@ -923,6 +923,25 @@ func TestDecodeRenditionsAndIframes(t *testing.T) {
 	is.Equal(len(allRenditions), 2) // Expected 2 renditions
 }
 
+// Check that dangling SCTE35 DateRange tags is reported as error since not supported.
+func TestDanglingScte35DateRange(t *testing.T) {
+	is := is.New(t)
+	f1, err := os.Open("sample-playlists/media-playlist-dangling-scte35-daterange.m3u8")
+	is.NoErr(err) // must open file
+	defer f1.Close()
+	_, listType, err := DecodeFrom(bufio.NewReader(f1), true)
+	is.Equal(listType, MEDIA)                 // must be media playlist
+	is.Equal(ErrDanglingSCTE35DateRange, err) // must return ErrDanglingSCTE35DateRange
+
+	f2, err := os.Open("sample-playlists/media-playlist-dangling-scte35-daterange.m3u8")
+	is.NoErr(err) // must open file
+	defer f2.Close()
+	pl, err := NewMediaPlaylist(0, 5)
+	is.NoErr(err) // must create playlist
+	err = pl.DecodeFrom(bufio.NewReader(f2), true)
+	is.Equal(ErrDanglingSCTE35DateRange, err) // must return ErrDanglingSCTE35DateRange
+}
+
 /***************************
  *  Code parsing examples  *
  ***************************/
