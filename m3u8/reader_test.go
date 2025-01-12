@@ -311,6 +311,7 @@ func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
 #EXT-X-VERSION:3
 #EXT-X-MEDIA-SEQUENCE:0
 %s
+1.ts
 `
 
 	tests := []struct {
@@ -320,21 +321,21 @@ func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
 		wantSegment *MediaSegment
 	}{
 		// strict mode on
-		{true, "#EXTINF:10.000,", false, &MediaSegment{Duration: 10.0, Title: ""}},
-		{true, "#EXTINF:10.000,Title", false, &MediaSegment{Duration: 10.0, Title: "Title"}},
-		{true, "#EXTINF:10.000,Title,Track", false, &MediaSegment{Duration: 10.0, Title: "Title,Track"}},
+		{true, "#EXTINF:10.000,", false, &MediaSegment{Duration: 10.0, Title: "", URI: "1.ts"}},
+		{true, "#EXTINF:10.000,Title", false, &MediaSegment{Duration: 10.0, Title: "Title", URI: "1.ts"}},
+		{true, "#EXTINF:10.000,Title,Track", false, &MediaSegment{Duration: 10.0, Title: "Title,Track", URI: "1.ts"}},
 		{true, "#EXTINF:invalid,", true, nil},
 		{true, "#EXTINF:10.000", true, nil},
 
 		// strict mode off
-		{false, "#EXTINF:10.000,", false, &MediaSegment{Duration: 10.0, Title: ""}},
-		{false, "#EXTINF:10.000,Title", false, &MediaSegment{Duration: 10.0, Title: "Title"}},
-		{false, "#EXTINF:10.000,Title,Track", false, &MediaSegment{Duration: 10.0, Title: "Title,Track"}},
-		{false, "#EXTINF:invalid,", false, &MediaSegment{Duration: 0.0, Title: ""}},
-		{false, "#EXTINF:10.000", false, &MediaSegment{Duration: 10.0, Title: ""}},
+		{false, "#EXTINF:10.000,", false, &MediaSegment{Duration: 10.0, Title: "", URI: "1.ts"}},
+		{false, "#EXTINF:10.000,Title", false, &MediaSegment{Duration: 10.0, Title: "Title", URI: "1.ts"}},
+		{false, "#EXTINF:10.000,Title,Track", false, &MediaSegment{Duration: 10.0, Title: "Title,Track", URI: "1.ts"}},
+		{false, "#EXTINF:invalid,", false, &MediaSegment{Duration: 0.0, Title: "", URI: "1.ts"}},
+		{false, "#EXTINF:10.000", false, &MediaSegment{Duration: 10.0, Title: "", URI: "1.ts"}},
 	}
 
-	for _, test := range tests {
+	for nr, test := range tests {
 		p, err := NewMediaPlaylist(1, 1)
 		is.NoErr(err) // create playlist
 
@@ -346,7 +347,7 @@ func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
 		}
 		is.NoErr(err) // must decode playlist
 		if !reflect.DeepEqual(p.Segments[0], test.wantSegment) {
-			t.Errorf("\nhave: %+v\nwant: %+v", p.Segments[0], test.wantSegment)
+			t.Errorf("\nnr %d: have: %+v\nwant: %+v", nr, p.Segments[0], test.wantSegment)
 		}
 	}
 }

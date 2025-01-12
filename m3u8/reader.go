@@ -70,6 +70,9 @@ func (p *MasterPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 			break
 		}
 		line = trimLineEnd(line)
+		if line == "" {
+			continue
+		}
 		err = decodeLineOfMasterPlaylist(p, state, line, strict)
 		if strict && err != nil {
 			return err
@@ -156,6 +159,9 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 			break
 		}
 		line = trimLineEnd(line)
+		if line == "" {
+			continue
+		}
 		err = decodeLineOfMediaPlaylist(p, state, line, strict)
 		if strict && err != nil {
 			return err
@@ -233,6 +239,9 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 			break
 		}
 		line = trimLineEnd(line)
+		if line == "" {
+			continue
+		}
 
 		if state.listType != MEDIA {
 			err = decodeLineOfMasterPlaylist(master, state, line, strict)
