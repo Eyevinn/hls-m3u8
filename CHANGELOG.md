@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SCTE-35 EXT-X-DATERANGE tags are attached to current segment
 - MediaPlaylist.SCTE35Syntax() method
 - SCTE35Syntax has String() method
+- EXT-X-DEFINE support in both master and media playlists
 
 ### Changed
 
