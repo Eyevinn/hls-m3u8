@@ -151,6 +151,7 @@ type MasterPlaylist struct {
 	Variants            []*Variant      // Variants is a list of media playlists
 	Args                string          // optional query placed after URI (URI?Args)
 	Defines             []Define        // EXT-X-DEFINE tags
+	SessionDatas        []*SessionData  // EXT-X-SESSION-DATA tags
 	buf                 bytes.Buffer    // buffer used for encoding and caching playlist
 	ver                 uint8           // protocol version of the playlist, 3 or higher
 	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
@@ -321,11 +322,20 @@ const (
 	QUERYPARAM
 )
 
-// The EXT-X-DEFINE tag provides a Playlist variable definition or declaration.
+// Define represents an EXT-X-DEFINE tag and provides a Playlist variable definition or declaration.
 type Define struct {
 	Name  string     // Specifies the Variable Name.
 	Type  DefineType // name-VALUE pair, QUERYPARAM or IMPORT.
 	Value string     // Only used if type is VALUE.
+}
+
+// SessionData represents an EXT-X-SESSION-DATA tag.
+type SessionData struct {
+	DataId   string // DATA-ID is a mandatory quoted-string
+	Value    string // VALUE is a quoted-string
+	URI      string // URI is a quoted-string
+	Format   string // FORMAT is enumerated string. Values are JSON and RAW (default is JSON)
+	Language string // LANGUAGE is a quoted-string containing an [RFC5646] language tag
 }
 
 /*
@@ -333,4 +343,5 @@ type Define struct {
 [hls-spec]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16
 [ISO/IEC 8601:2004]:http://www.iso.org/iso/catalogue_detail?csnumber=40874
 [Protocol Version Compatibility]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16#section-8
+[RFC5646]: https://datatracker.ietf.org/doc/html/rfc5646
 */

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MediaPlaylist.SCTE35Syntax() method
 - SCTE35Syntax has String() method
 - EXT-X-DEFINE support in both master and media playlists
+- EXT-X-SESSION-DATA support
 
 ### Changed
 

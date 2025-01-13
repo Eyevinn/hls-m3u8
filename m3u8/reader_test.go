@@ -271,6 +271,19 @@ func TestDecodeMasterWithHLSV7(t *testing.T) {
 	}
 }
 
+func TestReadBadSessionData(t *testing.T) {
+	is := is.New(t)
+	pl := `#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-SESSION-DATA:DATA-ID="com.example.title",VALUE="This is an example title",FORMAT=bad
+#EXT-X-INF:BANDWIDTH=1280000
+video.m3u8
+`
+	p := NewMasterPlaylist()
+	err := p.DecodeFrom(bufio.NewReader(bytes.NewBufferString(pl)), true)
+	is.True(err != nil) // must return an error
+}
+
 /****************************
  * Begin Test MediaPlaylist *
  ****************************/

@@ -1,0 +1,5 @@
+#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-SESSION-DATA:DATA-ID="com.example.movie.title",VALUE="good",LANGUAGE="en"
+#EXT-X-STREAM-INF:BANDWIDTH=600000
+chunklist-b300000.m3u8

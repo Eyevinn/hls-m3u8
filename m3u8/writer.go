@@ -98,6 +98,10 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 
+	for _, sd := range p.SessionDatas {
+		writeSessionData(&p.buf, sd)
+	}
+
 	// Write any custom master tags
 	if p.Custom != nil {
 		for _, v := range p.Custom {
@@ -334,6 +338,25 @@ func writeDateRange(buf *bytes.Buffer, dr *DateRange) {
 	}
 	for _, xa := range dr.XAttrs {
 		writeUnQuoted(buf, xa.Key, xa.Val)
+	}
+	buf.WriteRune('\n')
+}
+
+func writeSessionData(buf *bytes.Buffer, sd *SessionData) {
+	buf.WriteString("#EXT-X-SESSION-DATA:DATA-ID=\"")
+	buf.WriteString(sd.DataId)
+	buf.WriteRune('"')
+	if sd.Value != "" {
+		writeQuoted(buf, "VALUE", sd.Value)
+	}
+	if sd.URI != "" {
+		writeQuoted(buf, "URI", sd.URI)
+	}
+	if sd.Format != "JSON" {
+		writeUnQuoted(buf, "FORMAT", sd.Format)
+	}
+	if sd.Language != "" {
+		writeQuoted(buf, "LANGUAGE", sd.Language)
 	}
 	buf.WriteRune('\n')
 }

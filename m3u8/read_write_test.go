@@ -296,11 +296,57 @@ func TestReadWriteExtXIFrameStreamInf(t *testing.T) {
 	}
 }
 
+func TestReadWriteSessionData(t *testing.T) {
+	is := is.New(t)
+	cases := []struct {
+		desc  string
+		line  string
+		error bool
+	}{
+		{
+			desc:  "minimal",
+			line:  `#EXT-X-SESSION-DATA:DATA-ID="com.example.lyrics",VALUE="example",LANGUAGE="en"`,
+			error: false,
+		},
+		{
+			desc:  "bad tag",
+			line:  `#EXT-X-SESSION-DAT:DATA-ID="com.example.lyrics",VALUE="example",LANGUAGE="en"`,
+			error: true,
+		},
+		{
+			desc:  "raw uri",
+			line:  `#EXT-X-SESSION-DATA:DATA-ID="co.l",URI="dataURI",FORMAT=RAW,LANGUAGE="en"`,
+			error: false,
+		},
+		{
+			desc:  "bad format",
+			line:  `#EXT-X-SESSION-DATA:DATA-ID="co.l",URI="dataURI",FORMAT=raw,LANGUAGE="en"`,
+			error: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			sd, err := parseSessionData(c.line)
+			if c.error {
+				is.Equal(err != nil, true) // must return an error
+				return
+			}
+			is.NoErr(err)
+			out := bytes.Buffer{}
+			writeSessionData(&out, sd)
+			outStr := trimLineEnd(out.String())
+			is.Equal(c.line, outStr) // EXT-X-SESSION-DATA line must match
+		})
+	}
+
+}
+
 // TestReadWriteMediaPlaylist tests reading and writing media playlists from sample-playlists
 // Looks at verbatim match, so the order of tags and attributes must match.
 func TestReadWritePlaylists(t *testing.T) {
 	is := is.New(t)
 	files := []string{
+		"master-with-sessiondata.m3u8",
 		"master-with-closed-captions.m3u8",
 		"media-playlist-with-program-date-time.m3u8",
 		"master-groups-and-iframe.m3u8",
@@ -314,12 +360,14 @@ func TestReadWritePlaylists(t *testing.T) {
 			p, _, err := DecodeFrom(bufio.NewReader(f), true)
 			is.NoErr(err) // decode playlist should succeed
 			f.Close()
-			out := trimLineEnd(p.String())
+			got := trimLineEnd(p.String())
 			// os.WriteFile("out.m3u8", []byte(out), 0644)
 			inData, err := os.ReadFile("sample-playlists/" + fileName)
 			is.NoErr(err) // read file should succeed
-			inStr := trimLineEnd(strings.Replace(string(inData), "\r\n", "\n", -1))
-			is.Equal(inStr, out) // output must match input
+			want := trimLineEnd(strings.Replace(string(inData), "\r\n", "\n", -1))
+			if got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
 		})
 	}
 }

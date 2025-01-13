@@ -395,6 +395,12 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		if err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-SESSION-DATA:"):
+		sd, err := parseSessionData(line)
+		if err != nil {
+			return err
+		}
+		p.SessionDatas = append(p.SessionDatas, sd)
 	}
 	return err
 }
@@ -603,6 +609,35 @@ func parseDateRange(line string) (*DateRange, error) {
 		}
 	}
 	return &dr, nil
+}
+
+func parseSessionData(line string) (*SessionData, error) {
+	sd := SessionData{
+		Format: "JSON",
+	}
+	if !strings.HasPrefix(line, "#EXT-X-SESSION-DATA:") {
+		return nil, fmt.Errorf("invalid EXT-X-SESSION-DATA line: %q", line)
+	}
+	for _, attr := range decodeAttributes(line[len("EXT-X-SESSION_-DATA:"):]) {
+		switch attr.Key {
+		case "DATA-ID":
+			sd.DataId = DeQuote(attr.Val)
+		case "VALUE":
+			sd.Value = DeQuote(attr.Val)
+		case "URI":
+			sd.URI = DeQuote(attr.Val)
+		case "FORMAT":
+			switch attr.Val {
+			case "JSON", "RAW":
+				sd.Format = attr.Val
+			default:
+				return nil, fmt.Errorf("invalid FORMAT: %s", attr.Val)
+			}
+		case "LANGUAGE":
+			sd.Language = DeQuote(attr.Val)
+		}
+	}
+	return &sd, nil
 }
 
 // DeQuote removes quotes from a string.
