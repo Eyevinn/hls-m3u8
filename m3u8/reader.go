@@ -401,7 +401,10 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 			return err
 		}
 		p.SessionDatas = append(p.SessionDatas, sd)
+	case strings.HasPrefix(line, "#EXT-X-SESSION-KEY:"):
+		p.SessionKeys = append(p.SessionKeys, parseKeyParams(line[19:]))
 	}
+
 	return err
 }
 
@@ -640,6 +643,25 @@ func parseSessionData(line string) (*SessionData, error) {
 	return &sd, nil
 }
 
+func parseKeyParams(parameters string) *Key {
+	key := Key{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "METHOD":
+			key.Method = attr.Val // NONE, AES-128, SAMPLE-AES, SAMPLE-AES-CTR
+		case "URI":
+			key.URI = DeQuote(attr.Val)
+		case "IV":
+			key.IV = attr.Val // Hex value
+		case "KEYFORMAT":
+			key.Keyformat = DeQuote(attr.Val)
+		case "KEYFORMATVERSIONS":
+			key.Keyformatversions = DeQuote(attr.Val)
+		}
+	}
+	return &key
+}
+
 // DeQuote removes quotes from a string.
 func DeQuote(s string) string {
 	if len(s) < 2 {
@@ -860,21 +882,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA
-		state.xkey = new(Key)
-		for k, v := range decodeAndTrimAttributes(line[11:]) {
-			switch k {
-			case "METHOD":
-				state.xkey.Method = v
-			case "URI":
-				state.xkey.URI = v
-			case "IV":
-				state.xkey.IV = v
-			case "KEYFORMAT":
-				state.xkey.Keyformat = v
-			case "KEYFORMATVERSIONS":
-				state.xkey.Keyformatversions = v
-			}
-		}
+		state.xkey = parseKeyParams(line[11:])
 		state.tagKey = true
 	case strings.HasPrefix(line, "#EXT-X-MAP:"):
 		state.listType = MEDIA

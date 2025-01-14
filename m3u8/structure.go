@@ -152,6 +152,7 @@ type MasterPlaylist struct {
 	Args                string          // optional query placed after URI (URI?Args)
 	Defines             []Define        // EXT-X-DEFINE tags
 	SessionDatas        []*SessionData  // EXT-X-SESSION-DATA tags
+	SessionKeys         []*Key          // EXT-X-SESSION-KEY tags
 	buf                 bytes.Buffer    // buffer used for encoding and caching playlist
 	ver                 uint8           // protocol version of the playlist, 3 or higher
 	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS

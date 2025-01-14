@@ -101,6 +101,9 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	for _, sd := range p.SessionDatas {
 		writeSessionData(&p.buf, sd)
 	}
+	for _, key := range p.SessionKeys {
+		writeKey("#EXT-X-SESSION-KEY:", &p.buf, key)
+	}
 
 	// Write any custom master tags
 	if p.Custom != nil {
@@ -361,6 +364,25 @@ func writeSessionData(buf *bytes.Buffer, sd *SessionData) {
 	buf.WriteRune('\n')
 }
 
+func writeKey(tag string, buf *bytes.Buffer, key *Key) {
+	buf.WriteString(tag)
+	buf.WriteString("METHOD=")
+	buf.WriteString(key.Method)
+	if key.Method != "NONE" {
+		writeQuoted(buf, "URI", key.URI)
+		if key.IV != "" {
+			writeUnQuoted(buf, "IV", key.IV)
+		}
+		if key.Keyformat != "" {
+			writeQuoted(buf, "KEYFORMAT", key.Keyformat)
+		}
+		if key.Keyformatversions != "" {
+			writeQuoted(buf, "KEYFORMATVERSIONS", key.Keyformatversions)
+		}
+	}
+	buf.WriteRune('\n')
+}
+
 // writeQuoted writes a quoted key-value pair to the buffer preceded by a comma.
 func writeQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteRune(',')
@@ -600,29 +622,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 
 	// default key before any segment
 	if p.Key != nil {
-		p.buf.WriteString("#EXT-X-KEY:")
-		p.buf.WriteString("METHOD=")
-		p.buf.WriteString(p.Key.Method)
-		if p.Key.Method != "NONE" {
-			p.buf.WriteString(",URI=\"")
-			p.buf.WriteString(p.Key.URI)
-			p.buf.WriteRune('"')
-			if p.Key.IV != "" {
-				p.buf.WriteString(",IV=")
-				p.buf.WriteString(p.Key.IV)
-			}
-			if p.Key.Keyformat != "" {
-				p.buf.WriteString(",KEYFORMAT=\"")
-				p.buf.WriteString(p.Key.Keyformat)
-				p.buf.WriteRune('"')
-			}
-			if p.Key.Keyformatversions != "" {
-				p.buf.WriteString(",KEYFORMATVERSIONS=\"")
-				p.buf.WriteString(p.Key.Keyformatversions)
-				p.buf.WriteRune('"')
-			}
-		}
-		p.buf.WriteRune('\n')
+		writeKey("#EXT-X-KEY:", &p.buf, p.Key)
 	}
 	if len(p.Defines) > 0 {
 		for _, d := range p.Defines {
@@ -756,29 +756,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 		// check for key change
 		if seg.Key != nil && (p.Key == nil || *seg.Key != *p.Key) {
-			p.buf.WriteString("#EXT-X-KEY:")
-			p.buf.WriteString("METHOD=")
-			p.buf.WriteString(seg.Key.Method)
-			if seg.Key.Method != "NONE" {
-				p.buf.WriteString(",URI=\"")
-				p.buf.WriteString(seg.Key.URI)
-				p.buf.WriteRune('"')
-				if seg.Key.IV != "" {
-					p.buf.WriteString(",IV=")
-					p.buf.WriteString(seg.Key.IV)
-				}
-				if seg.Key.Keyformat != "" {
-					p.buf.WriteString(",KEYFORMAT=\"")
-					p.buf.WriteString(seg.Key.Keyformat)
-					p.buf.WriteRune('"')
-				}
-				if seg.Key.Keyformatversions != "" {
-					p.buf.WriteString(",KEYFORMATVERSIONS=\"")
-					p.buf.WriteString(seg.Key.Keyformatversions)
-					p.buf.WriteRune('"')
-				}
-			}
-			p.buf.WriteRune('\n')
+			writeKey("#EXT-X-KEY:", &p.buf, seg.Key)
 		}
 		if seg.Discontinuity {
 			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
