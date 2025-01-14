@@ -677,6 +677,35 @@ func parseContentSteering(params string) *ContentSteering {
 	return &cs
 }
 
+func parseServerControl(params string) (*ServerControl, error) {
+	sc := ServerControl{}
+	var err error
+	for _, attr := range decodeAttributes(params) {
+		switch attr.Key {
+		case "CAN-SKIP-UNTIL":
+			sc.CanSkipUntil, err = strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid CAN-SKIP-UNTIL: %w", err)
+			}
+		case "CAN-SKIP-DATERANGES":
+			sc.CanSkipDateranges = attr.Val == "YES"
+		case "HOLD-BACK":
+			sc.HoldBack, err = strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid HOLD-BACK: %w", err)
+			}
+		case "PART-HOLD-BACK":
+			sc.PartHoldBack, err = strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid PART-HOLD-BACK: %w", err)
+			}
+		case "CAN-BLOCK-RELOAD":
+			sc.CanBlockReload = attr.Val == "YES"
+		}
+	}
+	return &sc, nil
+}
+
 // DeQuote removes quotes from a string.
 func DeQuote(s string) string {
 	if len(s) < 2 {
@@ -895,6 +924,12 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				p.StartTimePrecise = v == "YES"
 			}
 		}
+	case strings.HasPrefix(line, "#EXT-X-SERVER-CONTROL:"):
+		sc, err := parseServerControl(line[len("#EXT-X-SERVER-CONTROL:"):])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-SERVER-CONTROL: %w", err)
+		}
+		p.ServerControl = sc
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA
 		state.xkey = parseKeyParams(line[11:])

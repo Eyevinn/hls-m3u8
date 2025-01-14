@@ -396,6 +396,42 @@ func writeContentSteering(buf *bytes.Buffer, cs *ContentSteering) {
 	buf.WriteRune('\n')
 }
 
+func addCommaIfNotFirst(first bool, buf *bytes.Buffer) bool {
+	if !first {
+		buf.WriteRune(',')
+	}
+	return false
+}
+
+func writeServerControl(buf *bytes.Buffer, sc *ServerControl) {
+	buf.WriteString("#EXT-X-SERVER-CONTROL:")
+	first := true
+	if sc.CanSkipUntil > 0 {
+		buf.WriteString("CAN-SKIP-UNTIL=")
+		buf.WriteString(strconv.FormatFloat(sc.CanSkipUntil, 'f', 3, 64))
+		first = false
+	}
+	if sc.CanSkipDateranges {
+		first = addCommaIfNotFirst(first, buf)
+		buf.WriteString("CAN-SKIP-DATERANGES=YES")
+	}
+	if sc.HoldBack > 0 {
+		first = addCommaIfNotFirst(first, buf)
+		buf.WriteString("HOLD-BACK=")
+		buf.WriteString(strconv.FormatFloat(sc.HoldBack, 'f', 3, 64))
+	}
+	if sc.PartHoldBack > 0 {
+		first = addCommaIfNotFirst(first, buf)
+		buf.WriteString("PART-HOLD-BACK=")
+		buf.WriteString(strconv.FormatFloat(sc.PartHoldBack, 'f', 3, 64))
+	}
+	if sc.CanBlockReload {
+		_ = addCommaIfNotFirst(first, buf)
+		buf.WriteString("CAN-BLOCK-RELOAD=YES")
+	}
+	buf.WriteRune('\n')
+}
+
 // writeQuoted writes a quoted key-value pair to the buffer preceded by a comma.
 func writeQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteRune(',')
@@ -703,6 +739,9 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	}
 	if p.Iframe {
 		p.buf.WriteString("#EXT-X-I-FRAMES-ONLY\n")
+	}
+	if p.ServerControl != nil {
+		writeServerControl(&p.buf, p.ServerControl)
 	}
 
 	var (

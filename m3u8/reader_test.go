@@ -284,6 +284,23 @@ video.m3u8
 	is.True(err != nil) // must return an error
 }
 
+func TestReadBadPlaylists(t *testing.T) {
+	is := is.New(t)
+	files := []string{
+		"media-playlist-with-bad-server-control.m3u8",
+	}
+
+	for _, fileName := range files {
+		t.Run(fileName, func(t *testing.T) {
+			f, err := os.Open("sample-playlists/" + fileName)
+			is.NoErr(err) // open file should succeed
+			_, _, err = DecodeFrom(bufio.NewReader(f), true)
+			is.Equal(err != nil, true) // decode playlist should fail
+			f.Close()
+		})
+	}
+}
+
 /****************************
  * Begin Test MediaPlaylist *
  ****************************/

@@ -338,7 +338,53 @@ func TestReadWriteSessionData(t *testing.T) {
 			is.Equal(c.line, outStr) // EXT-X-SESSION-DATA line must match
 		})
 	}
+}
 
+func TestReadWriteServerControl(t *testing.T) {
+	is := is.New(t)
+	cases := []struct {
+		desc  string
+		line  string
+		error bool
+	}{
+		{
+			desc: "all fields",
+			line: `#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=60.000,CAN-SKIP-DATERANGES=YES,HOLD-BACK=18.000,PART-HOLD-BACK=3.000,CAN-BLOCK-RELOAD=YES`,
+		},
+		{
+			desc: "only hold-back",
+			line: `#EXT-X-SERVER-CONTROL:HOLD-BACK=18.000`,
+		},
+		{
+			desc:  "bad float 1",
+			line:  `#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=60.00E,CAN-SKIP-DATERANGES=YES,HOLD-BACK=18.000,PART-HOLD-BACK=3.000,CAN-BLOCK-RELOAD=YES`,
+			error: true,
+		},
+		{
+			desc:  "bad float 2",
+			line:  `#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=60.000,CAN-SKIP-DATERANGES=YES,HOLD-BACK=18.00F,PART-HOLD-BACK=3.000,CAN-BLOCK-RELOAD=YES`,
+			error: true,
+		},
+		{
+			desc:  "bad float 3",
+			line:  `#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=60.000,CAN-SKIP-DATERANGES=YES,HOLD-BACK=18.000,PART-HOLD-BACK=3.G00,CAN-BLOCK-RELOAD=YES`,
+			error: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			sd, err := parseServerControl(strings.TrimPrefix(c.line, "#EXT-X-SERVER-CONTROL:"))
+			if c.error {
+				is.Equal(err != nil, true) // must return an error
+				return
+			}
+			is.NoErr(err)
+			out := bytes.Buffer{}
+			writeServerControl(&out, sd)
+			outStr := trimLineEnd(out.String())
+			is.Equal(c.line, outStr) // EXT-X-SERVER-CONTROL line must match
+		})
+	}
 }
 
 // TestReadWriteMediaPlaylist tests reading and writing media playlists from sample-playlists
@@ -351,6 +397,7 @@ func TestReadWritePlaylists(t *testing.T) {
 		"media-playlist-with-program-date-time.m3u8",
 		"master-groups-and-iframe.m3u8",
 		"media-playlist-with-multiple-dateranges.m3u8",
+		"media-playlist-with-server-control.m3u8",
 	}
 
 	for _, fileName := range files {

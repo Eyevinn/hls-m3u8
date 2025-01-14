@@ -125,6 +125,7 @@ type MediaPlaylist struct {
 	DiscontinuitySeq    uint64          // EXT-X-DISCONTINUITY-SEQUENCE
 	StartTime           float64         // EXT-X-START:TIME-OFFSET=<n>
 	StartTimePrecise    bool            // EXT-X-START:PRECISE=YES
+	ServerControl       *ServerControl  // EXT-X-SERVER-CONTROL tag
 	Key                 *Key            // EXT-X-KEY is initial key tag for encrypted segments
 	Map                 *Map            // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
 	DateRanges          []*DateRange    // EXT-X-DATERANGE tags not associated with SCTE-35
@@ -344,6 +345,14 @@ type SessionData struct {
 type ContentSteering struct {
 	ServerURI string // SERVER-URI is a quoted-string containing a URI to a Steering Manifest
 	PathwayId string // PATHWAY-ID is a quoted-string containing a unique identifier for the pathway
+}
+
+type ServerControl struct {
+	CanSkipUntil      float64 // CAN-SKIP-UNTIL is a floating-point number of seconds
+	CanSkipDateranges bool    // CAN-SKIP-DATERANGES is optional enumerated YES, only allowd with CanSkipUntil
+	HoldBack          float64 // HOLD-BACK is a floating-point number of seconds
+	PartHoldBack      float64 // PART-HOLD-BACK is a floating-point number of seconds
+	CanBlockReload    bool    // CAN-BLOCK-RELOAD is optional enumerated YES (default is implicit NO)
 }
 
 /*

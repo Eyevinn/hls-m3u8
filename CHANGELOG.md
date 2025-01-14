@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - EXT-X-SESSION-KEY support
 - EXT-X-CONTENT-STEERING support
+- EXT-X-SERVER-CONTROL support
 
 ## [v0.3.0] 2025-01-14
 
