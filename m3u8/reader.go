@@ -403,6 +403,8 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		p.SessionDatas = append(p.SessionDatas, sd)
 	case strings.HasPrefix(line, "#EXT-X-SESSION-KEY:"):
 		p.SessionKeys = append(p.SessionKeys, parseKeyParams(line[19:]))
+	case strings.HasPrefix(line, "#EXT-X-CONTENT-STEERING:"):
+		p.ContentSteering = parseContentSteering(line[len("#EXT-X-CONTENT-STEERING:"):])
 	}
 
 	return err
@@ -660,6 +662,19 @@ func parseKeyParams(parameters string) *Key {
 		}
 	}
 	return &key
+}
+
+func parseContentSteering(params string) *ContentSteering {
+	cs := ContentSteering{}
+	for _, attr := range decodeAttributes(params) {
+		switch attr.Key {
+		case "SERVER-URI":
+			cs.ServerURI = DeQuote(attr.Val)
+		case "PATHWAY-ID":
+			cs.PathwayId = DeQuote(attr.Val)
+		}
+	}
+	return &cs
 }
 
 // DeQuote removes quotes from a string.

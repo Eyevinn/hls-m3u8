@@ -75,6 +75,9 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	p.buf.WriteString("#EXTM3U\n#EXT-X-VERSION:")
 	p.buf.WriteString(strVer(p.ver))
 	p.buf.WriteRune('\n')
+	if p.ContentSteering != nil {
+		writeContentSteering(&p.buf, p.ContentSteering)
+	}
 
 	if p.IndependentSegments() {
 		p.buf.WriteString("#EXT-X-INDEPENDENT-SEGMENTS\n")
@@ -379,6 +382,16 @@ func writeKey(tag string, buf *bytes.Buffer, key *Key) {
 		if key.Keyformatversions != "" {
 			writeQuoted(buf, "KEYFORMATVERSIONS", key.Keyformatversions)
 		}
+	}
+	buf.WriteRune('\n')
+}
+
+func writeContentSteering(buf *bytes.Buffer, cs *ContentSteering) {
+	buf.WriteString(`#EXT-X-CONTENT-STEERING:SERVER-URI="`)
+	buf.WriteString(cs.ServerURI)
+	buf.WriteRune('"')
+	if cs.PathwayId != "" {
+		writeQuoted(buf, "PATHWAY-ID", cs.PathwayId)
 	}
 	buf.WriteRune('\n')
 }

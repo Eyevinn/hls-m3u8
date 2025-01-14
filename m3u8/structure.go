@@ -148,16 +148,17 @@ type MediaPlaylist struct {
 // provides parameters and lists one or more media playlists. URI lines in the
 // playlist identify media playlists.
 type MasterPlaylist struct {
-	Variants            []*Variant      // Variants is a list of media playlists
-	Args                string          // optional query placed after URI (URI?Args)
-	Defines             []Define        // EXT-X-DEFINE tags
-	SessionDatas        []*SessionData  // EXT-X-SESSION-DATA tags
-	SessionKeys         []*Key          // EXT-X-SESSION-KEY tags
-	buf                 bytes.Buffer    // buffer used for encoding and caching playlist
-	ver                 uint8           // protocol version of the playlist, 3 or higher
-	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
-	Custom              CustomMap       // Custom-provided tags for encoding
-	customDecoders      []CustomDecoder // customDecoders provided custom tags for decoding
+	Variants            []*Variant       // Variants is a list of media playlists
+	Args                string           // optional query placed after URI (URI?Args)
+	Defines             []Define         // EXT-X-DEFINE tags
+	SessionDatas        []*SessionData   // EXT-X-SESSION-DATA tags
+	SessionKeys         []*Key           // EXT-X-SESSION-KEY tags
+	ContentSteering     *ContentSteering // EXT-X-CONTENT-STEERING tag
+	buf                 bytes.Buffer     // buffer used for encoding and caching playlist
+	ver                 uint8            // protocol version of the playlist, 3 or higher
+	independentSegments bool             // Global tag for EXT-X-INDEPENDENT-SEGMENTS
+	Custom              CustomMap        // Custom-provided tags for encoding
+	customDecoders      []CustomDecoder  // customDecoders provided custom tags for decoding
 }
 
 // Variant structure represents media playlist variants in master playlists.
@@ -337,6 +338,12 @@ type SessionData struct {
 	URI      string // URI is a quoted-string
 	Format   string // FORMAT is enumerated string. Values are JSON and RAW (default is JSON)
 	Language string // LANGUAGE is a quoted-string containing an [RFC5646] language tag
+}
+
+// ContentSteering represents an EXT-X-CONTENT-STEERING tag.
+type ContentSteering struct {
+	ServerURI string // SERVER-URI is a quoted-string containing a URI to a Steering Manifest
+	PathwayId string // PATHWAY-ID is a quoted-string containing a unique identifier for the pathway
 }
 
 /*
