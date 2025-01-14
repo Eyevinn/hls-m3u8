@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing yet
+
+## [v0.3.0]
+
 ### Added
 
 - Support for multiple EXT-X-DATERANGE tags in a media playlist
@@ -71,7 +75,8 @@ The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 
 - initial version of the repo
 
-[Unreleased]: https://github.com/Eyevinn/mp4ff/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Eyevinn/mp4ff/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/Eyevinn/mp4ff/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/Eyevinn/mp4ff/compare/v0.1.0...v0.2.0
 [grafov]: https://github.com/grafov/m3u8
 [rfc8216bis-16]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16
