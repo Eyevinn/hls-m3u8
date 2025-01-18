@@ -368,30 +368,11 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		state.variant.Iframe = true
 		p.Variants = append(p.Variants, state.variant)
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
-		var (
-			name       string
-			value      string
-			defineType DefineType
-		)
-
-		switch {
-		case strings.HasPrefix(line, "#EXT-X-DEFINE:NAME="):
-			defineType = VALUE
-			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:NAME=%q,VALUE=%q", &name, &value)
-		case strings.HasPrefix(line, "#EXT-X-DEFINE:QUERYPARAM="):
-			defineType = QUERYPARAM
-			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:QUERYPARAM=%q", &name)
-		case strings.HasPrefix(line, "#EXT-X-DEFINE:IMPORT="):
-			return fmt.Errorf("EXT-X-DEFINE IMPORT not allowed in master playlist")
-		default:
-			return fmt.Errorf("unknown EXT-X-DEFINE format: %s", line)
-		}
-
+		define, err := parseDefine(line)
 		if err != nil {
-			return fmt.Errorf("error parsing EXT-X-DEFINE: %w", err)
+			return err
 		}
-
-		err = p.AppendDefine(Define{name, defineType, value})
+		err = p.AppendDefine(define)
 		if err != nil {
 			return err
 		}
@@ -616,6 +597,32 @@ func parseDateRange(line string) (*DateRange, error) {
 	return &dr, nil
 }
 
+func parseDefine(line string) (Define, error) {
+	var (
+		d   Define
+		err error
+	)
+
+	switch {
+	case strings.HasPrefix(line, "#EXT-X-DEFINE:NAME="):
+		d.Type = VALUE
+		_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:NAME=%q,VALUE=%q", &d.Name, &d.Value)
+	case strings.HasPrefix(line, "#EXT-X-DEFINE:QUERYPARAM="):
+		d.Type = QUERYPARAM
+		_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:QUERYPARAM=%q", &d.Name)
+	case strings.HasPrefix(line, "#EXT-X-DEFINE:IMPORT="):
+		d.Type = IMPORT
+		_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:IMPORT=%q", &d.Name)
+	default:
+		return d, fmt.Errorf("unknown EXT-X-DEFINE format: %s", line)
+	}
+
+	if err != nil {
+		return d, fmt.Errorf("error parsing EXT-X-DEFINE: %w", err)
+	}
+	return d, nil
+}
+
 func parseSessionData(line string) (*SessionData, error) {
 	sd := SessionData{
 		Format: "JSON",
@@ -835,31 +842,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			return err
 		}
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
-		var (
-			name       string
-			value      string
-			defineType DefineType
-		)
-
-		switch {
-		case strings.HasPrefix(line, "#EXT-X-DEFINE:NAME="):
-			defineType = VALUE
-			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:NAME=%q,VALUE=%q", &name, &value)
-		case strings.HasPrefix(line, "#EXT-X-DEFINE:QUERYPARAM="):
-			defineType = QUERYPARAM
-			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:QUERYPARAM=%q", &name)
-		case strings.HasPrefix(line, "#EXT-X-DEFINE:IMPORT="):
-			defineType = IMPORT
-			_, err = fmt.Sscanf(line, "#EXT-X-DEFINE:IMPORT=%q", &name)
-		default:
-			return fmt.Errorf("unknown EXT-X-DEFINE format: %s", line)
-		}
-
+		define, err := parseDefine(line)
 		if err != nil {
 			return fmt.Errorf("error parsing EXT-X-DEFINE: %w", err)
 		}
-
-		p.AppendDefine(Define{name, defineType, value})
+		p.AppendDefine(define)
 	case strings.HasPrefix(line, "#EXT-X-PLAYLIST-TYPE:"):
 		state.listType = MEDIA
 		var playlistType string

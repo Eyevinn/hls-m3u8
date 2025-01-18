@@ -83,22 +83,7 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 		p.buf.WriteString("#EXT-X-INDEPENDENT-SEGMENTS\n")
 	}
 	if len(p.Defines) > 0 {
-		for _, d := range p.Defines {
-			p.buf.WriteString("#EXT-X-DEFINE:")
-			switch d.Type {
-			case VALUE:
-				p.buf.WriteString("NAME=\"")
-				p.buf.WriteString(d.Name)
-				p.buf.WriteString("\",VALUE=\"")
-				p.buf.WriteString(d.Value)
-				p.buf.WriteString("\"")
-			case QUERYPARAM:
-				p.buf.WriteString("QUERYPARAM=\"")
-				p.buf.WriteString(d.Name)
-				p.buf.WriteString("\"")
-			}
-			p.buf.WriteRune('\n')
-		}
+		writeDefines(&p.buf, p.Defines)
 	}
 
 	for _, sd := range p.SessionDatas {
@@ -346,6 +331,29 @@ func writeDateRange(buf *bytes.Buffer, dr *DateRange) {
 		writeUnQuoted(buf, xa.Key, xa.Val)
 	}
 	buf.WriteRune('\n')
+}
+
+func writeDefines(buf *bytes.Buffer, defines []Define) {
+	for _, d := range defines {
+		buf.WriteString("#EXT-X-DEFINE:")
+		switch d.Type {
+		case VALUE:
+			buf.WriteString("NAME=\"")
+			buf.WriteString(d.Name)
+			buf.WriteString("\",VALUE=\"")
+			buf.WriteString(d.Value)
+			buf.WriteString("\"")
+		case IMPORT:
+			buf.WriteString("IMPORT=\"")
+			buf.WriteString(d.Name)
+			buf.WriteString("\"")
+		case QUERYPARAM:
+			buf.WriteString("QUERYPARAM=\"")
+			buf.WriteString(d.Name)
+			buf.WriteString("\"")
+		}
+		buf.WriteRune('\n')
+	}
 }
 
 func writeSessionData(buf *bytes.Buffer, sd *SessionData) {
@@ -633,32 +641,15 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		p.buf.WriteRune('\n')
 	}
 
+	if len(p.Defines) > 0 {
+		writeDefines(&p.buf, p.Defines)
+	}
+
 	// default key before any segment
 	if p.Key != nil {
 		writeKey("#EXT-X-KEY:", &p.buf, p.Key)
 	}
-	if len(p.Defines) > 0 {
-		for _, d := range p.Defines {
-			p.buf.WriteString("#EXT-X-DEFINE:")
-			switch d.Type {
-			case VALUE:
-				p.buf.WriteString("NAME=\"")
-				p.buf.WriteString(d.Name)
-				p.buf.WriteString("\",VALUE=\"")
-				p.buf.WriteString(d.Value)
-				p.buf.WriteString("\"")
-			case IMPORT:
-				p.buf.WriteString("IMPORT=\"")
-				p.buf.WriteString(d.Name)
-				p.buf.WriteString("\"")
-			case QUERYPARAM:
-				p.buf.WriteString("QUERYPARAM=\"")
-				p.buf.WriteString(d.Name)
-				p.buf.WriteString("\"")
-			}
-			p.buf.WriteRune('\n')
-		}
-	}
+
 	// default MAP before any segment
 	if p.Map != nil {
 		p.buf.WriteString("#EXT-X-MAP:")
