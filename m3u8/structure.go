@@ -123,7 +123,7 @@ type MediaPlaylist struct {
 	Closed              bool            // is this VOD/EVENT (closed) or Live (sliding) playlist?
 	MediaType           MediaType       // EXT-X-PLAYLIST-TYPE (EVENT, VOD or empty)
 	DiscontinuitySeq    uint64          // EXT-X-DISCONTINUITY-SEQUENCE
-	StartTime           float64         // EXT-X-START:TIME-OFFSET=<n>
+	StartTime           float64         // EXT-X-START:TIME-OFFSET=<n> (positive or negative)
 	StartTimePrecise    bool            // EXT-X-START:PRECISE=YES
 	Key                 *Key            // EXT-X-KEY is initial key tag for encrypted segments
 	Map                 *Map            // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
@@ -150,6 +150,8 @@ type MediaPlaylist struct {
 type MasterPlaylist struct {
 	Variants            []*Variant       // Variants is a list of media playlists
 	Args                string           // optional query placed after URI (URI?Args)
+	StartTime           float64          // EXT-X-START:TIME-OFFSET=<n> (positive or negative)
+	StartTimePrecise    bool             // EXT-X-START:PRECISE=YES
 	Defines             []Define         // EXT-X-DEFINE tags
 	SessionDatas        []*SessionData   // EXT-X-SESSION-DATA tags
 	SessionKeys         []*Key           // EXT-X-SESSION-KEY tags

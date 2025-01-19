@@ -338,6 +338,51 @@ func TestReadWriteSessionData(t *testing.T) {
 			is.Equal(c.line, outStr) // EXT-X-SESSION-DATA line must match
 		})
 	}
+}
+
+func TestReadWriteExtXStart(t *testing.T) {
+	is := is.New(t)
+	cases := []struct {
+		desc    string
+		line    string
+		start   float64
+		precise bool
+		error   bool
+	}{
+		{
+			desc:    "positive precise",
+			line:    `#EXT-X-START:TIME-OFFSET=10.000,PRECISE=YES`,
+			start:   10,
+			precise: true,
+		},
+		{
+			desc:    "negative",
+			line:    `#EXT-X-START:TIME-OFFSET=-5.720`,
+			start:   -5.72,
+			precise: false,
+		},
+		{
+			desc:  "offset not a float",
+			line:  `#EXT-X-START:TIME-OFFSET="5.72"`,
+			error: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			start, precise, err := parseExtXStartParams(c.line[len("#EXT-X-START:"):])
+			if c.error {
+				is.Equal(err != nil, true) // must return an error
+				return
+			}
+			is.NoErr(err)
+			out := bytes.Buffer{}
+			is.Equal(c.start, start)     // start time must match
+			is.Equal(c.precise, precise) // precise must match
+			writeExtXStart(&out, start, precise)
+			outStr := trimLineEnd(out.String())
+			is.Equal(c.line, outStr) // EXT-X-START line must match
+		})
+	}
 
 }
 
@@ -351,6 +396,8 @@ func TestReadWritePlaylists(t *testing.T) {
 		"media-playlist-with-program-date-time.m3u8",
 		"master-groups-and-iframe.m3u8",
 		"media-playlist-with-multiple-dateranges.m3u8",
+		"media-playlist-with-start-time.m3u8",
+		"master-with-independent-segments.m3u8",
 	}
 
 	for _, fileName := range files {

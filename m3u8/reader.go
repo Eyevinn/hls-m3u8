@@ -337,6 +337,11 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 		if strict && err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-START:"):
+		p.StartTime, p.StartTimePrecise, err = parseExtXStartParams(line[len("#EXT-X-START:"):])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-START: %w", err)
+		}
 	case line == "#EXT-X-INDEPENDENT-SEGMENTS":
 		p.SetIndependentSegments(true)
 	case strings.HasPrefix(line, "#EXT-X-MEDIA:"):
@@ -595,6 +600,26 @@ func parseDateRange(line string) (*DateRange, error) {
 		}
 	}
 	return &dr, nil
+}
+
+func parseExtXStartParams(parameters string) (float64, bool, error) {
+	var startTime float64
+	var startTimePrecise bool
+	var err error
+
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "TIME-OFFSET":
+			startTime, err = strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return startTime, startTimePrecise,
+					fmt.Errorf("invalid TIME-OFFSET: %s: %w", attr.Val, err)
+			}
+		case "PRECISE":
+			startTimePrecise = attr.Val == "YES"
+		}
+	}
+	return startTime, startTimePrecise, nil
 }
 
 func parseDefine(line string) (Define, error) {
@@ -869,18 +894,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			return err
 		}
 	case strings.HasPrefix(line, "#EXT-X-START:"):
-		state.listType = MEDIA
-		for k, v := range decodeAndTrimAttributes(line[13:]) {
-			switch k {
-			case "TIME-OFFSET":
-				st, err := strconv.ParseFloat(v, 64)
-				if err != nil {
-					return fmt.Errorf("invalid TIME-OFFSET: %s: %w", v, err)
-				}
-				p.StartTime = st
-			case "PRECISE":
-				p.StartTimePrecise = v == "YES"
-			}
+		p.StartTime, p.StartTimePrecise, err = parseExtXStartParams(line[len("#EXT-X-START:"):])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-START: %w", err)
 		}
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA

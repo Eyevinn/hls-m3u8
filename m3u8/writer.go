@@ -82,6 +82,11 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	if p.IndependentSegments() {
 		p.buf.WriteString("#EXT-X-INDEPENDENT-SEGMENTS\n")
 	}
+
+	if p.StartTime != 0.0 { // Both negative and positive values are allowed. Negative values are relative to the end.
+		writeExtXStart(&p.buf, p.StartTime, p.StartTimePrecise)
+	}
+
 	if len(p.Defines) > 0 {
 		writeDefines(&p.buf, p.Defines)
 	}
@@ -371,6 +376,15 @@ func writeSessionData(buf *bytes.Buffer, sd *SessionData) {
 	}
 	if sd.Language != "" {
 		writeQuoted(buf, "LANGUAGE", sd.Language)
+	}
+	buf.WriteRune('\n')
+}
+
+func writeExtXStart(buf *bytes.Buffer, startTime float64, precise bool) {
+	buf.WriteString("#EXT-X-START:TIME-OFFSET=")
+	buf.WriteString(strconv.FormatFloat(startTime, 'f', 3, 64))
+	if precise {
+		buf.WriteString(",PRECISE=YES")
 	}
 	buf.WriteRune('\n')
 }
@@ -679,13 +693,8 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	p.buf.WriteString("#EXT-X-TARGETDURATION:")
 	p.buf.WriteString(strconv.FormatInt(int64(p.TargetDuration), 10))
 	p.buf.WriteRune('\n')
-	if p.StartTime > 0.0 {
-		p.buf.WriteString("#EXT-X-START:TIME-OFFSET=")
-		p.buf.WriteString(strconv.FormatFloat(p.StartTime, 'f', -1, 64))
-		if p.StartTimePrecise {
-			p.buf.WriteString(",PRECISE=YES")
-		}
-		p.buf.WriteRune('\n')
+	if p.StartTime != 0.0 { // Both negative and positive values are allowed. Negative values are relative to the end.
+		writeExtXStart(&p.buf, p.StartTime, p.StartTimePrecise)
 	}
 	if p.DiscontinuitySeq != 0 {
 		p.buf.WriteString("#EXT-X-DISCONTINUITY-SEQUENCE:")
