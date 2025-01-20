@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - EXT-X-START was not written for negative values
+- EXT-X-MAP is written when changed
+
+### Chore
+
+- Refactored EXT-X-DEFINE and EXT-X-MAP parsing and writing
 
 ## [v0.3.0] 2025-01-14
 

@@ -677,6 +677,21 @@ func parseSessionData(line string) (*SessionData, error) {
 	return &sd, nil
 }
 
+func parseExtXMapParameters(parameters string) (*Map, error) {
+	m := Map{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "URI":
+			m.URI = attr.Val
+		case "BYTERANGE":
+			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &m.Limit, &m.Offset); err != nil {
+				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+			}
+		}
+	}
+	return &m, nil
+}
+
 func parseKeyParams(parameters string) *Key {
 	key := Key{}
 	for _, attr := range decodeAttributes(parameters) {
@@ -768,7 +783,16 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case !strings.HasPrefix(line, "#"):
 		if state.tagInf {
-			err := p.Append(line, state.duration, state.title)
+			seg := MediaSegment{
+				URI:      line,
+				Duration: state.duration,
+				Title:    state.title,
+			}
+			if state.lastReadMap != nil && !state.lastReadMap.Equal(state.lastStoredMap) {
+				seg.Map = state.lastReadMap
+				state.lastStoredMap = state.lastReadMap
+			}
+			err := p.AppendSegment(&seg)
 			if err == ErrPlaylistFull {
 				// Extend playlist by doubling size, reset internal state, try again.
 				// If the second Append fails, the if err block will handle it.
@@ -777,7 +801,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				p.Segments = append(p.Segments, make([]*MediaSegment, p.Count())...)
 				p.capacity = uint(len(p.Segments))
 				p.tail = p.count
-				err = p.Append(line, state.duration, state.title)
+				err = p.AppendSegment(&seg)
 			}
 			// Check err for first or subsequent Append()
 			if err != nil {
@@ -829,17 +853,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			}
 			state.tagKey = false
 		}
-		// If EXT-X-MAP appeared before reference to segment (EXTINF) then it linked to this segment
-		if state.tagMap {
-			p.Segments[p.last()].Map = &Map{state.xmap.URI, state.xmap.Limit, state.xmap.Offset}
-			// First EXT-X-MAP may appeared in the header of the playlist and linked to first segment
-			// but for convenient playlist generation it also linked as default playlist map
-			if p.Map == nil {
-				p.Map = state.xmap
-			}
-			state.tagMap = false
-		}
-
 		// if segment custom tag appeared before EXTINF then it links to this segment
 		if state.tagCustom {
 			p.Segments[p.last()].Custom = state.custom
@@ -904,18 +917,17 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.tagKey = true
 	case strings.HasPrefix(line, "#EXT-X-MAP:"):
 		state.listType = MEDIA
-		state.xmap = new(Map)
-		for k, v := range decodeAndTrimAttributes(line[11:]) {
-			switch k {
-			case "URI":
-				state.xmap.URI = v
-			case "BYTERANGE":
-				if _, err = fmt.Sscanf(v, "%d@%d", &state.xmap.Limit, &state.xmap.Offset); strict && err != nil {
-					return fmt.Errorf("byterange sub-range length value parsing error: %w", err)
-				}
-			}
+		xMap, err := parseExtXMapParameters(line[11:])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-MAP: %w", err)
 		}
-		state.tagMap = true
+		if state.lastReadMap == nil && p.Count() == 0 {
+			p.Map = xMap
+			state.lastStoredMap = xMap
+		}
+		if state.lastReadMap == nil || !state.lastReadMap.Equal(xMap) {
+			state.lastReadMap = xMap
+		}
 	case !state.tagProgramDateTime && strings.HasPrefix(line, "#EXT-X-PROGRAM-DATE-TIME:"):
 		state.tagProgramDateTime = true
 		state.listType = MEDIA

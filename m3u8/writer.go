@@ -389,6 +389,20 @@ func writeExtXStart(buf *bytes.Buffer, startTime float64, precise bool) {
 	buf.WriteRune('\n')
 }
 
+func writeExtXMap(buf *bytes.Buffer, m *Map) {
+	buf.WriteString("#EXT-X-MAP:")
+	buf.WriteString("URI=\"")
+	buf.WriteString(m.URI)
+	buf.WriteRune('"')
+	if m.Limit > 0 {
+		buf.WriteString(",BYTERANGE=")
+		buf.WriteString(strconv.FormatInt(m.Limit, 10))
+		buf.WriteRune('@')
+		buf.WriteString(strconv.FormatInt(m.Offset, 10))
+	}
+	buf.WriteRune('\n')
+}
+
 func writeKey(tag string, buf *bytes.Buffer, key *Key) {
 	buf.WriteString(tag)
 	buf.WriteString("METHOD=")
@@ -631,6 +645,8 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		return &p.buf
 	}
 
+	var lastMap *Map
+
 	p.buf.WriteString("#EXTM3U\n#EXT-X-VERSION:")
 	p.buf.WriteString(strVer(p.ver))
 	p.buf.WriteRune('\n')
@@ -664,20 +680,6 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		writeKey("#EXT-X-KEY:", &p.buf, p.Key)
 	}
 
-	// default MAP before any segment
-	if p.Map != nil {
-		p.buf.WriteString("#EXT-X-MAP:")
-		p.buf.WriteString("URI=\"")
-		p.buf.WriteString(p.Map.URI)
-		p.buf.WriteRune('"')
-		if p.Map.Limit > 0 {
-			p.buf.WriteString(",BYTERANGE=")
-			p.buf.WriteString(strconv.FormatInt(p.Map.Limit, 10))
-			p.buf.WriteRune('@')
-			p.buf.WriteString(strconv.FormatInt(p.Map.Offset, 10))
-		}
-		p.buf.WriteRune('\n')
-	}
 	if p.MediaType > 0 {
 		p.buf.WriteString("#EXT-X-PLAYLIST-TYPE:")
 		switch p.MediaType {
@@ -703,6 +705,10 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	}
 	if p.Iframe {
 		p.buf.WriteString("#EXT-X-I-FRAMES-ONLY\n")
+	}
+	if p.Map != nil {
+		writeExtXMap(&p.buf, p.Map)
+		lastMap = p.Map
 	}
 
 	var (
@@ -774,19 +780,10 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		if seg.Discontinuity {
 			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
 		}
-		// ignore segment Map if default playlist Map is present
-		if p.Map == nil && seg.Map != nil {
-			p.buf.WriteString("#EXT-X-MAP:")
-			p.buf.WriteString("URI=\"")
-			p.buf.WriteString(seg.Map.URI)
-			p.buf.WriteRune('"')
-			if seg.Map.Limit > 0 {
-				p.buf.WriteString(",BYTERANGE=")
-				p.buf.WriteString(strconv.FormatInt(seg.Map.Limit, 10))
-				p.buf.WriteRune('@')
-				p.buf.WriteString(strconv.FormatInt(seg.Map.Offset, 10))
-			}
-			p.buf.WriteRune('\n')
+		// ignore segment Map if already written
+		if seg.Map != nil && !seg.Map.Equal(lastMap) {
+			writeExtXMap(&p.buf, seg.Map)
+			lastMap = seg.Map
 		}
 		if !seg.ProgramDateTime.IsZero() {
 			p.buf.WriteString("#EXT-X-PROGRAM-DATE-TIME:")

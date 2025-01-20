@@ -261,25 +261,44 @@ test01.ts`
 
 // Create new media playlist
 // Set default map
-// Add segment to media playlist
-// Set map on segment (should be ignored when encoding)
+// Add segment to media playlist with two different maps.
+// Only the second should be included in the playlist.
 func TestEncodeMediaPlaylistWithDefaultMap(t *testing.T) {
 	is := is.New(t)
-	p, e := NewMediaPlaylist(3, 5)
-	is.NoErr(e) // Create media playlist should be successful
+	p, err := NewMediaPlaylist(3, 5)
+	is.NoErr(err) // Create media playlist should be successful
 	p.SetDefaultMap("https://example.com", 1000*1024, 1024*1024)
 
-	e = p.Append("test01.ts", 5.0, "")
-	is.NoErr(e) // Add 1st segment to a media playlist should be successful
-	e = p.SetMap("https://notencoded.com", 1000*1024, 1024*1024)
-	is.NoErr(e) // Set map to a media playlist should be successful, but not set
+	err = p.Append("test01.ts", 5.0, "")
+	is.NoErr(err) // Add 1st segment to a media playlist should be successful
+	err = p.SetMap("https://example.com", 1000*1024, 1024*1024)
+	is.NoErr(err) // Set map to a media playlist should be successful, but not set since same as default.
+
+	err = p.Append("test02.ts", 5.0, "")
+	is.NoErr(err) // Add 1st segment to a media playlist should be successful
+	err = p.SetMap("https://example2.com", 1000*1024, 1024*1024)
+	is.NoErr(err) // Set map to a media playlist should be successful, but not set since same as already set.
+
+	err = p.SetDiscontinuity()
+	is.NoErr(err) // Set discontinuity tag should be successful
+
+	err = p.Append("test03.ts", 5.0, "")
+	is.NoErr(err) // Add 1st segment to a media playlist should be successful
+	err = p.SetMap("https://example2.com", 1000*1024, 1024*1024)
+	is.NoErr(err) // Set map to a media playlist should be successful, but not set since same as already set.
 
 	encoded := p.String()
 	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE=1024000@1048576`
-	is.True(strings.Contains(encoded, expected)) // default map is included in the playlist
+	is.Equal(1, strings.Count(encoded, expected)) // default map is included in the playlist just once
 
-	ignored := `EXT-X-MAP:URI="https://notencoded.com"`
-	is.True(!strings.Contains(encoded, ignored)) // additional map is not included in the playlist
+	expected = `EXT-X-MAP:URI="https://example2.com",BYTERANGE=1024000@1048576`
+	is.Equal(1, strings.Count(encoded, expected)) // new map is included in the playlist just once
+
+	split := strings.Split(encoded, "#EXT-X-DISCONTINUITY")
+	is.Equal(2, len(split)) // discontinuity tag is included one time
+
+	expected = `EXT-X-MAP:URI="https://example2.com",BYTERANGE=1024000@1048576`
+	is.Equal(1, strings.Count(split[1], expected)) // new map should be after discontinuity tag
 }
 
 // Create new media playlist

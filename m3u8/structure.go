@@ -268,6 +268,17 @@ type Map struct {
 	Offset int64  // [@o] is offset from the start of the file under URI
 }
 
+// Equal compares two MediaSegment for equality.
+func (m *Map) Equal(other *Map) bool {
+	if m == nil && other == nil {
+		return true
+	}
+	if m == nil || other == nil {
+		return false
+	}
+	return m.URI == other.URI && m.Limit == other.Limit && m.Offset == other.Offset
+}
+
 // Internal structure for decoding a line of input stream with a list type detection
 type decodingState struct {
 	listType           ListType
@@ -279,7 +290,6 @@ type decodingState struct {
 	tagDiscontinuity   bool
 	tagProgramDateTime bool
 	tagKey             bool
-	tagMap             bool
 	tagCustom          bool
 	programDateTime    time.Time
 	limit              int64
@@ -289,7 +299,8 @@ type decodingState struct {
 	variant            *Variant
 	alternatives       []*Alternative
 	xkey               *Key
-	xmap               *Map
+	lastReadMap        *Map
+	lastStoredMap      *Map
 	scte               *SCTE
 	scte35DateRanges   []*DateRange
 	custom             CustomMap
