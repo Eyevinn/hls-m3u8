@@ -970,14 +970,14 @@ func TestDecodeRenditionsAndIframes(t *testing.T) {
 // Check that dangling SCTE35 DateRange tags is reported as error since not supported.
 func TestDanglingScte35DateRange(t *testing.T) {
 	is := is.New(t)
-	f1, err := os.Open("sample-playlists/media-playlist-dangling-scte35-daterange.m3u8")
+	f1, err := os.Open("testdata/bad-playlists/media-playlist-dangling-scte35-daterange.m3u8")
 	is.NoErr(err) // must open file
 	defer f1.Close()
 	_, listType, err := DecodeFrom(bufio.NewReader(f1), true)
 	is.Equal(listType, MEDIA)                 // must be media playlist
 	is.Equal(ErrDanglingSCTE35DateRange, err) // must return ErrDanglingSCTE35DateRange
 
-	f2, err := os.Open("sample-playlists/media-playlist-dangling-scte35-daterange.m3u8")
+	f2, err := os.Open("testdata/bad-playlists/media-playlist-dangling-scte35-daterange.m3u8")
 	is.NoErr(err) // must open file
 	defer f2.Close()
 	pl, err := NewMediaPlaylist(0, 5)
@@ -1003,6 +1003,7 @@ func TestDecodeMasterPlaylistWithDefines(t *testing.T) {
 	is.Equal(p.Defines[1].Type, QUERYPARAM)
 	is.Equal(p.Defines[1].Value, "")
 }
+
 func TestDecodeMasterPlaylistWithInvalidDefines(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-defines-invalid.m3u8")
@@ -1013,9 +1014,10 @@ func TestDecodeMasterPlaylistWithInvalidDefines(t *testing.T) {
 	// check parsed values
 	is.Equal(len(p.Defines), 0) // must be 0 defines
 }
+
 func TestDecodeMediaPlaylistWithDefines(t *testing.T) {
 	is := is.New(t)
-	f, err := os.Open("sample-playlists/media-playlist-with-defines.m3u8")
+	f, err := os.Open("sample-playlists/media-playlist-with-queryparam.m3u8")
 	is.NoErr(err) // must open file
 	p, err := NewMediaPlaylist(1, 1)
 	is.NoErr(err) // must create playlist
@@ -1091,4 +1093,37 @@ func BenchmarkDecodeMediaPlaylist(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func readTestMasterPlaylist(t *testing.T, fileName string) (*MasterPlaylist, error) {
+	t.Helper()
+	f, err := os.Open(fileName)
+	if err != nil {
+		t.Fail()
+	}
+	defer f.Close()
+	p := NewMasterPlaylist()
+	err = p.DecodeFrom(bufio.NewReader(f), false)
+	if err != nil {
+		t.Fail()
+	}
+	return p, nil
+}
+
+func readTestMediaPlaylist(t *testing.T, fileName string) (*MediaPlaylist, error) {
+	t.Helper()
+	f, err := os.Open(fileName)
+	if err != nil {
+		t.Fail()
+	}
+	defer f.Close()
+	p, err := NewMediaPlaylist(50000, 50000)
+	if err != nil {
+		t.Fatalf("Create media playlist failed: %s", err)
+	}
+	err = p.DecodeFrom(bufio.NewReader(f), true)
+	if err != nil {
+		t.Fail()
+	}
+	return p, nil
 }
