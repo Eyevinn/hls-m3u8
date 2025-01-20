@@ -34,6 +34,26 @@ func TestSCTE35String(t *testing.T) {
 	}
 }
 
+func TestMapEqual(t *testing.T) {
+	cases := []struct {
+		desc   string
+		m1, m2 *Map
+		equal  bool
+	}{
+		{desc: "nil vs nil", m1: nil, m2: nil, equal: true},
+		{desc: "nil vs non-nil", m1: &Map{}, m2: nil, equal: false},
+		{desc: "equal non-nil", m1: &Map{URI: "a"}, m2: &Map{URI: "a"}, equal: true},
+		{desc: "non-equal non-nil", m1: &Map{URI: "a"}, m2: &Map{URI: "b"}, equal: false},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			if c.m1.Equal(c.m2) != c.equal {
+				t.Fatalf("Expected %v, got %v for %s", c.equal, c.m1.Equal(c.m2), c.desc)
+			}
+		})
+	}
+}
+
 type MockCustomTag struct {
 	name          string
 	err           error

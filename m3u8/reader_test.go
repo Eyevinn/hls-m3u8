@@ -271,17 +271,48 @@ func TestDecodeMasterWithHLSV7(t *testing.T) {
 	}
 }
 
-func TestReadBadSessionData(t *testing.T) {
+func TestReadBadMasterPlaylists(t *testing.T) {
 	is := is.New(t)
-	pl := `#EXTM3U
+	cases := []struct {
+		desc     string
+		playlist string
+	}{
+		{
+			desc: "bad session data",
+			playlist: `#EXTM3U
 #EXT-X-VERSION:7
 #EXT-X-SESSION-DATA:DATA-ID="com.example.title",VALUE="This is an example title",FORMAT=bad
 #EXT-X-INF:BANDWIDTH=1280000
 video.m3u8
-`
-	p := NewMasterPlaylist()
-	err := p.DecodeFrom(bufio.NewReader(bytes.NewBufferString(pl)), true)
-	is.True(err != nil) // must return an error
+		`,
+		},
+		{
+			desc: "bad define",
+			playlist: `#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-DEFINE:NAME="example.com"
+#EXT-X-INF:BANDWIDTH=1280000
+video.m3u8
+		`,
+		},
+		{
+			desc: "bad start",
+			playlist: `#EXTM3U
+#EXT-X-VERSION:7
+#EXT-X-START:TIME-OFFSET=bad
+#EXT-X-INF:BANDWIDTH=1280000
+video.m3u8
+		`,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			p := NewMasterPlaylist()
+			err := p.DecodeFrom(bufio.NewReader(bytes.NewBufferString(c.playlist)), true)
+			is.True(err != nil) // must return an error
+		})
+	}
 }
 
 /****************************
