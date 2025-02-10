@@ -862,6 +862,22 @@ func TestMediaPlaylistWithSCTE35Tag(t *testing.T) {
 	}
 }
 
+func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-low-latency.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA) // must be media playlist
+	// check parsed values
+	is.Equal(pp.TargetDuration, uint(4))               // target duration must be 15
+	is.True(!pp.Closed)                                // live playlist
+	is.Equal(pp.SeqNo, uint64(0))                      // sequence number must be 0
+	is.Equal(pp.PartTargetDuration, float32(1.002000)) // part target duration must be 1.002000
+}
+
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-program-date-time.m3u8")
