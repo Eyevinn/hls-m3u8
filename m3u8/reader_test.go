@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -874,8 +875,49 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	// check parsed values
 	is.Equal(pp.TargetDuration, uint(4))               // target duration must be 15
 	is.True(!pp.Closed)                                // live playlist
-	is.Equal(pp.SeqNo, uint64(0))                      // sequence number must be 0
+	is.Equal(pp.SeqNo, uint64(234))                    // sequence number must be 0
+	is.Equal(pp.Count(), uint(16))                     // segment count must be 15
 	is.Equal(pp.PartTargetDuration, float32(1.002000)) // part target duration must be 1.002000
+
+	// segment names should be in the following format fileSequence%d.m4s
+	// starting from fileSequence235.m4s
+	t.Logf("First Segment is %s", pp.Segments[0].URI)
+
+	for i := range pp.Count() {
+		s := pp.Segments[i]
+		expected := fmt.Sprintf("fileSequence%d.m4s", i+234+1)
+		if s.URI != expected {
+			t.Errorf("Segment name mismatch: %s != %s", s.URI, expected)
+		}
+	}
+
+	// The ProgramDateTime of the 2nd segment should be: 2025-02-10T14:42:30.134Z
+	st, _ := time.Parse(time.RFC3339, "2025-02-10T14:42:30.134+00:00")
+	if !pp.Segments[1].ProgramDateTime.Equal(st) {
+		t.Errorf("The program date time of the 1st segment should be: %v, actual value: %v",
+			st, pp.Segments[1].ProgramDateTime)
+	}
+
+	is.Equal(len(pp.PartialSegments), int(10)) // partial segment count must be 10
+
+	for _, ps := range pp.PartialSegments {
+		// The partial segments should have a duration of 1 second
+		is.Equal(ps.Duration, float64(1.0))
+		is.True(ps.Independent)
+		// partial segment names should be in the following format filePart%d.%d.m4s
+		is.True(strings.HasPrefix(ps.URI, "filePart"))
+	}
+
+	// The ProgramDateTime of the 8st partial segment should be: 2025-02-10T14:43:30.134Z
+	st, _ = time.Parse(time.RFC3339, "2025-02-10T14:43:30.134+00:00")
+	if !pp.PartialSegments[8].ProgramDateTime.Equal(st) {
+		t.Errorf("The program date time of the 8st partial segment should be: %v, actual value: %v",
+			st, pp.PartialSegments[8].ProgramDateTime)
+	}
+
+	// Preload Hints
+	is.Equal(pp.PreloadHints.Type, "PART")
+	is.Equal(pp.PreloadHints.URI, "filePart251.3.m4s")
 }
 
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
