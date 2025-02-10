@@ -144,7 +144,7 @@ type MediaPlaylist struct {
 	ver                 uint8           // protocol version of the playlist, 3 or higher
 	targetDurLocked     bool            // target duration is locked and cannot be changed
 	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
-
+	PartTargetDuration  float32         // EXT-X-PART-INF:PART-TARGET
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which

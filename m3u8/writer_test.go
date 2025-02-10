@@ -407,6 +407,25 @@ test01.ts
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(3, 5)
+	is.NoErr(e) // Create media playlist should be successful
+	p.PartTargetDuration = 1.002
+	e = p.Append("test01.ts", 5.0, "")
+	is.NoErr(e) // Add 1st segment to a media playlist should be successful
+	expected := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-PART-INF:PART-TARGET=1.002000
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:5
+#EXTINF:5.000,
+test01.ts
+`
+	out := p.String()
+	is.Equal(out, expected) // Encode media playlist does not match expected
+}
+
 // Create new media playlist
 // Add 10 segments to media playlist
 // Test iterating over segments

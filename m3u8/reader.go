@@ -901,6 +901,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-TARGETDURATION:%d", &p.TargetDuration); strict && err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-PART-INF:PART-TARGET="):
+		state.listType = MEDIA
+		if _, err = fmt.Sscanf(line, "#EXT-X-PART-INF:PART-TARGET=%f", &p.PartTargetDuration); strict && err != nil {
+			return err
+		}
 	case strings.HasPrefix(line, "#EXT-X-MEDIA-SEQUENCE:"):
 		state.listType = MEDIA
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {

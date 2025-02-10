@@ -678,6 +678,11 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			p.buf.WriteString("VOD\n")
 		}
 	}
+	if p.PartTargetDuration > 0 {
+		p.buf.WriteString("#EXT-X-PART-INF:PART-TARGET=")
+		p.buf.WriteString(strconv.FormatFloat(float64(p.PartTargetDuration), 'f', 6, 64))
+		p.buf.WriteRune('\n')
+	}
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
 	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
 	p.buf.WriteRune('\n')
