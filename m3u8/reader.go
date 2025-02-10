@@ -914,6 +914,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA
 		state.xkey = parseKeyParams(line[11:])
+		state.versionCheck = ValidIVInEXTXKEY{
+			ActualVersion: p.ver,
+			IV:            state.xkey.IV}
 		state.tagKey = true
 	case strings.HasPrefix(line, "#EXT-X-MAP:"):
 		state.listType = MEDIA
@@ -1025,6 +1028,13 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		val := strings.TrimPrefix(line, "#EXT-X-ALLOW-CACHE:") == "YES"
 		p.AllowCache = &val
 	}
+
+	if strict {
+		if valid, err := state.versionCheck.Validate(); !valid {
+			return err
+		}
+	}
+
 	return err
 }
 
