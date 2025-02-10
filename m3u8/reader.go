@@ -669,6 +669,53 @@ func parseDefine(line string) (Define, error) {
 	return d, nil
 }
 
+func parsePartialSegment(parameters string) (*PartialSegment, error) {
+	ps := PartialSegment{}
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "URI":
+			ps.URI = DeQuote(attr.Val)
+		case "DURATION":
+			if ps.Duration, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("duration parsing error: %w", err)
+			}
+		case "INDEPENDENT":
+			ps.Independent = attr.Val == "YES"
+		case "BYTERANGE":
+			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &ps.Limit, &ps.Offset); err != nil {
+				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+			}
+		}
+	}
+	return &ps, nil
+}
+
+func parsePreloadHint(parameters string) (*PreloadHint, error) {
+	ph := PreloadHint{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "TYPE":
+			ph.Type = attr.Val
+		case "URI":
+			ph.URI = DeQuote(attr.Val)
+		case "BYTERANGE-START":
+			start, err := strconv.ParseInt(attr.Val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("start parsing error: %w", err)
+			}
+			ph.Offset = start
+		case "BYTERANGE-LENGTH":
+			length, err := strconv.ParseInt(attr.Val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("start parsing error: %w", err)
+			}
+			ph.Limit = length
+		}
+	}
+	return &ph, nil
+}
+
 func parseSessionData(line string) (*SessionData, error) {
 	sd := SessionData{
 		Format: "JSON",
@@ -886,6 +933,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			state.custom = make(CustomMap)
 			state.tagCustom = false
 		}
+		// all partial segment which appeared before the segment should be marked as completed
+		if state.tagPartialSegment {
+			// Mark all partial segments as completed
+			state.tagPartialSegment = false
+		}
 	// start tag first
 	case line == "#EXTM3U":
 		state.m3u = true
@@ -906,6 +958,25 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-PART-INF:PART-TARGET=%f", &p.PartTargetDuration); strict && err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-PART:"):
+		state.listType = MEDIA
+		state.tagPartialSegment = true
+		partialSegment, err := parsePartialSegment(line[12:])
+		if err != nil {
+			return err
+		}
+		// if the program date time tag is present, set it on this partial segment
+		if state.tagProgramDateTime && len(p.PartialSegments) > 0 {
+			partialSegment.ProgramDateTime = state.programDateTime
+			state.tagProgramDateTime = false
+		}
+		p.AppendPartialSegment(partialSegment)
+	case strings.HasPrefix(line, "#EXT-X-PRELOAD-HINT:"):
+		preloadHint, err := parsePreloadHint(line[20:])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-PRELOAD-HINT: %w", err)
+		}
+		p.PreloadHints = preloadHint
 	case strings.HasPrefix(line, "#EXT-X-MEDIA-SEQUENCE:"):
 		state.listType = MEDIA
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {

@@ -117,34 +117,36 @@ const (
 // It is used for both VOD, EVENT and sliding window live media playlists with window size.
 // URI lines in the Playlist point to media segments.
 type MediaPlaylist struct {
-	TargetDuration      uint            // TargetDuration is max media segment duration. Rounding depends on version.
-	SeqNo               uint64          // EXT-X-MEDIA-SEQUENCE
-	Segments            []*MediaSegment // List of segments in the playlist. Output may be limited by winsize.
-	Args                string          // optional query placed after URIs (URI?Args)
-	Defines             []Define        // EXT-X-DEFINE tags
-	Iframe              bool            // EXT-X-I-FRAMES-ONLY
-	Closed              bool            // is this VOD/EVENT (closed) or Live (sliding) playlist?
-	MediaType           MediaType       // EXT-X-PLAYLIST-TYPE (EVENT, VOD or empty)
-	DiscontinuitySeq    uint64          // EXT-X-DISCONTINUITY-SEQUENCE
-	StartTime           float64         // EXT-X-START:TIME-OFFSET=<n> (positive or negative)
-	StartTimePrecise    bool            // EXT-X-START:PRECISE=YES
-	Key                 *Key            // EXT-X-KEY is initial key tag for encrypted segments
-	Map                 *Map            // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
-	DateRanges          []*DateRange    // EXT-X-DATERANGE tags not associated with SCTE-35
-	AllowCache          *bool           // EXT-X-ALLOW-CACHE tag YES/NO, removed in version 7
-	Custom              CustomMap       // Custom-provided tags for encoding
-	customDecoders      []CustomDecoder // customDecoders provides custom tags for decoding
-	winsize             uint            // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT
-	capacity            uint            // total capacity of slice used for the playlist
-	head                uint            // head of FIFO, we add segments to head
-	tail                uint            // tail of FIFO, we remove segments from tail
-	count               uint            // number of segments added to the playlist
-	buf                 bytes.Buffer    // buffer used for encoding and caching playlist output
-	scte35Syntax        SCTE35Syntax    // SCTE-35 syntax used in the playlist
-	ver                 uint8           // protocol version of the playlist, 3 or higher
-	targetDurLocked     bool            // target duration is locked and cannot be changed
-	independentSegments bool            // Global tag for EXT-X-INDEPENDENT-SEGMENTS
-	PartTargetDuration  float32         // EXT-X-PART-INF:PART-TARGET
+	TargetDuration      uint              // TargetDuration is max media segment duration. Rounding depends on version.
+	SeqNo               uint64            // EXT-X-MEDIA-SEQUENCE
+	Segments            []*MediaSegment   // List of segments in the playlist. Output may be limited by winsize.
+	Args                string            // optional query placed after URIs (URI?Args)
+	Defines             []Define          // EXT-X-DEFINE tags
+	Iframe              bool              // EXT-X-I-FRAMES-ONLY
+	Closed              bool              // is this VOD/EVENT (closed) or Live (sliding) playlist?
+	MediaType           MediaType         // EXT-X-PLAYLIST-TYPE (EVENT, VOD or empty)
+	DiscontinuitySeq    uint64            // EXT-X-DISCONTINUITY-SEQUENCE
+	StartTime           float64           // EXT-X-START:TIME-OFFSET=<n> (positive or negative)
+	StartTimePrecise    bool              // EXT-X-START:PRECISE=YES
+	Key                 *Key              // EXT-X-KEY is initial key tag for encrypted segments
+	Map                 *Map              // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
+	DateRanges          []*DateRange      // EXT-X-DATERANGE tags not associated with SCTE-35
+	AllowCache          *bool             // EXT-X-ALLOW-CACHE tag YES/NO, removed in version 7
+	Custom              CustomMap         // Custom-provided tags for encoding
+	customDecoders      []CustomDecoder   // customDecoders provides custom tags for decoding
+	winsize             uint              // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT
+	capacity            uint              // total capacity of slice used for the playlist
+	head                uint              // head of FIFO, we add segments to head
+	tail                uint              // tail of FIFO, we remove segments from tail
+	count               uint              // number of segments added to the playlist
+	buf                 bytes.Buffer      // buffer used for encoding and caching playlist output
+	scte35Syntax        SCTE35Syntax      // SCTE-35 syntax used in the playlist
+	ver                 uint8             // protocol version of the playlist, 3 or higher
+	targetDurLocked     bool              // target duration is locked and cannot be changed
+	independentSegments bool              // Global tag for EXT-X-INDEPENDENT-SEGMENTS
+	PartTargetDuration  float32           // EXT-X-PART-INF:PART-TARGET
+	PartialSegments     []*PartialSegment // List of partial segments in the playlist.
+	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which
@@ -239,6 +241,23 @@ type MediaSegment struct {
 	Gap              bool
 }
 
+type PartialSegment struct {
+	URI             string    // EXT-X-PART:URI
+	Duration        float64   // EXT-X-PART:DURATION
+	Independent     bool      // EXT-X-PART:INDEPENDENT
+	ProgramDateTime time.Time // EXT-X-PROGRAM-DATE-TIME
+	Offset          int64     // EXT-X-PART:BYTERANGE [@o] is offset from the start of the file under URI.
+	Limit           int64     // EXT-X-PART:BYTERANGE <n> is length in bytes for the file under URI.
+	Gap             bool      // EXT-X-PART:GAP enumerated-string ("YES" if the Partial Segment is not available)
+}
+
+type PreloadHint struct {
+	Type   string // #EXT-X-PRELOAD-HINT:TYPE Enumerated-string ("PART" -> Partial Segment; "MAP" -> Media Initialization Section)
+	URI    string // #EXT-X-PRELOAD-HINT:URI
+	Offset int64  // #EXT-X-PRELOAD-HINT:BYTERANGE-START
+	Limit  int64  // #EXT-X-PRELOAD-HINT:BYTERANGE-LENGTH
+}
+
 // SCTE holds custom SCTE-35 tags.
 type SCTE struct {
 	Syntax   SCTE35Syntax  // Syntax defines the format of the SCTE-35 cue tag
@@ -296,6 +315,7 @@ type decodingState struct {
 	tagGap             bool
 	tagKey             bool
 	tagCustom          bool
+	tagPartialSegment  bool
 	programDateTime    time.Time
 	limit              int64
 	offset             int64

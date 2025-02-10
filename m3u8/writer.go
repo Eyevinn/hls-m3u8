@@ -603,6 +603,10 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	return nil
 }
 
+func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) {
+	p.PartialSegments = append(p.PartialSegments, ps)
+}
+
 func (p *MediaPlaylist) AppendDefine(d Define) {
 	p.Defines = append(p.Defines, d)
 }
