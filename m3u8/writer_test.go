@@ -409,18 +409,43 @@ test01.ts
 
 func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 	is := is.New(t)
-	p, e := NewMediaPlaylist(3, 5)
+	p, e := NewMediaPlaylist(4, 5)
 	is.NoErr(e) // Create media playlist should be successful
 	p.PartTargetDuration = 1.002
-	e = p.Append("test01.ts", 5.0, "")
-	is.NoErr(e) // Add 1st segment to a media playlist should be successful
+
+	segments := []string{"test01.m4s", "test02.m4s", "test03.m4s", "test04.m4s"}
+	for _, segment := range segments {
+		e = p.Append(segment, 4.0, "")
+		is.NoErr(e) // Add segment to a media playlist should be successful
+	}
+
+	partialSegments := []string{"test04.1.m4s", "test04.2.m4s", "test04.3.m4s", "test04.4.m4s", "test05.1.m4s"}
+	for _, ps := range partialSegments {
+		e = p.AppendPartial(ps, 1.0, true)
+		is.NoErr(e) // Add partial segment to a media playlist should be successful
+	}
+
+	p.SetPreloadHint("PART", "test05.2.m4s")
+
 	expected := `#EXTM3U
 #EXT-X-VERSION:3
-#EXT-X-PART-INF:PART-TARGET=1.002000
+#EXT-X-PART-INF:PART-TARGET=1.002
 #EXT-X-MEDIA-SEQUENCE:0
-#EXT-X-TARGETDURATION:5
-#EXTINF:5.000,
-test01.ts
+#EXT-X-TARGETDURATION:4
+#EXTINF:4.000,
+test01.m4s
+#EXTINF:4.000,
+test02.m4s
+#EXTINF:4.000,
+test03.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.2.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.3.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.4.m4s"
+#EXTINF:4.000,
+test04.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test05.1.m4s"
+#EXT-X-PRELOAD-HINT:TYPE=PART,URI="test05.2.m4s"
 `
 	out := p.String()
 	is.Equal(out, expected) // Encode media playlist does not match expected
@@ -795,7 +820,7 @@ func TestEncodeMasterPlaylistWithStreamInfName(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000000, Resolution: "1152x960", Name: "HD 960p"})
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000, Resolution: "1152x960", Name: "HD 960p"})
 
 	is.Equal(m.Variants[0].Name, "HD 960p")                 //  Bad variant name
 	is.True(strings.Contains(m.String(), `NAME="HD 960p"`)) // Master playlist does not contain Name in EXT-X-STREAM-INF
@@ -914,6 +939,35 @@ func TestAppendDefine(t *testing.T) {
 		is.NoErr(e) // Create media playlist should be successful
 		mp.AppendDefine(test.define)
 		is.True(strings.Contains(mp.String(), test.Expected))
+	}
+}
+
+func TestIsPartOf(t *testing.T) {
+	tests := []struct {
+		partialSegUri string
+		segUri        string
+		expected      bool
+	}{
+		{"filePart249.1.m4s", "fileSequence249.m4s", true},
+		{"filePart249.2.m4s", "fileSequence249.m4s", true},
+		{"chunk249.1.m4s", "fileSequence249.m4s", true},
+		{"filePart0249.1.m4s", "fileSequence249.m4s", true},
+
+		{"filePart249.1.m4s", "fileSequence2490.m4s", false},
+		{"filePart2490.1.m4s", "fileSequence249.m4s", false},
+		{"filePart1249.1.m4s", "fileSequence249.m4s", false},
+		{"filePart249.1.ts", "fileSequence249.m4s", false},
+		{"filePart249.m4s", "fileSequence249.m4s", false},
+		{"filePart249.m4s", "fileSequence249.1.m4s", false},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s", test.partialSegUri, test.segUri), func(t *testing.T) {
+			result := IsPartOf(test.partialSegUri, test.segUri)
+			if result != test.expected {
+				t.Errorf("IsPartOf(%s, %s) = %v; want %v", test.partialSegUri, test.segUri, result, test.expected)
+			}
+		})
 	}
 }
 

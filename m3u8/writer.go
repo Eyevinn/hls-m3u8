@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -294,6 +296,49 @@ func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant) {
 		writeQuoted(buf, "NAME", vnt.Name)
 	}
 	writeQuoted(buf, "URI", vnt.URI) // Mandatory
+	buf.WriteRune('\n')
+}
+
+func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment) {
+	if !ps.ProgramDateTime.IsZero() {
+		buf.WriteString("#EXT-X-PROGRAM-DATE-TIME:")
+		buf.WriteString(ps.ProgramDateTime.Format(DATETIME))
+		buf.WriteRune('\n')
+	}
+	buf.WriteString("#EXT-X-PART:")
+	buf.WriteString("DURATION=")
+	buf.WriteString(strconv.FormatFloat(ps.Duration, 'f', 3, 64))
+	if ps.Independent {
+		buf.WriteString(",INDEPENDENT=YES")
+	}
+	if ps.Gap {
+		buf.WriteString(",GAP=YES")
+	}
+	if ps.Limit > 0 {
+		buf.WriteString(",BYTERANGE=")
+		buf.WriteString(strconv.FormatInt(ps.Limit, 10))
+		buf.WriteRune('@')
+		buf.WriteString(strconv.FormatInt(ps.Offset, 10))
+	}
+	buf.WriteString(",URI=\"")
+	buf.WriteString(ps.URI)
+	buf.WriteRune('"')
+	buf.WriteRune('\n')
+}
+
+func writePreloadHint(buf *bytes.Buffer, ph *PreloadHint) {
+	buf.WriteString("#EXT-X-PRELOAD-HINT:")
+	buf.WriteString("TYPE=")
+	buf.WriteString(ph.Type)
+	buf.WriteString(",URI=\"")
+	buf.WriteString(ph.URI)
+	buf.WriteRune('"')
+	if ph.Offset > 0 {
+		buf.WriteString(",BYTERANGE-START=")
+		buf.WriteString(strconv.FormatInt(ph.Offset, 10))
+		buf.WriteString(",BYTERANGE-LENGTH=")
+		buf.WriteString(strconv.FormatInt(ph.Limit, 10))
+	}
 	buf.WriteRune('\n')
 }
 
@@ -603,8 +648,28 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	return nil
 }
 
-func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) {
+func (p *MediaPlaylist) AppendPartial(uri string, duration float64, independent bool) error {
+	seg := new(PartialSegment)
+	seg.URI = uri
+	seg.Duration = duration
+	seg.Independent = independent
+	return p.AppendPartialSegment(seg)
+}
+
+func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
+	if p.count == 0 {
+		return ErrPlaylistEmpty
+	}
 	p.PartialSegments = append(p.PartialSegments, ps)
+
+	return nil
+}
+
+func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {
+	preloadHint := new(PreloadHint)
+	preloadHint.Type = hintType
+	preloadHint.URI = uri
+	p.PreloadHints = preloadHint
 }
 
 func (p *MediaPlaylist) AppendDefine(d Define) {
@@ -684,7 +749,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	}
 	if p.PartTargetDuration > 0 {
 		p.buf.WriteString("#EXT-X-PART-INF:PART-TARGET=")
-		p.buf.WriteString(strconv.FormatFloat(float64(p.PartTargetDuration), 'f', 6, 64))
+		p.buf.WriteString(strconv.FormatFloat(float64(p.PartTargetDuration), 'f', 3, 64))
 		p.buf.WriteRune('\n')
 	}
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
@@ -791,6 +856,22 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			p.buf.WriteString(seg.ProgramDateTime.Format(DATETIME))
 			p.buf.WriteRune('\n')
 		}
+		// handle completed partial segments
+		if p.HasPartialSegments() {
+			fullSegUri := seg.URI
+			countPartialSeg := 0
+			for _, ps := range p.PartialSegments {
+				if IsPartOf(ps.URI, fullSegUri) {
+					// This partial segment is part of the current full segment
+					writePartialSegment(&p.buf, ps)
+					countPartialSeg += 1
+				}
+			}
+			if countPartialSeg > 0 {
+				// Remove completed partial segments from list
+				p.PartialSegments = p.PartialSegments[countPartialSeg:]
+			}
+		}
 		if seg.Limit > 0 {
 			p.buf.WriteString("#EXT-X-BYTERANGE:")
 			p.buf.WriteString(strconv.FormatInt(seg.Limit, 10))
@@ -826,6 +907,17 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 		p.buf.WriteRune('\n')
 	}
+
+	// handle uncompleted partial segments
+	if p.HasPartialSegments() {
+		for _, ps := range p.PartialSegments {
+			writePartialSegment(&p.buf, ps)
+		}
+	}
+	if p.PreloadHints != nil {
+		writePreloadHint(&p.buf, p.PreloadHints)
+	}
+
 	if p.Closed {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
 	}
@@ -843,6 +935,10 @@ func (p *MediaPlaylist) String() string {
 // Count tells us the number of items that are currently in the media playlist.
 func (p *MediaPlaylist) Count() uint {
 	return p.count
+}
+
+func (p *MediaPlaylist) HasPartialSegments() bool {
+	return len(p.PartialSegments) > 0
 }
 
 // Close sliding playlist and by setting the EXT-X-ENDLIST tag and setting the Closed flag.
@@ -1078,3 +1174,50 @@ func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
 /*
 [Protocol Version Compatibility]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16#section-8
 */
+
+/// Helper functions
+
+func splitUriBy(uri, sep string) (string, string) {
+	// split the uri by the last dot
+	uriParts := strings.Split(uri, sep)
+	if len(uriParts) < 2 {
+		return "", ""
+	}
+	// get the last part of the uri
+	lastPart := uriParts[len(uriParts)-1]
+	// get the rest of the uri
+	rest := strings.Join(uriParts[:len(uriParts)-1], sep)
+	return rest, lastPart
+}
+
+// find the numbers in the string
+// e.g., fileSequence250 -> 250
+// filePart250 -> 250
+func getSequenceNum(uri string) uint64 {
+	// find the last number in the uri
+	re := regexp.MustCompile(`(\d+)$`)
+	numStr := re.FindString(uri)
+	if numStr == "" {
+		return 0
+	}
+	num, err := strconv.ParseUint(numStr, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return num
+}
+
+// check if a uri include the other
+func IsPartOf(partialSegUri, segUri string) bool {
+	// check if the extension is the same
+	if filepath.Ext(partialSegUri) != filepath.Ext(segUri) {
+		return false
+	}
+
+	// remove the extension
+	partialSegUri = strings.TrimSuffix(partialSegUri, filepath.Ext(partialSegUri))
+	partialSegUriPrefix, _ := splitUriBy(partialSegUri, ".")
+	segUri = strings.TrimSuffix(segUri, filepath.Ext(segUri))
+
+	return getSequenceNum(partialSegUriPrefix) == getSequenceNum(segUri)
+}
