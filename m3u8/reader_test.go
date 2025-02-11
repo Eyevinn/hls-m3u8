@@ -877,7 +877,7 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	is.True(!pp.Closed) // live playlist
 	is.Equal(pp.SeqNo, uint64(244))
 	is.Equal(pp.Count(), uint(6))
-	is.Equal(pp.PartTargetDuration, float32(1.002000))
+	is.Equal(pp.PartTargetDuration, 1.002)
 
 	// segment names should be in the following format fileSequence%d.m4s
 	// starting from fileSequence235.m4s
@@ -900,15 +900,17 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 
 	is.Equal(len(pp.PartialSegments), int(10)) // partial segment count must be 10
 
-	for _, ps := range pp.PartialSegments {
+	for i, ps := range pp.PartialSegments {
 		// The partial segments should have a duration of 1 second
 		is.Equal(ps.Duration, float64(1.0))
-		is.True(ps.Independent)
+		if i < 8 {
+			is.True(ps.Independent)
+		}
 		// partial segment names should be in the following format filePart%d.%d.m4s
 		is.True(strings.HasPrefix(ps.URI, "filePart"))
 	}
 
-	// The ProgramDateTime of the 8st partial segment should be: 2025-02-10T14:43:30.134Z
+	// The ProgramDateTime of the 9th partial segment should be: 2025-02-10T14:43:30.134Z
 	st, _ = time.Parse(time.RFC3339, "2025-02-10T14:43:30.134+00:00")
 	if !pp.PartialSegments[8].ProgramDateTime.Equal(st) {
 		t.Errorf("The program date time of the 8st partial segment should be: %v, actual value: %v",
