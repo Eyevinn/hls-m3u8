@@ -144,7 +144,7 @@ type MediaPlaylist struct {
 	ver                 uint8             // protocol version of the playlist, 3 or higher
 	targetDurLocked     bool              // target duration is locked and cannot be changed
 	independentSegments bool              // Global tag for EXT-X-INDEPENDENT-SEGMENTS
-	PartTargetDuration  float32           // EXT-X-PART-INF:PART-TARGET
+	PartTargetDuration  float64           // EXT-X-PART-INF:PART-TARGET
 	PartialSegments     []*PartialSegment // List of partial segments in the playlist.
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 }

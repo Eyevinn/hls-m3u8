@@ -708,7 +708,7 @@ func parsePreloadHint(parameters string) (*PreloadHint, error) {
 		case "BYTERANGE-LENGTH":
 			length, err := strconv.ParseInt(attr.Val, 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("start parsing error: %w", err)
+				return nil, fmt.Errorf("length parsing error: %w", err)
 			}
 			ph.Limit = length
 		}
