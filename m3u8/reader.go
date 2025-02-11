@@ -729,7 +729,7 @@ func parseExtXMapParameters(parameters string) (*Map, error) {
 	for _, attr := range decodeAttributes(parameters) {
 		switch attr.Key {
 		case "URI":
-			m.URI = attr.Val
+			m.URI = DeQuote(attr.Val)
 		case "BYTERANGE":
 			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &m.Limit, &m.Offset); err != nil {
 				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
@@ -850,6 +850,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				p.tail = p.count
 				err = p.AppendSegment(&seg)
 			}
+
 			// Check err for first or subsequent Append()
 			if err != nil {
 				return err
@@ -939,7 +940,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			return err
 		}
 		// if the program date time tag is present, set it on this partial segment
-		if state.tagProgramDateTime && len(p.PartialSegments) > 0 {
+		if state.tagProgramDateTime && p.HasPartialSegments() {
 			partialSegment.ProgramDateTime = state.programDateTime
 			state.tagProgramDateTime = false
 		}
