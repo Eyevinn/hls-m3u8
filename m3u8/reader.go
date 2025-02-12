@@ -163,6 +163,48 @@ func (p *MediaPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
 }
 
+func (p *MediaPlaylist) LastMSN() uint64 {
+	if p.NextPartIndex == 0 {
+		return p.NextMSNIndex - 1
+	}
+	return p.NextMSNIndex
+}
+
+func (p *MediaPlaylist) LastPart() uint64 {
+	if p.NextPartIndex == 0 {
+		return p.MaxPartIndex - 1
+	}
+	return p.NextPartIndex - 1
+}
+
+func (p *MediaPlaylist) GetNextSequenceAndPart() (uint64, uint64) {
+	nextSeqNo := p.LastMSN()
+	nextPartNo := p.LastPart()
+	if nextPartNo == p.MaxPartIndex {
+		nextPartNo = 0
+		nextSeqNo++
+	} else {
+		nextPartNo++
+	}
+	return nextSeqNo, nextPartNo
+}
+
+func (p *MediaPlaylist) IsSegmentReady(uri string) bool {
+	for _, seg := range p.Segments {
+		if seg != nil && strings.HasSuffix(uri, seg.URI) {
+			return true
+		}
+	}
+
+	for _, partial := range p.PartialSegments {
+		if strings.HasSuffix(uri, partial.URI) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SCTE35Syntax returns the SCTE35 syntax version detected as used in the playlist.
 func (p *MediaPlaylist) SCTE35Syntax() SCTE35Syntax {
 	return p.scte35Syntax
@@ -876,6 +918,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			if err != nil {
 				return err
 			}
+
+			p.NextMSNIndex++
+			p.NextPartIndex = 0
 			state.tagInf = false
 		}
 		if state.tagRange {
@@ -972,6 +1017,10 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			state.tagProgramDateTime = false
 		}
 		p.AppendPartialSegment(partialSegment)
+		p.NextPartIndex++
+		if p.MaxPartIndex < p.NextPartIndex {
+			p.MaxPartIndex = p.NextPartIndex
+		}
 	case strings.HasPrefix(line, "#EXT-X-PRELOAD-HINT:"):
 		preloadHint, err := parsePreloadHint(line[20:])
 		if err != nil {
@@ -983,6 +1032,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {
 			return err
 		}
+		p.NextMSNIndex = p.SeqNo
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
 		define, err := parseDefine(line)
 		if err != nil {

@@ -146,6 +146,9 @@ type MediaPlaylist struct {
 	independentSegments bool              // Global tag for EXT-X-INDEPENDENT-SEGMENTS
 	PartTargetDuration  float64           // EXT-X-PART-INF:PART-TARGET
 	PartialSegments     []*PartialSegment // List of partial segments in the playlist.
+	NextMSNIndex        uint64            // The index to be used for the next full segment
+	NextPartIndex       uint64            // The index to be used for the next partial segment
+	MaxPartIndex        uint64            // To determine when to "roll over" on the NextPartIndex
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 }
 

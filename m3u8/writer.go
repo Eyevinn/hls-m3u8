@@ -748,6 +748,12 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 	if p.PartTargetDuration > 0 {
+		p.buf.WriteString("#EXT-X-SERVER-CONTROL:")
+		p.buf.WriteString("CAN-BLOCK-RELOAD=YES,")
+		p.buf.WriteString("PART-HOLD-BACK=")
+		p.buf.WriteString(strconv.FormatFloat(p.PartTargetDuration*3, 'f', 3, 64))
+		p.buf.WriteRune('\n')
+
 		p.buf.WriteString("#EXT-X-PART-INF:PART-TARGET=")
 		p.buf.WriteString(strconv.FormatFloat(p.PartTargetDuration, 'f', 3, 64))
 		p.buf.WriteRune('\n')
