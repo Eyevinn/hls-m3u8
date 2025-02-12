@@ -781,14 +781,26 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 
 	head := p.head
 	count := p.count
-	for i := uint(0); (i < p.winsize || p.winsize == 0) && count > 0; count-- {
-		seg = p.Segments[head]
-		head = (head + 1) % p.capacity
+	isVoD := p.winsize == 0
+	var outputCount uint // number of segments to output
+	var start uint       // start index of segments to output
+	if isVoD {
+		// for VoD playlists, output all segments
+		outputCount = count
+		start = head
+	} else {
+		// for Live playlists, output the last winsize segments
+		outputCount = min(p.winsize, count)
+		start = head + count - outputCount
+	}
+
+	// shift head to start
+	head = start
+	// output segments
+	for i := start; i < start+outputCount; i++ {
+		seg = p.Segments[i]
 		if seg == nil { // protection from badly filled chunklists
 			continue
-		}
-		if p.winsize > 0 { // skip for VOD playlists, where winsize = 0
-			i++
 		}
 		if seg.SCTE != nil {
 			switch seg.SCTE.Syntax {

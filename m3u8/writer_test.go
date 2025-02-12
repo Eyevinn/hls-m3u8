@@ -988,8 +988,8 @@ func ExampleNewMediaPlaylist_string() {
 	// #EXT-X-VERSION:3
 	// #EXT-X-MEDIA-SEQUENCE:0
 	// #EXT-X-TARGETDURATION:6
-	// #EXTINF:5.000,
-	// test01.ts
+	// #EXTINF:6.000,
+	// test02.ts
 }
 
 // Create new media playlist
