@@ -318,10 +318,7 @@ func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment) {
 		writeYESorNO(buf, ps.Gap)
 	}
 	if ps.Limit > 0 {
-		buf.WriteString(",BYTERANGE=")
-		buf.WriteString(strconv.FormatInt(ps.Limit, 10))
-		buf.WriteRune('@')
-		buf.WriteString(strconv.FormatInt(ps.Offset, 10))
+		writeRange(buf, ",BYTERANGE=", ps.Limit, ps.Offset)
 	}
 	buf.WriteString(",URI=\"")
 	buf.WriteString(ps.URI)
@@ -474,10 +471,7 @@ func writeExtXMap(buf *bytes.Buffer, m *Map) {
 	buf.WriteString(m.URI)
 	buf.WriteRune('"')
 	if m.Limit > 0 {
-		buf.WriteString(",BYTERANGE=")
-		buf.WriteString(strconv.FormatInt(m.Limit, 10))
-		buf.WriteRune('@')
-		buf.WriteString(strconv.FormatInt(m.Offset, 10))
+		writeRange(buf, ",BYTERANGE=", m.Limit, m.Offset)
 	}
 	buf.WriteRune('\n')
 }
@@ -509,6 +503,13 @@ func writeContentSteering(buf *bytes.Buffer, cs *ContentSteering) {
 		writeQuoted(buf, "PATHWAY-ID", cs.PathwayId)
 	}
 	buf.WriteRune('\n')
+}
+
+func writeRange(buf *bytes.Buffer, tag string, limit, offset int64) {
+	buf.WriteString(tag)
+	buf.WriteString(strconv.FormatInt(limit, 10))
+	buf.WriteRune('@')
+	buf.WriteString(strconv.FormatInt(offset, 10))
 }
 
 // writeQuoted writes a quoted key-value pair to the buffer preceded by a comma.
@@ -993,10 +994,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		}
 
 		if seg.Limit > 0 {
-			p.buf.WriteString("#EXT-X-BYTERANGE:")
-			p.buf.WriteString(strconv.FormatInt(seg.Limit, 10))
-			p.buf.WriteRune('@')
-			p.buf.WriteString(strconv.FormatInt(seg.Offset, 10))
+			writeRange(&p.buf, "#EXT-X-BYTERANGE:", seg.Limit, seg.Offset)
 			p.buf.WriteRune('\n')
 		}
 
