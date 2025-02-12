@@ -142,14 +142,14 @@ func (p *MediaPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Playl
 	return p
 }
 
-func (p *MediaPlaylist) LastMSN() uint64 {
-	if p.NextPartIndex == 0 {
-		return p.NextMSNIndex - 1
+func (p *MediaPlaylist) LastSegIndex() uint64 {
+	if p.NextPartIndex == p.MaxPartIndex {
+		return p.NextMSNIndex
 	}
-	return p.NextMSNIndex
+	return p.NextMSNIndex - 1
 }
 
-func (p *MediaPlaylist) LastPart() uint64 {
+func (p *MediaPlaylist) LastPartSegIndex() uint64 {
 	if p.NextPartIndex == 0 {
 		return p.MaxPartIndex - 1
 	}
@@ -157,13 +157,11 @@ func (p *MediaPlaylist) LastPart() uint64 {
 }
 
 func (p *MediaPlaylist) GetNextSequenceAndPart() (uint64, uint64) {
-	nextSeqNo := p.LastMSN()
-	nextPartNo := p.LastPart()
+	nextSeqNo := p.NextMSNIndex
+	nextPartNo := p.NextPartIndex
 	if nextPartNo == p.MaxPartIndex {
 		nextPartNo = 0
 		nextSeqNo++
-	} else {
-		nextPartNo++
 	}
 	return nextSeqNo, nextPartNo
 }
@@ -1005,7 +1003,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {
 			return err
 		}
-		p.NextMSNIndex = p.SeqNo
+		p.NextMSNIndex = p.SeqNo + 1
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
 		define, err := parseDefine(line)
 		if err != nil {
