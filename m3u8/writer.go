@@ -801,7 +801,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	}
 
 	// shift head to start
-	head = start
+	p.head = start
 	// output segments
 	for i := start; i < start+outputCount; i++ {
 		seg = p.Segments[i]

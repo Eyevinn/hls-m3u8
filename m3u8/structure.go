@@ -255,10 +255,11 @@ type PartialSegment struct {
 }
 
 type PreloadHint struct {
-	Type   string // #EXT-X-PRELOAD-HINT:TYPE Enumerated-string ("PART" -> Partial Segment; "MAP" -> Media Initialization Section)
-	URI    string // #EXT-X-PRELOAD-HINT:URI
-	Offset int64  // #EXT-X-PRELOAD-HINT:BYTERANGE-START
-	Limit  int64  // #EXT-X-PRELOAD-HINT:BYTERANGE-LENGTH
+	// #EXT-X-PRELOAD-HINT:
+	Type   string // TYPE ("PART" -> Partial Segment; "MAP" -> Media Initialization Section)
+	URI    string // URI
+	Offset int64  // BYTERANGE-START
+	Limit  int64  // BYTERANGE-LENGTH
 }
 
 // SCTE holds custom SCTE-35 tags.

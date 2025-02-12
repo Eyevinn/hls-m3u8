@@ -1014,7 +1014,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			partialSegment.ProgramDateTime = state.programDateTime
 			state.tagProgramDateTime = false
 		}
-		p.AppendPartialSegment(partialSegment)
+		if err = p.AppendPartialSegment(partialSegment); err != nil {
+			return err
+		}
 		p.NextPartIndex++
 		if p.MaxPartIndex < p.NextPartIndex {
 			p.MaxPartIndex = p.NextPartIndex
