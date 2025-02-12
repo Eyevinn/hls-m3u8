@@ -777,6 +777,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			if state.duration, err = strconv.ParseFloat(duration, 64); strict && err != nil {
 				return fmt.Errorf("duration parsing error: %w", err)
 			}
+			state.versionCheckRule = FloatPointDuration{p.ver, duration}
 		}
 		if len(line) > sepIndex {
 			state.title = line[sepIndex+1:]
@@ -914,10 +915,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA
 		state.xkey = parseKeyParams(line[11:])
-		state.versionCheck = ValidIVInEXTXKEY{
-			ActualVersion: p.ver,
-			IV:            state.xkey.IV}
 		state.tagKey = true
+		state.versionCheckRule = ValidIVInEXTXKey{p.ver, state.xkey.IV}
 	case strings.HasPrefix(line, "#EXT-X-MAP:"):
 		state.listType = MEDIA
 		xMap, err := parseExtXMapParameters(line[11:])
@@ -950,6 +949,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				return fmt.Errorf("byterange sub-range offset value parsing error: %w ", err)
 			}
 		}
+		state.versionCheckRule = ContainsByteRangeOrIFrameOnly{p.ver}
 	case !state.tagSCTE35 && strings.HasPrefix(line, "#EXT-SCTE35:"):
 		state.tagSCTE35 = true
 		state.listType = MEDIA
@@ -1024,15 +1024,19 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-I-FRAMES-ONLY"):
 		state.listType = MEDIA
 		p.Iframe = true
+		state.versionCheckRule = ContainsByteRangeOrIFrameOnly{p.ver}
 	case strings.HasPrefix(line, "#EXT-X-ALLOW-CACHE:"):
 		val := strings.TrimPrefix(line, "#EXT-X-ALLOW-CACHE:") == "YES"
 		p.AllowCache = &val
 	}
 
-	if strict {
-		if valid, err := state.versionCheck.Validate(); !valid {
-			return err
+	// Check version rules
+	if valid, mismatch := state.versionCheckRule.Validate(); !valid {
+		minimumVersion := mismatch.ExpectedVersion
+		if strict && p.ver < minimumVersion {
+			return fmt.Errorf("minimum version required: %d", minimumVersion)
 		}
+		fmt.Printf("minimum version suggested: %d\n", minimumVersion)
 	}
 
 	return err
@@ -1093,4 +1097,18 @@ func trimLineEnd(line string) string {
 		return line[:l-nrRemove]
 	}
 	return line
+}
+
+func isStringFloatNum(s string) bool {
+	if !strings.Contains(s, ".") {
+		return false
+	}
+
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
+}
+
+func isStringInteger(s string) bool {
+	_, err := strconv.Atoi(s)
+	return err == nil
 }

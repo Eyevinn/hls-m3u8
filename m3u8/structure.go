@@ -304,7 +304,7 @@ type decodingState struct {
 	scte               *SCTE
 	scte35DateRanges   []*DateRange
 	custom             CustomMap
-	versionCheck       VersionMatchingRule
+	versionCheckRule   VersionMatchingRule
 }
 
 // DateRange corresponds to EXT-X-DATERANGE tag.

@@ -1035,6 +1035,50 @@ func TestDecodeMediaPlaylistWithDefines(t *testing.T) {
 	is.Equal(p.Defines[2].Value, "")
 }
 
+func TestIsStringFloatNum(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"123", false},
+		{"123.456", true},
+		{"-123.456", true},
+		{"1e10", false},
+		{"abc", false},
+		{"123abc", false},
+		{"", false},
+	}
+
+	for _, test := range tests {
+		result := isStringFloatNum(test.input)
+		if result != test.expected {
+			t.Errorf("isStringFloatNum(%q) = %v; want %v", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestIsStringInteger(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"123", true},
+		{"-123", true},
+		{"0", true},
+		{"123.456", false},
+		{"abc", false},
+		{"123abc", false},
+		{"", false},
+	}
+
+	for _, test := range tests {
+		result := isStringInteger(test.input)
+		if result != test.expected {
+			t.Errorf("isStringInteger(%q) = %v; want %v", test.input, result, test.expected)
+		}
+	}
+}
+
 /***************************
  *  Code parsing examples  *
  ***************************/
