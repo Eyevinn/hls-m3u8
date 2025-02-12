@@ -875,8 +875,9 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	// check parsed values
 	is.Equal(pp.TargetDuration, uint(4))
 	is.True(!pp.Closed) // live playlist
-	is.Equal(pp.SeqNo, uint64(244))
-	is.Equal(pp.Count(), uint(6))
+	startIndex := uint(242)
+	is.Equal(pp.SeqNo, uint64(startIndex))
+	is.Equal(pp.Count(), uint(8))
 	is.Equal(pp.PartTargetDuration, 1.002)
 
 	// segment names should be in the following format fileSequence%d.m4s
@@ -885,15 +886,15 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 
 	for i := range pp.Count() {
 		s := pp.Segments[i]
-		expected := fmt.Sprintf("fileSequence%d.m4s", i+244+1)
+		expected := fmt.Sprintf("fileSequence%d.m4s", i+startIndex+1)
 		if s.URI != expected {
 			t.Errorf("Segment name mismatch: %s != %s", s.URI, expected)
 		}
 	}
 
-	// The ProgramDateTime of the 2nd segment should be: 2025-02-10T14:42:30.134Z
+	// The ProgramDateTime of the 4th segment should be: 2025-02-10T14:42:30.134Z
 	st, _ := time.Parse(time.RFC3339, "2025-02-10T14:43:10.134+00:00")
-	if !pp.Segments[1].ProgramDateTime.Equal(st) {
+	if !pp.Segments[3].ProgramDateTime.Equal(st) {
 		t.Errorf("The program date time of the 1st segment should be: %v, actual value: %v",
 			st, pp.Segments[1].ProgramDateTime)
 	}
