@@ -880,12 +880,9 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	is.Equal(pp.Count(), uint(8))
 	is.Equal(pp.PartTargetDuration, 1.002)
 
-	// segment names should be in the following format fileSequence%d.m4s
-	// starting from fileSequence235.m4s
-	t.Logf("First Segment is %s", pp.Segments[0].URI)
-
 	for i := range pp.Count() {
 		s := pp.Segments[i]
+		// segment names should be in the following format fileSequence%d.m4s
 		expected := fmt.Sprintf("fileSequence%d.m4s", i+startIndex+1)
 		if s.URI != expected {
 			t.Errorf("Segment name mismatch: %s != %s", s.URI, expected)
@@ -921,6 +918,16 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	// Preload Hints
 	is.Equal(pp.PreloadHints.Type, "PART")
 	is.Equal(pp.PreloadHints.URI, "filePart251.3.m4s")
+
+	// Existing segments
+	is.Equal(pp.LastSegIndex(), uint64(250))
+	// Existing partial segments (filePart251.2.m4s has index 1)
+	is.Equal(pp.LastPartSegIndex(), uint64(1))
+
+	// incoming segments
+	seq, part := pp.GetNextSequenceAndPart()
+	is.Equal(seq, uint64(251))
+	is.Equal(part, uint64(2))
 }
 
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
