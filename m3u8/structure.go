@@ -147,6 +147,7 @@ type MediaPlaylist struct {
 	NextPartIndex       uint64            // The index to be used for the next partial segment (starts at 0)
 	MaxPartIndex        uint64            // To determine when to "roll over" on the NextPartIndex
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
+	ServerControl       *ServerControl    // EXT-X-SERVER-CONTROL tags, MAY appear in any Media Playlist
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which
@@ -241,6 +242,7 @@ type MediaSegment struct {
 }
 
 type PartialSegment struct {
+	SeqID           uint64    // Sequence ID of the partial segment
 	URI             string    // EXT-X-PART:URI
 	Duration        float64   // EXT-X-PART:DURATION
 	Independent     bool      // EXT-X-PART:INDEPENDENT
@@ -256,6 +258,15 @@ type PreloadHint struct {
 	URI    string // URI
 	Offset int64  // BYTERANGE-START
 	Limit  int64  // BYTERANGE-LENGTH
+}
+
+type ServerControl struct {
+	// #EXT-X-SERVER-CONTROL:
+	CanSkipUntil      float64 // CAN-SKIP-UNTIL
+	CanSkipDateRanges bool    // CAN-SKIP-DATERANGES
+	HoldBack          float64 // HOLD-BACK
+	PartHoldBack      float64 // PART-HOLD-BACK
+	CanBlockReload    bool    // CAN-BLOCK-RELOAD
 }
 
 // SCTE holds custom SCTE-35 tags.
