@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -860,6 +861,94 @@ func TestMediaPlaylistWithSCTE35Tag(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-low-latency-initial-sequence-num-5.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA)              // must be media playlist
+	is.Equal(pp.TargetDuration, uint(4))   // target duration must be 4
+	is.True(!pp.Closed)                    // live playlist
+	is.Equal(pp.SeqNo, uint64(11))         // sequence number must be 11
+	is.Equal(pp.Count(), uint(16))         // segment count must be 16
+	is.Equal(pp.PartTargetDuration, 1.002) // partial target duration must be 1.002
+	startIndex := uint(5)
+	pp.Map.URI = fmt.Sprintf("fileSequence%d.m4s", startIndex) // init segment should be fileSequence5.m4s
+
+	for i := range pp.Count() {
+		s := pp.Segments[i]
+		// segment names should be in the following format fileSequence%d.m4s
+		expectedSeqNo := startIndex + uint(pp.SeqNo) + i + 1
+		expected := fmt.Sprintf("fileSequence%d.m4s", expectedSeqNo)
+		if s.URI != expected {
+			t.Errorf("Segment name mismatch: %s != %s", s.URI, expected)
+		}
+	}
+
+	// Existing segments
+	is.Equal(pp.LastSegIndex(), uint64(27)) // Last segment (filePart32.m4s) has index 27
+	// Existing partial segments
+	is.Equal(pp.LastPartSegIndex(), uint64(1)) // Last partial segment (filePart33.2.m4s) has index 1
+
+	seq, part := pp.GetNextSequenceAndPart()
+	is.Equal(seq, uint64(27)) // Has seqId 27
+	is.Equal(part, uint64(2)) // Has index 2
+}
+
+func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-low-latency.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA)                  // must be media playlist
+	is.Equal(pp.TargetDuration, uint(4))       // target duration must be 4
+	is.True(!pp.Closed)                        // live playlist
+	is.Equal(pp.Count(), uint(8))              // segment count must be 8
+	is.Equal(pp.PartTargetDuration, 1.002)     // partial target duration must be 1.002
+	is.Equal(len(pp.PartialSegments), int(10)) // partial segment count must be 10
+
+	// The ProgramDateTime of the 4th segment should be: 2025-02-10T14:42:30.134Z
+	st, _ := time.Parse(time.RFC3339, "2025-02-10T14:43:10.134+00:00")
+	if !pp.Segments[3].ProgramDateTime.Equal(st) {
+		t.Errorf("The program date time of the 1st segment should be: %v, actual value: %v",
+			st, pp.Segments[1].ProgramDateTime)
+	}
+
+	for i, ps := range pp.PartialSegments {
+		is.Equal(ps.Duration, float64(1.0)) // partial segment duration must be 1.0
+		if i < 8 {
+			is.True(ps.Independent) // the first 8 partial segment must be independent
+		}
+		is.True(strings.HasPrefix(ps.URI, "filePart")) // partial segment names should be in the following format filePart%d.%d.m4s
+	}
+
+	// The ProgramDateTime of the 9th partial segment should be: 2025-02-10T14:43:30.134Z
+	st, _ = time.Parse(time.RFC3339, "2025-02-10T14:43:30.134+00:00")
+	if !pp.PartialSegments[8].ProgramDateTime.Equal(st) {
+		t.Errorf("The program date time of the 8st partial segment should be: %v, actual value: %v",
+			st, pp.PartialSegments[8].ProgramDateTime)
+	}
+
+	// Preload Hints
+	is.Equal(pp.PreloadHints.Type, "PART")             // preload hints type must be PART
+	is.Equal(pp.PreloadHints.URI, "filePart251.3.m4s") // preload hints uri must be filePart251.3.m4s
+
+	// Existing segments
+	is.Equal(pp.LastSegIndex(), uint64(250)) // Last segment index (fileSequence250.m4s has index 250)
+	// Existing partial segments
+	is.Equal(pp.LastPartSegIndex(), uint64(1)) // Last partial segment index (filePart251.2.m4s has index 1)
+
+	seq, part := pp.GetNextSequenceAndPart()
+	is.Equal(seq, uint64(250)) // Has seqId 250
+	is.Equal(part, uint64(2))  // Has index 2
 }
 
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {

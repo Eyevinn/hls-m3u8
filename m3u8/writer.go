@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +20,7 @@ import (
 var ErrPlaylistFull = errors.New("playlist is full")
 var ErrPlaylistEmpty = errors.New("playlist is empty")
 var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
+var RegexpNum = regexp.MustCompile(`(\d+)$`)
 
 // updateVersion updates the version if it is higher than before.
 func updateVersion(ver *uint8, newVer uint8) {
@@ -294,6 +297,80 @@ func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant) {
 		writeQuoted(buf, "NAME", vnt.Name)
 	}
 	writeQuoted(buf, "URI", vnt.URI) // Mandatory
+	buf.WriteRune('\n')
+}
+
+func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment) {
+	if !ps.ProgramDateTime.IsZero() {
+		buf.WriteString("#EXT-X-PROGRAM-DATE-TIME:")
+		buf.WriteString(ps.ProgramDateTime.Format(DATETIME))
+		buf.WriteRune('\n')
+	}
+	buf.WriteString("#EXT-X-PART:")
+	buf.WriteString("DURATION=")
+	buf.WriteString(strconv.FormatFloat(ps.Duration, 'f', 3, 64))
+	if ps.Independent {
+		buf.WriteString(",INDEPENDENT=")
+		writeYESorNO(buf, ps.Independent)
+	}
+	if ps.Gap {
+		buf.WriteString(",GAP=")
+		writeYESorNO(buf, ps.Gap)
+	}
+	if ps.Limit > 0 {
+		buf.WriteString(",BYTERANGE=")
+		buf.WriteString(strconv.FormatInt(ps.Limit, 10))
+		buf.WriteRune('@')
+		buf.WriteString(strconv.FormatInt(ps.Offset, 10))
+	}
+	buf.WriteString(",URI=\"")
+	buf.WriteString(ps.URI)
+	buf.WriteRune('"')
+	buf.WriteRune('\n')
+}
+
+func writePreloadHint(buf *bytes.Buffer, ph *PreloadHint) {
+	buf.WriteString("#EXT-X-PRELOAD-HINT:")
+	buf.WriteString("TYPE=")
+	buf.WriteString(ph.Type)
+	buf.WriteString(",URI=\"")
+	buf.WriteString(ph.URI)
+	buf.WriteRune('"')
+	if ph.Offset > 0 {
+		buf.WriteString(",BYTERANGE-START=")
+		buf.WriteString(strconv.FormatInt(ph.Offset, 10))
+		buf.WriteString(",BYTERANGE-LENGTH=")
+		buf.WriteString(strconv.FormatInt(ph.Limit, 10))
+	}
+	buf.WriteRune('\n')
+}
+
+func writeServerControl(buf *bytes.Buffer, sc *ServerControl) {
+	buf.WriteString("#EXT-X-SERVER-CONTROL:")
+	if sc.CanSkipUntil > 0 {
+		buf.WriteString("CAN-SKIP-UNTIL=")
+		buf.WriteString(strconv.FormatFloat(sc.CanSkipUntil, 'f', 3, 64))
+
+		if sc.CanSkipDateRanges {
+			buf.WriteString(",CAN-SKIP-DATERANGES=")
+			writeYESorNO(buf, sc.CanSkipDateRanges)
+		}
+		buf.WriteString(",")
+	}
+	if sc.HoldBack > 0 {
+		buf.WriteString("HOLD-BACK=")
+		buf.WriteString(strconv.FormatFloat(sc.HoldBack, 'f', 3, 64))
+		buf.WriteString(",")
+	}
+	if sc.PartHoldBack > 0 {
+		buf.WriteString("PART-HOLD-BACK=")
+		buf.WriteString(strconv.FormatFloat(sc.PartHoldBack, 'f', 3, 64))
+		buf.WriteString(",")
+	}
+	if sc.CanBlockReload {
+		buf.WriteString("CAN-BLOCK-RELOAD=")
+		writeYESorNO(buf, sc.CanBlockReload)
+	}
 	buf.WriteRune('\n')
 }
 
@@ -614,6 +691,40 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	return nil
 }
 
+func (p *MediaPlaylist) AppendPartial(uri string, duration float64, independent bool) error {
+	seg := new(PartialSegment)
+	seg.URI = uri
+	seg.Duration = duration
+	seg.Independent = independent
+	return p.AppendPartialSegment(seg)
+}
+
+func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
+	if p.count == 0 {
+		return ErrPlaylistEmpty
+	}
+
+	// Check if the partial segment belongs to the last full segment
+	fullSegUri := p.Segments[p.last()].URI
+	if IsPartOf(ps.URI, fullSegUri) {
+		ps.SeqID = p.Segments[p.last()].SeqId
+	} else {
+		// It belongs to the next segment
+		ps.SeqID = p.Segments[p.last()].SeqId + 1
+	}
+
+	p.PartialSegments = append(p.PartialSegments, ps)
+
+	return nil
+}
+
+func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {
+	preloadHint := new(PreloadHint)
+	preloadHint.Type = hintType
+	preloadHint.URI = uri
+	p.PreloadHints = preloadHint
+}
+
 func (p *MediaPlaylist) AppendDefine(d Define) {
 	p.Defines = append(p.Defines, d)
 }
@@ -689,6 +800,16 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			p.buf.WriteString("VOD\n")
 		}
 	}
+
+	if p.ServerControl != nil {
+		writeServerControl(&p.buf, p.ServerControl)
+	}
+
+	if p.PartTargetDuration > 0 {
+		p.buf.WriteString("#EXT-X-PART-INF:PART-TARGET=")
+		p.buf.WriteString(strconv.FormatFloat(p.PartTargetDuration, 'f', 3, 64))
+		p.buf.WriteRune('\n')
+	}
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
 	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
 	p.buf.WriteRune('\n')
@@ -717,15 +838,32 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	)
 
 	head := p.head
+	tail := p.tail
 	count := p.count
-	for i := uint(0); (i < p.winsize || p.winsize == 0) && count > 0; count-- {
-		seg = p.Segments[head]
-		head = (head + 1) % p.capacity
+	isVoDOrEvent := p.winsize == 0
+	var outputCount uint     // number of segments to output
+	var start uint           // start index of segments to output
+	var lastSegId uint64 = 0 // last segment sequence number in live playlist
+	if isVoDOrEvent {
+		// for VoD playlists, output all segments
+		outputCount = count
+		start = head
+	} else {
+		// for Live playlists, output the last winsize segments
+		outputCount = min(p.winsize, count)
+		start = head + count - outputCount
+		if tail > 0 {
+			lastSegId = p.Segments[tail-1].SeqId
+		}
+	}
+
+	// shift head to start
+	p.head = start
+	// output segments
+	for i := start; i < start+outputCount; i++ {
+		seg = p.Segments[i]
 		if seg == nil { // protection from badly filled chunklists
 			continue
-		}
-		if p.winsize > 0 { // skip for VOD playlists, where winsize = 0
-			i++
 		}
 		if seg.SCTE != nil {
 			switch seg.SCTE.Syntax {
@@ -790,6 +928,31 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			p.buf.WriteString(seg.ProgramDateTime.Format(DATETIME))
 			p.buf.WriteRune('\n')
 		}
+		// handle completed partial segments
+		if p.HasPartialSegments() {
+			fullSegUri := seg.URI
+			var remainingPartialSegments []*PartialSegment
+			for _, ps := range p.PartialSegments {
+				// output all partial segments if we have less than 3 segments, or
+				// output only partial segments that belong to the last 3 segments
+				if lastSegId < 3 || ps.SeqID > lastSegId-3 {
+					if IsPartOf(ps.URI, fullSegUri) {
+						// This partial segment is part of the current full segment
+						writePartialSegment(&p.buf, ps)
+					} else {
+						// This partial segment does not belong to current full segment
+						// Keep it to be written later
+						remainingPartialSegments = append(remainingPartialSegments, ps)
+					}
+				} else {
+					// This partial segment is older than the last 3 segments
+					// and should be ignored
+				}
+			}
+			// Update the PartialSegments list to exclude the completed ones
+			p.PartialSegments = remainingPartialSegments
+		}
+
 		if seg.Limit > 0 {
 			p.buf.WriteString("#EXT-X-BYTERANGE:")
 			p.buf.WriteString(strconv.FormatInt(seg.Limit, 10))
@@ -825,6 +988,24 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		}
 		p.buf.WriteRune('\n')
 	}
+
+	// handle remaining partial segments
+	if p.HasPartialSegments() {
+		for _, ps := range p.PartialSegments {
+			if ps.SeqID >= lastSegId {
+				// This partial segment is part of the next segment
+				writePartialSegment(&p.buf, ps)
+			} else {
+				// This partial segment does not belong to any segment
+				// and should be ignored
+			}
+		}
+	}
+
+	if p.PreloadHints != nil {
+		writePreloadHint(&p.buf, p.PreloadHints)
+	}
+
 	if p.Closed {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
 	}
@@ -842,6 +1023,10 @@ func (p *MediaPlaylist) String() string {
 // Count tells us the number of items that are currently in the media playlist.
 func (p *MediaPlaylist) Count() uint {
 	return p.count
+}
+
+func (p *MediaPlaylist) HasPartialSegments() bool {
+	return len(p.PartialSegments) > 0
 }
 
 // Close sliding playlist and by setting the EXT-X-ENDLIST tag and setting the Closed flag.
@@ -1051,6 +1236,10 @@ func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 	return nil
 }
 
+func (p *MediaPlaylist) SetServerControl(control *ServerControl) {
+	p.ServerControl = control
+}
+
 // GetAllSegments could get all segments currently added to playlist.
 // Winsize is ignored.
 func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
@@ -1076,3 +1265,49 @@ func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
 /*
 [Protocol Version Compatibility]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16#section-8
 */
+
+/// Helper functions
+
+func splitUriBy(uri, sep string) (string, string) {
+	// split the uri by the last dot
+	uriParts := strings.Split(uri, sep)
+	if len(uriParts) < 2 {
+		return "", ""
+	}
+	// get the last part of the uri
+	lastPart := uriParts[len(uriParts)-1]
+	// get the rest of the uri
+	rest := strings.Join(uriParts[:len(uriParts)-1], sep)
+	return rest, lastPart
+}
+
+// find the numbers in the string
+// e.g., fileSequence250 -> 250
+// filePart250 -> 250
+func getSequenceNum(uri string) uint64 {
+	// find the last number in the uri
+	numStr := RegexpNum.FindString(uri)
+	if numStr == "" {
+		return 0
+	}
+	num, err := strconv.ParseUint(numStr, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return num
+}
+
+// check if a uri include the other
+func IsPartOf(partialSegUri, segUri string) bool {
+	// check if the extension is the same
+	if filepath.Ext(partialSegUri) != filepath.Ext(segUri) {
+		return false
+	}
+
+	// remove the extension
+	partialSegUri = strings.TrimSuffix(partialSegUri, filepath.Ext(partialSegUri))
+	partialSegUriPrefix, _ := splitUriBy(partialSegUri, ".")
+	segUri = strings.TrimSuffix(segUri, filepath.Ext(segUri))
+
+	return getSequenceNum(partialSegUriPrefix) == getSequenceNum(segUri)
+}
