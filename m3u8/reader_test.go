@@ -895,10 +895,9 @@ func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testin
 	// Existing partial segments
 	is.Equal(pp.LastPartSegIndex(), uint64(1)) // Last partial segment (filePart33.2.m4s) has index 1
 
-	// Incoming segments
 	seq, part := pp.GetNextSequenceAndPart()
-	is.Equal(seq, uint64(28)) // Next segment (filePart33.m4s) has index 28
-	is.Equal(part, uint64(2)) // Next partial segment (filePart33.3.m4s) has index 2
+	is.Equal(seq, uint64(27)) // Has seqId 27
+	is.Equal(part, uint64(2)) // Has index 2
 }
 
 func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
@@ -947,10 +946,9 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	// Existing partial segments
 	is.Equal(pp.LastPartSegIndex(), uint64(1)) // Last partial segment index (filePart251.2.m4s has index 1)
 
-	// Incoming segments
 	seq, part := pp.GetNextSequenceAndPart()
-	is.Equal(seq, uint64(251)) // Next segment index must be 251
-	is.Equal(part, uint64(2))  // Next partial segment index must be 2 (filePart251.3.m4s)
+	is.Equal(seq, uint64(250)) // Has seqId 250
+	is.Equal(part, uint64(2))  // Has index 2
 }
 
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
