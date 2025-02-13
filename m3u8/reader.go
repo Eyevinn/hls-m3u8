@@ -165,24 +165,29 @@ func (p *MediaPlaylist) SetVersion(ver uint8) {
 
 func (p *MediaPlaylist) LastSegIndex() uint64 {
 	if p.NextPartIndex == 0 {
+		// Just rolled over to the next segment
 		return p.NextMSNIndex - 1
 	}
-	return p.NextMSNIndex - 1
+	return p.NextMSNIndex
 }
 
 func (p *MediaPlaylist) LastPartSegIndex() uint64 {
 	if p.NextPartIndex == 0 {
+		// Just rolled over to the next segment
 		return p.MaxPartIndex - 1
 	}
 	return p.NextPartIndex - 1
 }
 
 func (p *MediaPlaylist) GetNextSequenceAndPart() (uint64, uint64) {
-	nextSeqNo := p.NextMSNIndex
-	nextPartNo := p.NextPartIndex
+	nextSeqNo := p.LastSegIndex()
+	nextPartNo := p.LastPartSegIndex()
 	if nextPartNo == p.MaxPartIndex {
+		// Roll over to the next segment
 		nextPartNo = 0
 		nextSeqNo++
+	} else {
+		nextPartNo++
 	}
 	return nextSeqNo, nextPartNo
 }
@@ -1063,7 +1068,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {
 			return err
 		}
-		p.NextMSNIndex = p.SeqNo + 1
+		p.NextMSNIndex = p.SeqNo
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
 		define, err := parseDefine(line)
 		if err != nil {
