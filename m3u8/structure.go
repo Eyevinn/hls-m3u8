@@ -17,6 +17,7 @@ type Playlist interface {
 	DecodeFrom(reader io.Reader, strict bool) error
 	WithCustomDecoders([]CustomDecoder) Playlist
 	String() string
+	CalcMinVersion() (uint8, string, error)
 }
 
 // CustomDecoder interface for decoding custom and unsupported tags
