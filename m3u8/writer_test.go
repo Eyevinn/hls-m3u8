@@ -409,34 +409,70 @@ test01.ts
 
 func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 	is := is.New(t)
-	p, e := NewMediaPlaylist(4, 5)
+	p, e := NewMediaPlaylist(5, 10)
 	is.NoErr(e) // Create media playlist should be successful
 	p.PartTargetDuration = 1.002
 
-	segments := []string{"test01.m4s", "test02.m4s", "test03.m4s", "test04.m4s"}
-	for _, segment := range segments {
-		e = p.Append(segment, 4.0, "")
-		is.NoErr(e) // Add segment to a media playlist should be successful
+	e = p.Append("test00.m4s", 4.0, "")
+	is.NoErr(e) // Add segment to a media playlist should be successful
+
+	segments := [][]string{
+		{"test01.1.m4s", "test01.2.m4s", "test01.3.m4s", "test01.4.m4s", "test01.m4s"},
+		{"test02.1.m4s", "test02.2.m4s", "test02.3.m4s", "test02.4.m4s", "test02.m4s"},
+		{"test03.1.m4s", "test03.2.m4s", "test03.3.m4s", "test03.4.m4s", "test03.m4s"},
+		{"test04.1.m4s", "test04.2.m4s", "test04.3.m4s", "test04.4.m4s", "test04.m4s"},
+		{"test05.1.m4s"}}
+	for _, psList := range segments {
+		for index, ps := range psList {
+			if index > 0 && index == len(psList)-1 {
+				e = p.Append(ps, 4.0, "")
+				is.NoErr(e) // Add segment to a media playlist should be successful
+			} else {
+				e = p.AppendPartial(ps, 1.0, true)
+				is.NoErr(e) // Add partial segment to a media playlist should be successful
+			}
+		}
 	}
 
-	partialSegments := []string{"test04.1.m4s", "test04.2.m4s", "test04.3.m4s", "test04.4.m4s", "test05.1.m4s"}
-	for _, ps := range partialSegments {
-		e = p.AppendPartial(ps, 1.0, true)
-		is.NoErr(e) // Add partial segment to a media playlist should be successful
+	for seqNo, psList := range segments {
+		for partIndex := range psList {
+			if partIndex > 0 && partIndex == len(psList)-1 {
+				// ignore full segment
+				continue
+			}
+			partialSegment := p.PartialSegments[seqNo*4+partIndex]
+
+			is.Equal(partialSegment.URI, psList[partIndex]) // Partial segment URI does not match expected
+			is.Equal(partialSegment.SeqID, uint64(seqNo+1)) // Partial segment SeqID does not match expected
+		}
 	}
 
 	p.SetPreloadHint("PART", "test05.2.m4s")
 
+	serverControl := ServerControl{0.0, false, 0.0, 3.006, true}
+	p.SetServerControl(&serverControl)
+
+	// Output only partial segments from last 3 full segments
 	expected := `#EXTM3U
 #EXT-X-VERSION:3
-#EXT-X-SERVER-CONTROL:CAN-BLOCK-RELOAD=YES,PART-HOLD-BACK=3.006
+#EXT-X-SERVER-CONTROL:PART-HOLD-BACK=3.006,CAN-BLOCK-RELOAD=YES
 #EXT-X-PART-INF:PART-TARGET=1.002
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-TARGETDURATION:4
 #EXTINF:4.000,
+test00.m4s
+#EXTINF:4.000,
 test01.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.2.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.3.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.4.m4s"
 #EXTINF:4.000,
 test02.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.2.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.3.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.4.m4s"
 #EXTINF:4.000,
 test03.m4s
 #EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.1.m4s"

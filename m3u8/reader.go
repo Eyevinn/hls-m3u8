@@ -756,6 +756,32 @@ func parsePreloadHint(parameters string) (*PreloadHint, error) {
 	return &ph, nil
 }
 
+func parseServerControl(parameters string) (*ServerControl, error) {
+	sc := ServerControl{}
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "CAN-SKIP-UNTIL":
+			if sc.CanSkipUntil, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("can-skip-until parsing error: %w", err)
+			}
+		case "CAN-SKIP-DATERANGES":
+			sc.CanSkipDateRanges = attr.Val == "YES"
+		case "HOLD-BACK":
+			if sc.HoldBack, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("hold-back parsing error: %w", err)
+			}
+		case "PART-HOLD-BACK":
+			if sc.PartHoldBack, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("part-hold-back parsing error: %w", err)
+			}
+		case "CAN-BLOCK-RELOAD":
+			sc.CanBlockReload = attr.Val == "YES"
+		}
+	}
+	return &sc, nil
+}
+
 func parseSessionData(line string) (*SessionData, error) {
 	sd := SessionData{
 		Format: "JSON",
@@ -1000,6 +1026,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-PART-INF:PART-TARGET="):
 		state.listType = MEDIA
 		if _, err = fmt.Sscanf(line, "#EXT-X-PART-INF:PART-TARGET=%f", &p.PartTargetDuration); strict && err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-SERVER-CONTROL:"):
+		state.listType = MEDIA
+		if p.ServerControl, err = parseServerControl(line[22:]); err != nil {
 			return err
 		}
 	case strings.HasPrefix(line, "#EXT-X-PART:"):
