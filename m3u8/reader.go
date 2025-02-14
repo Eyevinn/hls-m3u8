@@ -113,6 +113,16 @@ func (p *MasterPlaylist) attachRenditionsToVariants(alternatives []*Alternative)
 	}
 }
 
+// Version returns the HLS protocol version as signaled by EXT-X-VERSION
+func (p *MasterPlaylist) Version() uint8 {
+	return p.ver
+}
+
+// SetVersion sets the HLS protocol version as signaled by EXT-X-VERSION
+func (p *MasterPlaylist) SetVersion(ver uint8) {
+	p.ver = ver
+}
+
 // Decode parses a media playlist passed from the buffer. If strict
 // parameter is true then return first syntax error.
 func (p *MediaPlaylist) Decode(data bytes.Buffer, strict bool) error {
@@ -140,6 +150,17 @@ func (p *MediaPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Playl
 	p.customDecoders = customDecoders
 
 	return p
+}
+
+// Version returns playlist's version number.
+func (p *MediaPlaylist) Version() uint8 {
+	return p.ver
+}
+
+// SetVersion sets the playlist version number, note the version
+// have increased automatically by other Set methods.
+func (p *MediaPlaylist) SetVersion(ver uint8) {
+	p.ver = ver
 }
 
 // SCTE35Syntax returns the SCTE35 syntax version detected as used in the playlist.

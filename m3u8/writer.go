@@ -480,17 +480,6 @@ func (p *MasterPlaylist) SetCustomTag(tag CustomTag) {
 	p.Custom[tag.TagName()] = tag
 }
 
-// Version returns the current playlist version number
-func (p *MasterPlaylist) Version() uint8 {
-	return p.ver
-}
-
-// SetVersion sets the playlist version number, note the version maybe changed
-// automatically by other Set methods.
-func (p *MasterPlaylist) SetVersion(ver uint8) {
-	p.ver = ver
-}
-
 // IndependentSegments returns true if all media samples in a segment can be
 // decoded without information from other buf.
 func (p *MasterPlaylist) IndependentSegments() bool {
@@ -1024,17 +1013,6 @@ func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	last.Custom[tag.TagName()] = tag
 
 	return nil
-}
-
-// Version returns playlist's version number.
-func (p *MediaPlaylist) Version() uint8 {
-	return p.ver
-}
-
-// SetVersion sets the playlist version number, note the version
-// have increased automatically by other Set methods.
-func (p *MediaPlaylist) SetVersion(ver uint8) {
-	p.ver = ver
 }
 
 // WinSize returns the playlist's window size.
