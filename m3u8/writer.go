@@ -345,32 +345,39 @@ func writePreloadHint(buf *bytes.Buffer, ph *PreloadHint) {
 	buf.WriteRune('\n')
 }
 
+func writeSkip(buf *bytes.Buffer, skip *Skip) {
+	buf.WriteString("#EXT-X-SKIP:")
+	buf.WriteString("SKIPPED-SEGMENTS=")
+	buf.WriteString(strconv.FormatUint(skip.SkippedSegments, 10))
+	if skip.RecentlyRemovedDateRanges != "" {
+		buf.WriteString(",RECENTLY-REMOVED-DATERANGES=\"")
+		buf.WriteString(skip.RecentlyRemovedDateRanges)
+		buf.WriteRune('"')
+	}
+	buf.WriteRune('\n')
+}
+
 func writeServerControl(buf *bytes.Buffer, sc *ServerControl) {
 	buf.WriteString("#EXT-X-SERVER-CONTROL:")
+	stringsToWrite := []string{}
 	if sc.CanSkipUntil > 0 {
-		buf.WriteString("CAN-SKIP-UNTIL=")
-		buf.WriteString(strconv.FormatFloat(sc.CanSkipUntil, 'f', 3, 64))
-
+		stringsToWrite = append(stringsToWrite, ("CAN-SKIP-UNTIL=" + strconv.FormatFloat(sc.CanSkipUntil, 'f', 3, 64)))
 		if sc.CanSkipDateRanges {
-			buf.WriteString(",CAN-SKIP-DATERANGES=")
-			writeYESorNO(buf, sc.CanSkipDateRanges)
+			stringsToWrite = append(stringsToWrite, ("CAN-SKIP-DATERANGES=YES"))
 		}
-		buf.WriteString(",")
 	}
 	if sc.HoldBack > 0 {
-		buf.WriteString("HOLD-BACK=")
-		buf.WriteString(strconv.FormatFloat(sc.HoldBack, 'f', 3, 64))
-		buf.WriteString(",")
+		stringsToWrite = append(stringsToWrite, ("HOLD-BACK=" + strconv.FormatFloat(sc.HoldBack, 'f', 3, 64)))
 	}
 	if sc.PartHoldBack > 0 {
-		buf.WriteString("PART-HOLD-BACK=")
-		buf.WriteString(strconv.FormatFloat(sc.PartHoldBack, 'f', 3, 64))
-		buf.WriteString(",")
+		stringsToWrite = append(stringsToWrite, ("PART-HOLD-BACK=" + strconv.FormatFloat(sc.PartHoldBack, 'f', 3, 64)))
 	}
 	if sc.CanBlockReload {
-		buf.WriteString("CAN-BLOCK-RELOAD=")
-		writeYESorNO(buf, sc.CanBlockReload)
+		stringsToWrite = append(stringsToWrite, ("CAN-BLOCK-RELOAD=YES"))
 	}
+
+	joinedString := strings.Join(stringsToWrite, ",")
+	buf.WriteString(joinedString)
 	buf.WriteRune('\n')
 }
 
@@ -714,6 +721,18 @@ func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {
 	p.PreloadHints = preloadHint
 }
 
+func (p *MediaPlaylist) SetSkip(skipped uint64, recentlyRemoved string) error {
+	if p.ServerControl == nil {
+		return errors.New("Skip tag requires server control tag to be set")
+	}
+	skip := new(Skip)
+	skip.SkippedSegments = skipped
+	skip.RecentlyRemovedDateRanges = recentlyRemoved
+	p.Skip = skip
+
+	return nil
+}
+
 func (p *MediaPlaylist) AppendDefine(d Define) {
 	p.Defines = append(p.Defines, d)
 }
@@ -816,8 +835,17 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	if p.Iframe {
 		p.buf.WriteString("#EXT-X-I-FRAMES-ONLY\n")
 	}
-	if p.Map != nil {
-		writeExtXMap(&p.buf, p.Map)
+
+	skipDuration := 0.0
+	if p.Skip != nil {
+		writeSkip(&p.buf, p.Skip)
+		skipDuration = float64(p.Skip.SkippedSegments) * float64(p.TargetDuration)
+	} else {
+		// Ignore the Media Initialization Section (EXT-X-MAP) tag
+		// in presence of skip (EXT-X-SKIP) tag
+		if p.Map != nil {
+			writeExtXMap(&p.buf, p.Map)
+		}
 		lastMap = p.Map
 	}
 
@@ -830,6 +858,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	tail := p.tail
 	count := p.count
 	isVoDOrEvent := p.winsize == 0
+	durationSkipped := 0.0
 	var outputCount uint     // number of segments to output
 	var start uint           // start index of segments to output
 	var lastSegId uint64 = 0 // last segment sequence number in live playlist
@@ -852,6 +881,10 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	for i := start; i < start+outputCount; i++ {
 		seg = p.Segments[i]
 		if seg == nil { // protection from badly filled chunklists
+			continue
+		}
+		if durationSkipped < skipDuration {
+			durationSkipped += seg.Duration
 			continue
 		}
 		if seg.SCTE != nil {
@@ -939,6 +972,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 				} else {
 					// This partial segment is older than the last 3 segments
 					// and should be ignored
+					continue
 				}
 			}
 			// Update the PartialSegments list to exclude the completed ones
@@ -990,6 +1024,7 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			} else {
 				// This partial segment does not belong to any segment
 				// and should be ignored
+				continue
 			}
 		}
 	}
@@ -1019,6 +1054,16 @@ func (p *MediaPlaylist) Count() uint {
 
 func (p *MediaPlaylist) HasPartialSegments() bool {
 	return len(p.PartialSegments) > 0
+}
+
+func (p *MediaPlaylist) TotalDuration() float64 {
+	totalDuration := float64(p.TargetDuration * p.count)
+
+	return totalDuration
+}
+
+func (p *MediaPlaylist) Skipped() uint64 {
+	return p.Skip.SkippedSegments
 }
 
 // Close sliding playlist and by setting the EXT-X-ENDLIST tag and setting the Closed flag.
@@ -1229,8 +1274,21 @@ func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 	return nil
 }
 
-func (p *MediaPlaylist) SetServerControl(control *ServerControl) {
+func (p *MediaPlaylist) SetServerControl(control *ServerControl) error {
+	if control.CanSkipUntil > 0 {
+		skipUntil := control.CanSkipUntil
+		skippedSegments := uint(math.Floor(skipUntil / float64(p.TargetDuration)))
+		if skippedSegments > 0 {
+			// if we want to skip the first N segments, we need to have at least N+1 winsize
+			if p.winsize <= skippedSegments {
+				return fmt.Errorf("winsize=%d <= skippedSegments=%d: %w",
+					p.winsize, skippedSegments, ErrWinSizeTooSmall)
+			}
+		}
+	}
+
 	p.ServerControl = control
+	return nil
 }
 
 // GetAllSegments could get all segments currently added to playlist.

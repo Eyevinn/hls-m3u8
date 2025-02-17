@@ -761,6 +761,22 @@ func parsePreloadHint(parameters string) (*PreloadHint, error) {
 	return &ph, nil
 }
 
+func parseSkipTag(parameters string) (*Skip, error) {
+	s := Skip{}
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "SKIPPED-SEGMENTS":
+			if s.SkippedSegments, err = strconv.ParseUint(attr.Val, 10, 64); err != nil {
+				return nil, fmt.Errorf("skipped-segments parsing error: %w", err)
+			}
+		case "RECENTLY-REMOVED-DATERANGES":
+			s.RecentlyRemovedDateRanges = attr.Val
+		}
+	}
+	return &s, nil
+}
+
 func parseServerControl(parameters string) (*ServerControl, error) {
 	sc := ServerControl{}
 	var err error
@@ -1038,6 +1054,14 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if p.ServerControl, err = parseServerControl(line[22:]); err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-SKIP:"):
+		state.listType = MEDIA
+		if p.Skip, err = parseSkipTag(line[12:]); err != nil {
+			return err
+		}
+		// Skip tag comes after the sequence number tag
+		p.SeqNo += p.Skip.SkippedSegments
+		p.NextMSNIndex += p.Skip.SkippedSegments
 	case strings.HasPrefix(line, "#EXT-X-PART:"):
 		state.listType = MEDIA
 		state.tagPartialSegment = true

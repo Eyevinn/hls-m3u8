@@ -410,8 +410,8 @@ test01.ts
 func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(5, 10)
-	is.NoErr(e) // Create media playlist should be successful
-	p.PartTargetDuration = 1.002
+	is.NoErr(e)                  // Create media playlist should be successful
+	p.PartTargetDuration = 1.002 // Set tag #EXT-X-PART-INF:PART-TARGET
 
 	e = p.Append("test00.m4s", 4.0, "")
 	is.NoErr(e) // Add segment to a media playlist should be successful
@@ -449,8 +449,10 @@ func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 
 	p.SetPreloadHint("PART", "test05.2.m4s")
 
-	serverControl := ServerControl{0.0, false, 0.0, 3.006, true}
-	p.SetServerControl(&serverControl)
+	partTargetDuration := p.PartTargetDuration
+	serverControl := ServerControl{0.0, false, 0.0, partTargetDuration * 3, true}
+	e = p.SetServerControl(&serverControl)
+	is.NoErr(e) // Set server control should be successful
 
 	// Output only partial segments from last 3 full segments
 	expected := `#EXTM3U
@@ -483,6 +485,46 @@ test03.m4s
 test04.m4s
 #EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test05.1.m4s"
 #EXT-X-PRELOAD-HINT:TYPE=PART,URI="test05.2.m4s"
+`
+	out := p.String()
+	is.Equal(out, expected) // Encode media playlist does not match expected
+}
+
+func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(10, 10)
+	is.NoErr(e) // Create media playlist should be successful
+
+	p.SetVersion(9)                   // Version 9 is required for EXT-X-SKIP tag
+	p.SetDefaultMap("init.mp4", 0, 0) // Set init segment (will be ignored)
+
+	for segNo := range 10 {
+		e = p.Append(fmt.Sprintf("test%02d.m4s", segNo), 4.0, "")
+		is.NoErr(e) // Add segment to a media playlist should be successful
+	}
+
+	canSkipUntil := 4.0 * 6 // skip at least 6 segment
+	holdBack := 4.0 * 3     // hold back 3 segment
+	serverControl := ServerControl{canSkipUntil, false, holdBack, 0.0, true}
+	e = p.SetServerControl(&serverControl)
+	is.NoErr(e)          // Set server control should be successful
+	e = p.SetSkip(6, "") // Set skip tag
+	is.NoErr(e)          // Set skip tag should be successful
+
+	expected := `#EXTM3U
+#EXT-X-VERSION:9
+#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-SKIP:SKIPPED-SEGMENTS=6
+#EXTINF:4.000,
+test06.m4s
+#EXTINF:4.000,
+test07.m4s
+#EXTINF:4.000,
+test08.m4s
+#EXTINF:4.000,
+test09.m4s
 `
 	out := p.String()
 	is.Equal(out, expected) // Encode media playlist does not match expected

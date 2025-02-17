@@ -951,6 +951,29 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	is.Equal(part, uint64(2))  // Has index 2
 }
 
+func TestDecodeMediaPlaylistWithSkip(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-with-skip.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA)                  // must be media playlist
+	is.Equal(pp.TargetDuration, uint(4))       // target duration must be 4
+	is.True(!pp.Closed)                        // live playlist
+	is.Equal(pp.Count(), uint(6))              // segment count must be 6
+	is.Equal(pp.PartTargetDuration, 0.33334)   // partial target duration must be 0.33334
+	is.Equal(len(pp.PartialSegments), int(28)) // partial segment count must be 24
+	is.Equal(pp.Skipped(), uint64(3))          // 3 segments are skipped
+	is.Equal(pp.ServerControl.CanSkipUntil,
+		float64(pp.TargetDuration*6)) // Can skip 6 segments
+
+	seq, part := pp.GetNextSequenceAndPart() // filePart273.4.mp4
+	is.Equal(seq, uint64(273))               // Has seqId 273
+	is.Equal(part, uint64(4))                // Has index 4
+}
+
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-program-date-time.m3u8")
