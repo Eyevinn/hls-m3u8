@@ -498,8 +498,8 @@ func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
 	p.SetVersion(9)                   // Version 9 is required for EXT-X-SKIP tag
 	p.SetDefaultMap("init.mp4", 0, 0) // Set init segment (will be ignored)
 
-	for segNo := range 10 {
-		e = p.Append(fmt.Sprintf("test%02d.m4s", segNo), 4.0, "")
+	for i := 0; i < 10; i++ {
+		e = p.Append(fmt.Sprintf("test%02d.m4s", i), 4.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
 

@@ -880,7 +880,7 @@ func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testin
 	startIndex := uint(5)
 	pp.Map.URI = fmt.Sprintf("fileSequence%d.m4s", startIndex) // init segment should be fileSequence5.m4s
 
-	for i := range pp.Count() {
+	for i := uint(0); i < pp.Count(); i++ {
 		s := pp.Segments[i]
 		// segment names should be in the following format fileSequence%d.m4s
 		expectedSeqNo := startIndex + uint(pp.SeqNo) + i + 1

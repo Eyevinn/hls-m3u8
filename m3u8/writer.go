@@ -1362,3 +1362,10 @@ func IsPartOf(partialSegUri, segUri string) bool {
 
 	return getSequenceNum(partialSegUriPrefix) == getSequenceNum(segUri)
 }
+
+func min(a, b uint) uint {
+	if a < b {
+		return a
+	}
+	return b
+}
