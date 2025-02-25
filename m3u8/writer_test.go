@@ -440,7 +440,12 @@ func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 				// ignore full segment
 				continue
 			}
-			partialSegment := p.PartialSegments[seqNo*4+partIndex]
+			if seqNo == 0 {
+				// ignore partial segment of first segment (they are removed)
+				continue
+			}
+
+			partialSegment := p.PartialSegments[(seqNo-1)*4+partIndex]
 
 			is.Equal(partialSegment.URI, psList[partIndex]) // Partial segment URI does not match expected
 			is.Equal(partialSegment.SeqID, uint64(seqNo+1)) // Partial segment SeqID does not match expected
@@ -503,13 +508,12 @@ func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
 
-	canSkipUntil := 4.0 * 6 // skip at least 6 segment
-	holdBack := 4.0 * 3     // hold back 3 segment
+	skipped := uint64(6)
+	canSkipUntil := float64(4.0 * skipped) // skip 6 segment
+	holdBack := 4.0 * 3                    // hold back 3 segment
 	serverControl := ServerControl{canSkipUntil, false, holdBack, 0.0, true}
 	e = p.SetServerControl(&serverControl)
-	is.NoErr(e)          // Set server control should be successful
-	e = p.SetSkip(6, "") // Set skip tag
-	is.NoErr(e)          // Set skip tag should be successful
+	is.NoErr(e) // Set server control should be successful
 
 	expected := `#EXTM3U
 #EXT-X-VERSION:9
@@ -526,8 +530,9 @@ test08.m4s
 #EXTINF:4.000,
 test09.m4s
 `
-	out := p.String()
-	is.Equal(out, expected) // Encode media playlist does not match expected
+	out, err := p.EncodeWithSkip(skipped)
+	is.NoErr(err)                    // Encode with skipped should be successful
+	is.Equal(out.String(), expected) // Encode media playlist does not match expected
 }
 
 // Create new media playlist

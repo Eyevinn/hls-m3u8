@@ -266,8 +266,7 @@ type PreloadHint struct {
 }
 
 type Skip struct {
-	SkippedSegments           uint64 // Number of segments skipped
-	RecentlyRemovedDateRanges string // Date ranges removed from the playlist
+	SkippedSegments uint64 // Number of segments skipped
 }
 
 type ServerControl struct {

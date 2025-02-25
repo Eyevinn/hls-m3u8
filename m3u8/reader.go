@@ -770,8 +770,6 @@ func parseSkipTag(parameters string) (*Skip, error) {
 			if s.SkippedSegments, err = strconv.ParseUint(attr.Val, 10, 64); err != nil {
 				return nil, fmt.Errorf("skipped-segments parsing error: %w", err)
 			}
-		case "RECENTLY-REMOVED-DATERANGES":
-			s.RecentlyRemovedDateRanges = attr.Val
 		}
 	}
 	return &s, nil

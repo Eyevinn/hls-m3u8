@@ -349,11 +349,6 @@ func writeSkip(buf *bytes.Buffer, skip *Skip) {
 	buf.WriteString("#EXT-X-SKIP:")
 	buf.WriteString("SKIPPED-SEGMENTS=")
 	buf.WriteString(strconv.FormatUint(skip.SkippedSegments, 10))
-	if skip.RecentlyRemovedDateRanges != "" {
-		buf.WriteString(",RECENTLY-REMOVED-DATERANGES=\"")
-		buf.WriteString(skip.RecentlyRemovedDateRanges)
-		buf.WriteRune('"')
-	}
 	buf.WriteRune('\n')
 }
 
@@ -710,8 +705,34 @@ func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 	}
 
 	p.PartialSegments = append(p.PartialSegments, ps)
+	p.removeExpiredPartials()
 
 	return nil
+}
+
+func (p *MediaPlaylist) removeExpiredPartials() {
+	if len(p.PartialSegments) == 0 {
+		return
+	}
+
+	// Last full segment
+	segId := p.Segments[p.last()].SeqId
+	var validPartialSegments []*PartialSegment
+	for _, ps := range p.PartialSegments {
+		if segId < 3 {
+			// Keep all partial segments if we have less than 3 full segments
+			validPartialSegments = append(validPartialSegments, ps)
+		} else if ps.SeqID > segId-3 {
+			// Keep partial segments that belong to the last 3 full segments
+			validPartialSegments = append(validPartialSegments, ps)
+		} else {
+			// This partial segment is older than the last 3 segments
+			// and should be removed
+			continue
+		}
+	}
+
+	p.PartialSegments = validPartialSegments
 }
 
 func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {
@@ -721,13 +742,12 @@ func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {
 	p.PreloadHints = preloadHint
 }
 
-func (p *MediaPlaylist) SetSkip(skipped uint64, recentlyRemoved string) error {
+func (p *MediaPlaylist) setSkip(skipped uint64) error {
 	if p.ServerControl == nil {
 		return errors.New("Skip tag requires server control tag to be set")
 	}
 	skip := new(Skip)
 	skip.SkippedSegments = skipped
-	skip.RecentlyRemovedDateRanges = recentlyRemoved
 	p.Skip = skip
 
 	return nil
@@ -752,6 +772,19 @@ func (p *MediaPlaylist) Slide(uri string, duration float64, title string) {
 // Next call to Encode() fills buffer/cache again.
 func (p *MediaPlaylist) ResetCache() {
 	p.buf.Reset()
+}
+
+// EncodeWithSkip sets the skip tag and encodes the playlist.
+// If skipped > 0, the first `skipped` segments will be skipped.
+// If recentlyRemoved is not empty, it will be added to the EXT-X-SKIP tag.
+func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) (*bytes.Buffer, error) {
+	if skipped > 0 {
+		if err := p.setSkip(skipped); err != nil {
+			return nil, err
+		}
+	}
+
+	return p.Encode(), nil
 }
 
 // Encode generates output and returns a pointer to an internal buffer.
@@ -958,21 +991,13 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			fullSegUri := seg.URI
 			var remainingPartialSegments []*PartialSegment
 			for _, ps := range p.PartialSegments {
-				// output all partial segments if we have less than 3 segments, or
-				// output only partial segments that belong to the last 3 segments
-				if lastSegId < 3 || ps.SeqID > lastSegId-3 {
-					if IsPartOf(ps.URI, fullSegUri) {
-						// This partial segment is part of the current full segment
-						writePartialSegment(&p.buf, ps)
-					} else {
-						// This partial segment does not belong to current full segment
-						// Keep it to be written later
-						remainingPartialSegments = append(remainingPartialSegments, ps)
-					}
+				if IsPartOf(ps.URI, fullSegUri) {
+					// This partial segment is part of the current full segment
+					writePartialSegment(&p.buf, ps)
 				} else {
-					// This partial segment is older than the last 3 segments
-					// and should be ignored
-					continue
+					// This partial segment does not belong to current full segment
+					// Keep it to be written later
+					remainingPartialSegments = append(remainingPartialSegments, ps)
 				}
 			}
 			// Update the PartialSegments list to exclude the completed ones
