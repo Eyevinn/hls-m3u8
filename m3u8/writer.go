@@ -769,6 +769,9 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 		if seg.Discontinuity {
 			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
 		}
+		if seg.Gap {
+			p.buf.WriteString("#EXT-X-GAP\n")
+		}
 		// ignore segment Map if already written
 		if seg.Map != nil && !seg.Map.Equal(lastMap) {
 			writeExtXMap(&p.buf, seg.Map)
@@ -973,6 +976,18 @@ func (p *MediaPlaylist) SetDiscontinuity() error {
 		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].Discontinuity = true
+	return nil
+}
+
+// SetGap sets the gap flag for the currently last media segment.
+// The EXT-X-GAP tag indicates that the segment URI to which it applies
+// does not contain media data and SHOULD NOT be loaded by clients.
+// It applies only to the latest Media Segment.
+func (p *MediaPlaylist) SetGap() error {
+	if p.count == 0 {
+		return ErrPlaylistEmpty
+	}
+	p.Segments[p.last()].Gap = true
 	return nil
 }
 

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- EXT-X-GAP support
 - EXT-X-SESSION-KEY support
 - EXT-X-CONTENT-STEERING support
 - EXT-X-START to master playlist

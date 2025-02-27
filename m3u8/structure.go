@@ -236,6 +236,7 @@ type MediaSegment struct {
 	SCTE35DateRanges []*DateRange // SCTE-35 date-range tags preceeding this segment
 	ProgramDateTime  time.Time    // EXT-X-PROGRAM-DATE-TIME associates first sample with an absolute date and/or time.
 	Custom           CustomMap    // Custom holds custom tags
+	Gap              bool
 }
 
 // SCTE holds custom SCTE-35 tags.
@@ -292,6 +293,7 @@ type decodingState struct {
 	tagRange           bool
 	tagDiscontinuity   bool
 	tagProgramDateTime bool
+	tagGap             bool
 	tagKey             bool
 	tagCustom          bool
 	programDateTime    time.Time

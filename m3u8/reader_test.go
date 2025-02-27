@@ -1037,6 +1037,33 @@ func TestDecodeMediaPlaylistWithDefines(t *testing.T) {
 	is.Equal(p.Defines[2].Value, "")
 }
 
+func TestDecodeMediaPlaylistWithGaps(t *testing.T) {
+	data := []struct {
+		playlist string
+		wantErr  bool
+	}{
+		{"sample-playlists/media-playlist-with-gap.m3u8", false},
+		{"sample-playlists/bad-media-playlist-with-gap.m3u8", true},
+	}
+	for _, d := range data {
+		t.Run(d.playlist, func(t *testing.T) {
+			is := is.New(t)
+			f, err := os.Open(d.playlist)
+			is.NoErr(err) // must open file
+			p, err := NewMediaPlaylist(0, 1)
+			is.NoErr(err) // must create playlist
+			err = p.DecodeFrom(bufio.NewReader(f), true)
+			if d.wantErr {
+				is.True(err != nil) // must return an error
+			} else {
+				is.NoErr(err)              // must decode playlist
+				is.True(p.Segments[0].Gap) // First segment should signal gap
+				is.True(p.Segments[4].Gap) // Fifth segment should signal gap
+			}
+		})
+	}
+}
+
 /***************************
  *  Code parsing examples  *
  ***************************/

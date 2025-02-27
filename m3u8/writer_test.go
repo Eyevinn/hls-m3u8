@@ -148,6 +148,23 @@ func TestSetSCTE35(t *testing.T) {
 }
 
 // Create new media playlist
+// Don't add segments
+// Expect error when trying to set EXT-X-GAP
+func TestGap(t *testing.T) {
+	p, _ := NewMediaPlaylist(1, 2)
+	if err := p.SetGap(); err == nil {
+		t.Error("SetGap expected empty playlist error")
+	}
+	_ = p.Append("test01.ts", 10.0, "title")
+	if err := p.SetGap(); err != nil {
+		t.Errorf("SetGap did not expect error: %v", err)
+	}
+	if !p.Segments[0].Gap {
+		t.Error("SetGap did not set gap")
+	}
+}
+
+// Create new media playlist
 // Add segment to media playlist
 // Set SCTE
 func TestSetSCTEForMediaPlaylist(t *testing.T) {
@@ -362,6 +379,27 @@ func TestEncodeMediaPlaylist(t *testing.T) {
 #EXT-X-VERSION:3
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-TARGETDURATION:5
+#EXTINF:5.000,
+test01.ts
+`
+	out := p.String()
+	is.Equal(out, expected) // Encode media playlist does not match expected
+}
+
+func TestEncodeMediaPlaylistWithGaps(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(3, 5)
+	is.NoErr(e) // Create media playlist should be successful
+	p.SetVersion(8)
+	e = p.Append("test01.ts", 5.0, "")
+	is.NoErr(e) // Add 1st segment to a media playlist should be successful
+	e = p.SetGap()
+	is.NoErr(e) // Set gap tag should be successful
+	expected := `#EXTM3U
+#EXT-X-VERSION:8
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:5
+#EXT-X-GAP
 #EXTINF:5.000,
 test01.ts
 `
