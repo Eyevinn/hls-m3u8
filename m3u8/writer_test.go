@@ -530,8 +530,50 @@ test08.m4s
 #EXTINF:4.000,
 test09.m4s
 `
-	out, err := p.EncodeWithSkip(skipped)
-	is.NoErr(err)                    // Encode with skipped should be successful
+	out := p.EncodeWithSkip(skipped)
+	is.Equal(out.String(), expected) // Encode media playlist does not match expected
+}
+
+func TestEncodeMediaPlaylistWithoutSkip(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(10, 10)
+	is.NoErr(e) // Create media playlist should be successful
+
+	testPlaylist := `#EXTM3U
+#EXT-X-VERSION:9
+#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-SKIP:SKIPPED-SEGMENTS=6
+#EXTINF:4.000,
+test06.m4s
+#EXTINF:4.000,
+test07.m4s
+#EXTINF:4.000,
+test08.m4s
+#EXTINF:4.000,
+test09.m4s
+`
+
+	err := p.DecodeFrom(strings.NewReader(testPlaylist), true)
+	is.NoErr(err)                // Decode media playlist should be successful
+	is.Equal(p.SeqNo, uint64(6)) // SeqNo of media playlist does not match expected 6
+
+	expected := `#EXTM3U
+#EXT-X-VERSION:9
+#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
+#EXT-X-MEDIA-SEQUENCE:6
+#EXT-X-TARGETDURATION:4
+#EXTINF:4.000,
+test06.m4s
+#EXTINF:4.000,
+test07.m4s
+#EXTINF:4.000,
+test08.m4s
+#EXTINF:4.000,
+test09.m4s
+`
+	out := p.Encode()
 	is.Equal(out.String(), expected) // Encode media playlist does not match expected
 }
 
@@ -1043,6 +1085,8 @@ func TestIsPartOf(t *testing.T) {
 		{"filePart249.1.ts", "fileSequence249.m4s", false},
 		{"filePart249.m4s", "fileSequence249.m4s", false},
 		{"filePart249.m4s", "fileSequence249.1.m4s", false},
+		{"filePart.1.m4s", "fileSequence249.m4s", false},
+		{"filePart.1.m4s", "fileSequence.m4s", false},
 	}
 
 	for _, test := range tests {
@@ -1050,6 +1094,30 @@ func TestIsPartOf(t *testing.T) {
 			result := IsPartOf(test.partialSegUri, test.segUri)
 			if result != test.expected {
 				t.Errorf("IsPartOf(%s, %s) = %v; want %v", test.partialSegUri, test.segUri, result, test.expected)
+			}
+		})
+	}
+}
+
+func TestGetSequenceNum(t *testing.T) {
+	tests := []struct {
+		uriPrefix string
+		expected  bool
+		num       uint64
+	}{
+		{"fileSequence249", true, 249},
+		{"fileSequence2490", true, 2490},
+		{"fileSequence", false, 0},
+		{"fileSequence249abc", false, 0},
+		{"fileSequence249.1", false, 0},
+		{"fileSequence0249", true, 249},
+	}
+
+	for _, test := range tests {
+		t.Run(test.uriPrefix, func(t *testing.T) {
+			result, num := getSequenceNum(test.uriPrefix)
+			if result != test.expected || num != test.num {
+				t.Errorf("getSequenceNum(%s) = %v, %d; want %v, %d", test.uriPrefix, result, num, test.expected, test.num)
 			}
 		})
 	}

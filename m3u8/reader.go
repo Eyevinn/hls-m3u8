@@ -761,18 +761,18 @@ func parsePreloadHint(parameters string) (*PreloadHint, error) {
 	return &ph, nil
 }
 
-func parseSkipTag(parameters string) (*Skip, error) {
-	s := Skip{}
+func parseSkipTag(parameters string) (uint64, error) {
+	var skipped uint64
 	var err error
 	for _, attr := range decodeAttributes(parameters) {
 		switch attr.Key {
 		case "SKIPPED-SEGMENTS":
-			if s.SkippedSegments, err = strconv.ParseUint(attr.Val, 10, 64); err != nil {
-				return nil, fmt.Errorf("skipped-segments parsing error: %w", err)
+			if skipped, err = strconv.ParseUint(attr.Val, 10, 64); err != nil {
+				return 0, fmt.Errorf("skipped-segments parsing error: %w", err)
 			}
 		}
 	}
-	return &s, nil
+	return skipped, nil
 }
 
 func parseServerControl(parameters string) (*ServerControl, error) {
@@ -1054,12 +1054,13 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case strings.HasPrefix(line, "#EXT-X-SKIP:"):
 		state.listType = MEDIA
-		if p.Skip, err = parseSkipTag(line[12:]); err != nil {
+		skipped, err := parseSkipTag(line[12:])
+		if err != nil {
 			return err
 		}
 		// Skip tag comes after the sequence number tag
-		p.SeqNo += p.Skip.SkippedSegments
-		p.NextMSNIndex += p.Skip.SkippedSegments
+		p.SeqNo += skipped
+		p.NextMSNIndex += skipped
 	case strings.HasPrefix(line, "#EXT-X-PART:"):
 		state.listType = MEDIA
 		state.tagPartialSegment = true
