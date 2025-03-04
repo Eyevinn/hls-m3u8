@@ -413,6 +413,9 @@ func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 	is.NoErr(e)                  // Create media playlist should be successful
 	p.PartTargetDuration = 1.002 // Set tag #EXT-X-PART-INF:PART-TARGET
 
+	e = p.AppendPartial("test01.1.ts", 1.0, true)
+	is.True(e != nil) // Add partial segments to an empty media playlist should fail
+
 	e = p.Append("test00.m4s", 4.0, "")
 	is.NoErr(e) // Add segment to a media playlist should be successful
 
@@ -433,6 +436,9 @@ func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
 			}
 		}
 	}
+
+	is.Equal(p.TotalDuration(), 20.0) // Total duration of media playlist does not match expected 20.0
+	is.True(p.HasPartialSegments())   // Media playlist should have partial segments
 
 	for seqNo, psList := range segments {
 		for partIndex := range psList {
@@ -1118,6 +1124,52 @@ func TestGetSequenceNum(t *testing.T) {
 			result, num := getSequenceNum(test.uriPrefix)
 			if result != test.expected || num != test.num {
 				t.Errorf("getSequenceNum(%s) = %v, %d; want %v, %d", test.uriPrefix, result, num, test.expected, test.num)
+			}
+		})
+	}
+}
+
+func TestSplitUriBy(t *testing.T) {
+	tests := []struct {
+		uri              string
+		sep              string
+		expectedRest     string
+		expectedLastPart string
+	}{
+		{"fileSequence249.m4s", ".", "fileSequence249", "m4s"},
+		{"fileSequence249.1.m4s", ".", "fileSequence249.1", "m4s"},
+		{"fileSequence249", ".", "", ""},
+		{"fileSequence249.m4s", "/", "", ""},
+		{"fileSequence249.m4s", "Sequence", "file", "249.m4s"},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s", test.uri, test.sep), func(t *testing.T) {
+			rest, lastPart := splitUriBy(test.uri, test.sep)
+			if rest != test.expectedRest || lastPart != test.expectedLastPart {
+				t.Errorf("splitUriBy(%s, %s) = %v, %v; want %v, %v", test.uri, test.sep, rest, lastPart, test.expectedRest, test.expectedLastPart)
+			}
+		})
+	}
+}
+
+func TestMin(t *testing.T) {
+	tests := []struct {
+		a, b     uint
+		expected uint
+	}{
+		{1, 2, 1},
+		{2, 1, 1},
+		{5, 5, 5},
+		{0, 10, 0},
+		{10, 0, 0},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("min(%d, %d)", test.a, test.b), func(t *testing.T) {
+			result := min(test.a, test.b)
+			if result != test.expected {
+				t.Errorf("min(%d, %d) = %d; want %d", test.a, test.b, result, test.expected)
 			}
 		})
 	}

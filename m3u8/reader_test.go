@@ -882,6 +882,7 @@ func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testin
 
 	for i := uint(0); i < pp.Count(); i++ {
 		s := pp.Segments[i]
+		is.True(pp.IsSegmentReady(s.URI)) // all segments should be ready
 		// segment names should be in the following format fileSequence%d.m4s
 		expectedSeqNo := startIndex + uint(pp.SeqNo) + i + 1
 		expected := fmt.Sprintf("fileSequence%d.m4s", expectedSeqNo)
@@ -891,13 +892,17 @@ func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testin
 	}
 
 	// Existing segments
-	is.Equal(pp.LastSegIndex(), uint64(27)) // Last segment (filePart32.m4s) has index 27
+	is.Equal(pp.LastSegIndex(), uint64(27))          // Last segment (fileSequence32.m4s) has index 27
+	is.True(pp.IsSegmentReady("fileSequence32.m4s")) // it should be ready
+
 	// Existing partial segments
-	is.Equal(pp.LastPartSegIndex(), uint64(1)) // Last partial segment (filePart33.2.m4s) has index 1
+	is.Equal(pp.LastPartSegIndex(), uint64(1))     // Last partial segment (filePart33.2.m4s) has index 1
+	is.True(pp.IsSegmentReady("filePart33.2.m4s")) // it should be ready
 
 	seq, part := pp.GetNextSequenceAndPart()
-	is.Equal(seq, uint64(27)) // Has seqId 27
-	is.Equal(part, uint64(2)) // Has index 2
+	is.Equal(seq, uint64(27))                       // Has seqId 27
+	is.Equal(part, uint64(2))                       // Has index 2
+	is.True(!pp.IsSegmentReady("filePart33.3.m4s")) // it should not be ready
 }
 
 func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
