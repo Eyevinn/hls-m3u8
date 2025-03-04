@@ -182,7 +182,7 @@ func (p *MediaPlaylist) LastPartSegIndex() uint64 {
 func (p *MediaPlaylist) GetNextSequenceAndPart() (uint64, uint64) {
 	nextSeqNo := p.LastSegIndex()
 	nextPartNo := p.LastPartSegIndex()
-	if nextPartNo == p.MaxPartIndex {
+	if nextPartNo+1 == p.MaxPartIndex {
 		// Roll over to the next segment
 		nextPartNo = 0
 		nextSeqNo++
@@ -716,15 +716,16 @@ func parseDefine(line string) (Define, error) {
 
 func parsePartialSegment(parameters string) (*PartialSegment, error) {
 	ps := PartialSegment{}
-	var err error
 	for _, attr := range decodeAttributes(parameters) {
 		switch attr.Key {
 		case "URI":
 			ps.URI = DeQuote(attr.Val)
 		case "DURATION":
-			if ps.Duration, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+			duration, err := strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
 				return nil, fmt.Errorf("duration parsing error: %w", err)
 			}
+			ps.Duration = duration
 		case "INDEPENDENT":
 			ps.Independent = attr.Val == "YES"
 		case "BYTERANGE":
@@ -962,8 +963,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				return err
 			}
 
-			p.NextMSNIndex++
-			p.NextPartIndex = 0
 			state.tagInf = false
 		}
 		if state.tagRange {
@@ -1075,10 +1074,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		if err = p.AppendPartialSegment(partialSegment); err != nil {
 			return err
-		}
-		p.NextPartIndex++
-		if p.MaxPartIndex < p.NextPartIndex {
-			p.MaxPartIndex = p.NextPartIndex
 		}
 	case strings.HasPrefix(line, "#EXT-X-PRELOAD-HINT:"):
 		preloadHint, err := parsePreloadHint(line[20:])

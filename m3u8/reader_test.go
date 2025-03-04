@@ -954,6 +954,34 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	seq, part := pp.GetNextSequenceAndPart()
 	is.Equal(seq, uint64(250)) // Has seqId 250
 	is.Equal(part, uint64(2))  // Has index 2
+
+	{
+		// Test for appending partial segments
+		_ = pp.AppendPartial("filePart251.3.m4s", 1.0, false)
+		is.Equal(pp.LastPartSegIndex(), uint64(2)) // Last partial segment index (filePart251.3.m4s has index 2)
+		is.True(pp.IsSegmentReady("filePart251.3.m4s"))
+
+		_ = pp.AppendPartial("filePart251.4.m4s", 1.0, false)
+		_ = pp.Append("fileSequence251.m4s", 1.0, "")
+		is.Equal(pp.LastSegIndex(), uint64(250))   // Last segment index (filePart250.m4s has index 250)
+		is.Equal(pp.LastPartSegIndex(), uint64(3)) // Last partial segment index (filePart251.4.m4s has index 3)
+		is.True(pp.IsSegmentReady("filePart251.4.m4s"))
+		is.True(pp.IsSegmentReady("fileSequence251.m4s"))
+
+		// Rolled over
+		seq, part = pp.GetNextSequenceAndPart()
+		is.Equal(seq, uint64(251)) // Has seqId 251
+		is.Equal(part, uint64(0))  // Has index 0
+
+		// Add more
+		_ = pp.AppendPartial("filePart252.1.m4s", 1.0, false)
+		is.Equal(pp.LastSegIndex(), uint64(251))   // Last segment index (fileSequence251.m4s has index 251)
+		is.Equal(pp.LastPartSegIndex(), uint64(0)) // Last partial segment index (filePart252.1.m4s has index 0)
+
+		seq, part = pp.GetNextSequenceAndPart()
+		is.Equal(seq, uint64(251)) // Has seqId 251
+		is.Equal(part, uint64(1))  // Has index 1
+	}
 }
 
 func TestDecodeMediaPlaylistWithSkip(t *testing.T) {
@@ -1176,6 +1204,191 @@ func TestDecodeMediaPlaylistWithGaps(t *testing.T) {
 				is.NoErr(err)              // must decode playlist
 				is.True(p.Segments[0].Gap) // First segment should signal gap
 				is.True(p.Segments[4].Gap) // Fifth segment should signal gap
+			}
+		})
+	}
+}
+
+func TestDeQuote(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`"quoted"`, "quoted"},
+		{`"quoted with spaces"`, "quoted with spaces"},
+		{`"quoted with \"escaped\" quotes"`, `quoted with \"escaped\" quotes`},
+		{`"quoted with 'single' quotes"`, `quoted with 'single' quotes`},
+		{`"quoted with \n new line"`, `quoted with \n new line`},
+		{"not quoted", "not quoted"},
+		{"", ""},
+		{`"`, `"`},
+		{`"a`, `"a`},
+		{`a"`, `a"`},
+	}
+
+	for _, test := range tests {
+		result := DeQuote(test.input)
+		if result != test.expected {
+			t.Errorf("DeQuote(%q) = %q; want %q", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestParsePartialSegment(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       *PartialSegment
+		wantErr    bool
+	}{
+		{
+			name:       "Valid parameters",
+			parameters: `URI="segment.ts",DURATION=10.0,INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want: &PartialSegment{
+				URI:         "segment.ts",
+				Duration:    10.0,
+				Independent: true,
+				Limit:       1000,
+				Offset:      2000,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Invalid duration",
+			parameters: `URI="segment.ts",DURATION=invalid,INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid byterange",
+			parameters: `URI="segment.ts",DURATION=10.0,INDEPENDENT=YES,BYTERANGE=invalid`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing URI",
+			parameters: `DURATION=10.0,INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want: &PartialSegment{
+				URI:         "",
+				Duration:    10.0,
+				Independent: true,
+				Limit:       1000,
+				Offset:      2000,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing duration",
+			parameters: `URI="segment.ts",INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want: &PartialSegment{
+				URI:         "segment.ts",
+				Duration:    0,
+				Independent: true,
+				Limit:       1000,
+				Offset:      2000,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing byterange",
+			parameters: `URI="segment.ts",DURATION=10.0,INDEPENDENT=YES`,
+			want: &PartialSegment{
+				URI:         "segment.ts",
+				Duration:    10.0,
+				Independent: true,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePartialSegment(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePartialSegment() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parsePartialSegment() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParsePreloadHint(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       *PreloadHint
+		wantErr    bool
+	}{
+		{
+			name:       "Valid parameters",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=1234,BYTERANGE-LENGTH=5678`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "filePart273.4.m4s",
+				Offset: 1234,
+				Limit:  5678,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Invalid BYTERANGE-START",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=invalid,BYTERANGE-LENGTH=5678`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid BYTERANGE-LENGTH",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=1234,BYTERANGE-LENGTH=invalid`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing URI",
+			parameters: `TYPE=PART,BYTERANGE-START=1234,BYTERANGE-LENGTH=5678`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "",
+				Offset: 1234,
+				Limit:  5678,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing BYTERANGE-START",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-LENGTH=5678`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "filePart273.4.m4s",
+				Offset: 0,
+				Limit:  5678,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing BYTERANGE-LENGTH",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=1234`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "filePart273.4.m4s",
+				Offset: 1234,
+				Limit:  0,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePreloadHint(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePreloadHint() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parsePreloadHint() = %v, want %v", got, tt.want)
 			}
 		})
 	}

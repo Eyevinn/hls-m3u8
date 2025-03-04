@@ -668,6 +668,8 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	p.Segments[p.tail] = seg
 	p.tail = (p.tail + 1) % p.capacity
 	p.count++
+	p.NextMSNIndex++
+	p.NextPartIndex = 0
 	if !p.targetDurLocked {
 		p.TargetDuration = calcNewTargetDuration(seg.Duration, p.ver, p.TargetDuration)
 	}
@@ -704,6 +706,10 @@ func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 	}
 
 	p.PartialSegments = append(p.PartialSegments, ps)
+	p.NextPartIndex++
+	if p.MaxPartIndex < p.NextPartIndex {
+		p.MaxPartIndex = p.NextPartIndex
+	}
 	p.removeExpiredPartials()
 
 	return nil
