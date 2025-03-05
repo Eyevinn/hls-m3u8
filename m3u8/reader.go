@@ -164,11 +164,12 @@ func (p *MediaPlaylist) SetVersion(ver uint8) {
 }
 
 func (p *MediaPlaylist) LastSegIndex() uint64 {
+	nextSeqNo := p.NextMSNIndex + p.AlreadySkippedSegs
 	if p.NextPartIndex == 0 {
 		// Just rolled over to the next segment
-		return p.NextMSNIndex - 1
+		return nextSeqNo - 1
 	}
-	return p.NextMSNIndex
+	return nextSeqNo
 }
 
 func (p *MediaPlaylist) LastPartSegIndex() uint64 {
@@ -1057,9 +1058,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if err != nil {
 			return err
 		}
-		// Skip tag comes after the sequence number tag
-		p.SeqNo += skipped
-		p.NextMSNIndex += skipped
+		p.AlreadySkippedSegs = skipped
 	case strings.HasPrefix(line, "#EXT-X-PART:"):
 		state.listType = MEDIA
 		state.tagPartialSegment = true

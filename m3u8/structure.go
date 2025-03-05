@@ -151,6 +151,7 @@ type MediaPlaylist struct {
 	MaxPartIndex        uint64            // To determine when to "roll over" on the NextPartIndex
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 	ServerControl       *ServerControl    // EXT-X-SERVER-CONTROL tags, MAY appear in any Media Playlist
+	AlreadySkippedSegs  uint64            // EXT-X-SKIP:SKIPPED-SEGMENTS tag. Number of segments already skipped
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which

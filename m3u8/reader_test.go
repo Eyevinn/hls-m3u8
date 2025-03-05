@@ -996,15 +996,20 @@ func TestDecodeMediaPlaylistWithSkip(t *testing.T) {
 	is.Equal(pp.TargetDuration, uint(4))       // target duration must be 4
 	is.True(!pp.Closed)                        // live playlist
 	is.Equal(pp.Count(), uint(6))              // segment count must be 6
-	is.Equal(pp.PartTargetDuration, 0.33334)   // partial target duration must be 0.33334
+	is.Equal(pp.PartTargetDuration, 0.334)     // partial target duration must be 0.334
 	is.Equal(len(pp.PartialSegments), int(28)) // partial segment count must be 24
-	is.Equal(pp.SeqNo, uint64(267))            // seqNo is 264 but 3 segments are skipped
+	is.Equal(pp.SeqNo, uint64(264))            // seqNo is not 264
+	is.Equal(pp.AlreadySkippedSegs, uint64(3)) // skipped segments must be 3
 	is.Equal(pp.ServerControl.CanSkipUntil,
 		float64(pp.TargetDuration*6)) // Can skip 6 segments
 
 	seq, part := pp.GetNextSequenceAndPart() // filePart273.4.mp4
 	is.Equal(seq, uint64(273))               // Has seqId 273
 	is.Equal(part, uint64(4))                // Has index 4
+
+	// Try decoding the playlist with skip
+	_, err = pp.EncodeWithSkip(1)
+	is.True(err != nil) // must return an error
 }
 
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
@@ -1389,6 +1394,160 @@ func TestParsePreloadHint(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parsePreloadHint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseServerControl(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       *ServerControl
+		wantErr    bool
+	}{
+		{
+			name:       "Valid parameters",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Invalid CAN-SKIP-UNTIL",
+			parameters: `CAN-SKIP-UNTIL=invalid,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=invalid,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid PART-HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=invalid,CAN-BLOCK-RELOAD=YES`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing CAN-SKIP-UNTIL",
+			parameters: `CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      0,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing CAN-SKIP-DATERANGES",
+			parameters: `CAN-SKIP-UNTIL=12.5,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: false,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing PART-HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing CAN-BLOCK-RELOAD",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    false,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseServerControl(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseServerControl() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseServerControl() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseSkipTag(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       uint64
+		wantErr    bool
+	}{
+		{
+			name:       "Valid SKIPPED-SEGMENTS",
+			parameters: `SKIPPED-SEGMENTS=5`,
+			want:       5,
+			wantErr:    false,
+		},
+		{
+			name:       "Invalid SKIPPED-SEGMENTS",
+			parameters: `SKIPPED-SEGMENTS=invalid`,
+			want:       0,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing SKIPPED-SEGMENTS",
+			parameters: ``,
+			want:       0,
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSkipTag(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseSkipTag() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseSkipTag() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -501,6 +501,61 @@ test04.m4s
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+func TestEncodePartialSegments(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(5, 10)
+	is.NoErr(e)                  // Create media playlist should be successful
+	p.PartTargetDuration = 1.002 // Set tag #EXT-X-PART-INF:PART-TARGET
+
+	e = p.AppendSegment(&MediaSegment{
+		SeqId:    0,
+		URI:      "test00.m4s",
+		Duration: 4.0,
+		Title:    "",
+		Offset:   0,
+		Limit:    100})
+	is.NoErr(e) // Add segment to a media playlist should be successful
+
+	e = p.AppendPartialSegment(&PartialSegment{
+		SeqID:       1,
+		URI:         "test01.1.m4s",
+		Duration:    1.0,
+		Independent: true,
+		Offset:      0,
+		Limit:       100,
+		Gap:         true,
+	})
+	is.NoErr(e) // Add partial segment to a media playlist should be successful
+
+	p.PreloadHints = &PreloadHint{
+		Type:   "PART",
+		URI:    "test01.2.m4s",
+		Offset: 0,
+		Limit:  100,
+	}
+
+	partTargetDuration := p.PartTargetDuration
+	serverControl := ServerControl{0.0, false, 0.0, partTargetDuration * 3, true}
+	e = p.SetServerControl(&serverControl)
+	is.NoErr(e) // Set server control should be successful
+
+	// Output only partial segments from last 3 full segments
+	expected := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-SERVER-CONTROL:PART-HOLD-BACK=3.006,CAN-BLOCK-RELOAD=YES
+#EXT-X-PART-INF:PART-TARGET=1.002
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+test00.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,GAP=YES,BYTERANGE=100@0,URI="test01.1.m4s"
+#EXT-X-PRELOAD-HINT:TYPE=PART,URI="test01.2.m4s",BYTERANGE-START=0,BYTERANGE-LENGTH=100
+`
+	out := p.String()
+	is.Equal(out, expected) // Encode media playlist does not match expected
+}
+
 func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(10, 10)
@@ -521,6 +576,17 @@ func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
 	e = p.SetServerControl(&serverControl)
 	is.NoErr(e) // Set server control should be successful
 
+	{
+		// Skipping 16 segments should fail
+		// as winsize is 10 and there are at most 10 segments
+		skipped := uint64(16)
+		canSkipUntil := float64(4.0 * skipped)
+		holdBack := 4.0 * 3
+		serverControl := ServerControl{canSkipUntil, false, holdBack, 0.0, true}
+		e = p.SetServerControl(&serverControl)
+		is.True(e != nil) // Set server control should fail
+	}
+
 	expected := `#EXTM3U
 #EXT-X-VERSION:9
 #EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
@@ -536,50 +602,8 @@ test08.m4s
 #EXTINF:4.000,
 test09.m4s
 `
-	out := p.EncodeWithSkip(skipped)
-	is.Equal(out.String(), expected) // Encode media playlist does not match expected
-}
-
-func TestEncodeMediaPlaylistWithoutSkip(t *testing.T) {
-	is := is.New(t)
-	p, e := NewMediaPlaylist(10, 10)
-	is.NoErr(e) // Create media playlist should be successful
-
-	testPlaylist := `#EXTM3U
-#EXT-X-VERSION:9
-#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
-#EXT-X-MEDIA-SEQUENCE:0
-#EXT-X-TARGETDURATION:4
-#EXT-X-SKIP:SKIPPED-SEGMENTS=6
-#EXTINF:4.000,
-test06.m4s
-#EXTINF:4.000,
-test07.m4s
-#EXTINF:4.000,
-test08.m4s
-#EXTINF:4.000,
-test09.m4s
-`
-
-	err := p.DecodeFrom(strings.NewReader(testPlaylist), true)
-	is.NoErr(err)                // Decode media playlist should be successful
-	is.Equal(p.SeqNo, uint64(6)) // SeqNo of media playlist does not match expected 6
-
-	expected := `#EXTM3U
-#EXT-X-VERSION:9
-#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
-#EXT-X-MEDIA-SEQUENCE:6
-#EXT-X-TARGETDURATION:4
-#EXTINF:4.000,
-test06.m4s
-#EXTINF:4.000,
-test07.m4s
-#EXTINF:4.000,
-test08.m4s
-#EXTINF:4.000,
-test09.m4s
-`
-	out := p.Encode()
+	out, err := p.EncodeWithSkip(skipped)
+	is.NoErr(err)                    // Encode media playlist should be successful
 	is.Equal(out.String(), expected) // Encode media playlist does not match expected
 }
 

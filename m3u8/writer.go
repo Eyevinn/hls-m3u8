@@ -20,6 +20,7 @@ import (
 var ErrPlaylistFull = errors.New("playlist is full")
 var ErrPlaylistEmpty = errors.New("playlist is empty")
 var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
+var ErrAlreadySkipped = errors.New("playlist with skip tag can not skip again")
 var RegexpNum = regexp.MustCompile(`(\d+)$`)
 
 // updateVersion updates the version if it is higher than before.
@@ -773,7 +774,7 @@ func (p *MediaPlaylist) ResetCache() {
 // If already encoded, and not changed, the cached buffer will be returned.
 // Don't change the buffer externally, e.g. by using the Write() method
 // if you want to use the cached value. Instead use the String() or Bytes() methods.
-func (p *MediaPlaylist) encode(skippedSegments uint64) *bytes.Buffer {
+func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	if p.buf.Len() > 0 {
 		return &p.buf
 	}
@@ -851,9 +852,9 @@ func (p *MediaPlaylist) encode(skippedSegments uint64) *bytes.Buffer {
 	}
 
 	skipDuration := 0.0
-	if skippedSegments > 0 {
-		writeSkip(&p.buf, skippedSegments)
-		skipDuration = float64(skippedSegments) * float64(p.TargetDuration)
+	if segmentsToSkipInTotal > 0 {
+		writeSkip(&p.buf, segmentsToSkipInTotal)
+		skipDuration = float64(segmentsToSkipInTotal) * float64(p.TargetDuration)
 	} else {
 		// Ignore the Media Initialization Section (EXT-X-MAP) tag
 		// in presence of skip (EXT-X-SKIP) tag
@@ -872,7 +873,7 @@ func (p *MediaPlaylist) encode(skippedSegments uint64) *bytes.Buffer {
 	tail := p.tail
 	count := p.count
 	isVoDOrEvent := p.winsize == 0
-	durationSkipped := 0.0
+	durationSkipped := float64(p.AlreadySkippedSegs) * float64(p.TargetDuration)
 	var outputCount uint     // number of segments to output
 	var start uint           // start index of segments to output
 	var lastSegId uint64 = 0 // last segment sequence number in live playlist
@@ -1050,13 +1051,17 @@ func (p *MediaPlaylist) encode(skippedSegments uint64) *bytes.Buffer {
 
 // EncodeWithSkip sets the skip tag and encodes the playlist.
 // If skipped > 0, the first `skipped` segments will be skipped.
-// If recentlyRemoved is not empty, it will be added to the EXT-X-SKIP tag.
-func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) *bytes.Buffer {
-	return p.encode(skipped)
+// If playlist has a skip tag already, it will return an error.
+func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) (*bytes.Buffer, error) {
+	if p.AlreadySkippedSegs > 0 {
+		return nil, ErrAlreadySkipped
+	}
+
+	return p.encode(skipped), nil
 }
 
 func (p *MediaPlaylist) Encode() *bytes.Buffer {
-	return p.encode(0)
+	return p.encode(p.AlreadySkippedSegs)
 }
 
 // String provides the playlist fulfilling the Stringer interface.
