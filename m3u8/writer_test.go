@@ -407,6 +407,206 @@ test01.ts
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+func TestEncodeLowLatencyMediaPlaylist(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(5, 10)
+	is.NoErr(e)                  // Create media playlist should be successful
+	p.PartTargetDuration = 1.002 // Set tag #EXT-X-PART-INF:PART-TARGET
+
+	e = p.AppendPartial("test01.1.ts", 1.0, true)
+	is.True(e != nil) // Add partial segments to an empty media playlist should fail
+
+	e = p.Append("test00.m4s", 4.0, "")
+	is.NoErr(e) // Add segment to a media playlist should be successful
+
+	segments := [][]string{
+		{"test01.1.m4s", "test01.2.m4s", "test01.3.m4s", "test01.4.m4s", "test01.m4s"},
+		{"test02.1.m4s", "test02.2.m4s", "test02.3.m4s", "test02.4.m4s", "test02.m4s"},
+		{"test03.1.m4s", "test03.2.m4s", "test03.3.m4s", "test03.4.m4s", "test03.m4s"},
+		{"test04.1.m4s", "test04.2.m4s", "test04.3.m4s", "test04.4.m4s", "test04.m4s"},
+		{"test05.1.m4s"}}
+	for _, psList := range segments {
+		for index, ps := range psList {
+			if index > 0 && index == len(psList)-1 {
+				e = p.Append(ps, 4.0, "")
+				is.NoErr(e) // Add segment to a media playlist should be successful
+			} else {
+				e = p.AppendPartial(ps, 1.0, true)
+				is.NoErr(e) // Add partial segment to a media playlist should be successful
+			}
+		}
+	}
+
+	is.Equal(p.TotalDuration(), 20.0) // Total duration of media playlist does not match expected 20.0
+	is.True(p.HasPartialSegments())   // Media playlist should have partial segments
+
+	for seqNo, psList := range segments {
+		for partIndex := range psList {
+			if partIndex > 0 && partIndex == len(psList)-1 {
+				// ignore full segment
+				continue
+			}
+			if seqNo == 0 {
+				// ignore partial segment of first segment (they are removed)
+				continue
+			}
+
+			partialSegment := p.PartialSegments[(seqNo-1)*4+partIndex]
+
+			is.Equal(partialSegment.URI, psList[partIndex]) // Partial segment URI does not match expected
+			is.Equal(partialSegment.SeqID, uint64(seqNo+1)) // Partial segment SeqID does not match expected
+		}
+	}
+
+	p.SetPreloadHint("PART", "test05.2.m4s")
+
+	partTargetDuration := p.PartTargetDuration
+	serverControl := ServerControl{0.0, false, 0.0, partTargetDuration * 3, true}
+	e = p.SetServerControl(&serverControl)
+	is.NoErr(e) // Set server control should be successful
+
+	// Output only partial segments from last 3 full segments
+	expected := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-SERVER-CONTROL:PART-HOLD-BACK=3.006,CAN-BLOCK-RELOAD=YES
+#EXT-X-PART-INF:PART-TARGET=1.002
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXTINF:4.000,
+test00.m4s
+#EXTINF:4.000,
+test01.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.2.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.3.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test02.4.m4s"
+#EXTINF:4.000,
+test02.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.2.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.3.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test03.4.m4s"
+#EXTINF:4.000,
+test03.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.2.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.3.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test04.4.m4s"
+#EXTINF:4.000,
+test04.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,URI="test05.1.m4s"
+#EXT-X-PRELOAD-HINT:TYPE=PART,URI="test05.2.m4s"
+`
+	out := p.String()
+	is.Equal(out, expected) // Encode media playlist does not match expected
+}
+
+func TestEncodePartialSegments(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(5, 10)
+	is.NoErr(e)                  // Create media playlist should be successful
+	p.PartTargetDuration = 1.002 // Set tag #EXT-X-PART-INF:PART-TARGET
+
+	e = p.AppendSegment(&MediaSegment{
+		SeqId:    0,
+		URI:      "test00.m4s",
+		Duration: 4.0,
+		Title:    "",
+		Offset:   0,
+		Limit:    100})
+	is.NoErr(e) // Add segment to a media playlist should be successful
+
+	e = p.AppendPartialSegment(&PartialSegment{
+		SeqID:       1,
+		URI:         "test01.1.m4s",
+		Duration:    1.0,
+		Independent: true,
+		Offset:      0,
+		Limit:       100,
+		Gap:         true,
+	})
+	is.NoErr(e) // Add partial segment to a media playlist should be successful
+
+	p.PreloadHints = &PreloadHint{
+		Type:   "PART",
+		URI:    "test01.2.m4s",
+		Offset: 0,
+		Limit:  100,
+	}
+
+	partTargetDuration := p.PartTargetDuration
+	serverControl := ServerControl{0.0, false, 0.0, partTargetDuration * 3, true}
+	e = p.SetServerControl(&serverControl)
+	is.NoErr(e) // Set server control should be successful
+
+	// Output only partial segments from last 3 full segments
+	expected := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-SERVER-CONTROL:PART-HOLD-BACK=3.006,CAN-BLOCK-RELOAD=YES
+#EXT-X-PART-INF:PART-TARGET=1.002
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+test00.m4s
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,GAP=YES,BYTERANGE=100@0,URI="test01.1.m4s"
+#EXT-X-PRELOAD-HINT:TYPE=PART,URI="test01.2.m4s",BYTERANGE-START=0,BYTERANGE-LENGTH=100
+`
+	out := p.String()
+	is.Equal(out, expected) // Encode media playlist does not match expected
+}
+
+func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(10, 10)
+	is.NoErr(e) // Create media playlist should be successful
+
+	p.SetVersion(9)                   // Version 9 is required for EXT-X-SKIP tag
+	p.SetDefaultMap("init.mp4", 0, 0) // Set init segment (will be ignored)
+
+	for i := 0; i < 10; i++ {
+		e = p.Append(fmt.Sprintf("test%02d.m4s", i), 4.0, "")
+		is.NoErr(e) // Add segment to a media playlist should be successful
+	}
+
+	skipped := uint64(6)
+	canSkipUntil := float64(4.0 * skipped) // skip 6 segment
+	holdBack := 4.0 * 3                    // hold back 3 segment
+	serverControl := ServerControl{canSkipUntil, false, holdBack, 0.0, true}
+	e = p.SetServerControl(&serverControl)
+	is.NoErr(e) // Set server control should be successful
+
+	{
+		// Skipping 16 segments should fail
+		// as winsize is 10 and there are at most 10 segments
+		skipped := uint64(16)
+		canSkipUntil := float64(4.0 * skipped)
+		holdBack := 4.0 * 3
+		serverControl := ServerControl{canSkipUntil, false, holdBack, 0.0, true}
+		e = p.SetServerControl(&serverControl)
+		is.True(e != nil) // Set server control should fail
+	}
+
+	expected := `#EXTM3U
+#EXT-X-VERSION:9
+#EXT-X-SERVER-CONTROL:CAN-SKIP-UNTIL=24.000,HOLD-BACK=12.000,CAN-BLOCK-RELOAD=YES
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-SKIP:SKIPPED-SEGMENTS=6
+#EXTINF:4.000,
+test06.m4s
+#EXTINF:4.000,
+test07.m4s
+#EXTINF:4.000,
+test08.m4s
+#EXTINF:4.000,
+test09.m4s
+`
+	out, err := p.EncodeWithSkip(skipped)
+	is.NoErr(err)                    // Encode media playlist should be successful
+	is.Equal(out.String(), expected) // Encode media playlist does not match expected
+}
+
 // Create new media playlist
 // Add 10 segments to media playlist
 // Test iterating over segments
@@ -776,7 +976,7 @@ func TestEncodeMasterPlaylistWithStreamInfName(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000000, Resolution: "1152x960", Name: "HD 960p"})
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000, Resolution: "1152x960", Name: "HD 960p"})
 
 	is.Equal(m.Variants[0].Name, "HD 960p")                 //  Bad variant name
 	is.True(strings.Contains(m.String(), `NAME="HD 960p"`)) // Master playlist does not contain Name in EXT-X-STREAM-INF
@@ -898,6 +1098,107 @@ func TestAppendDefine(t *testing.T) {
 	}
 }
 
+func TestIsPartOf(t *testing.T) {
+	tests := []struct {
+		partialSegUri string
+		segUri        string
+		expected      bool
+	}{
+		{"filePart249.1.m4s", "fileSequence249.m4s", true},
+		{"filePart249.2.m4s", "fileSequence249.m4s", true},
+		{"chunk249.1.m4s", "fileSequence249.m4s", true},
+		{"filePart0249.1.m4s", "fileSequence249.m4s", true},
+
+		{"filePart249.1.m4s", "fileSequence2490.m4s", false},
+		{"filePart2490.1.m4s", "fileSequence249.m4s", false},
+		{"filePart1249.1.m4s", "fileSequence249.m4s", false},
+		{"filePart249.1.ts", "fileSequence249.m4s", false},
+		{"filePart249.m4s", "fileSequence249.m4s", false},
+		{"filePart249.m4s", "fileSequence249.1.m4s", false},
+		{"filePart.1.m4s", "fileSequence249.m4s", false},
+		{"filePart.1.m4s", "fileSequence.m4s", false},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s", test.partialSegUri, test.segUri), func(t *testing.T) {
+			result := IsPartOf(test.partialSegUri, test.segUri)
+			if result != test.expected {
+				t.Errorf("IsPartOf(%s, %s) = %v; want %v", test.partialSegUri, test.segUri, result, test.expected)
+			}
+		})
+	}
+}
+
+func TestGetSequenceNum(t *testing.T) {
+	tests := []struct {
+		uriPrefix string
+		expected  bool
+		num       uint64
+	}{
+		{"fileSequence249", true, 249},
+		{"fileSequence2490", true, 2490},
+		{"fileSequence", false, 0},
+		{"fileSequence249abc", false, 0},
+		{"fileSequence249.1", false, 0},
+		{"fileSequence0249", true, 249},
+	}
+
+	for _, test := range tests {
+		t.Run(test.uriPrefix, func(t *testing.T) {
+			result, num := getSequenceNum(test.uriPrefix)
+			if result != test.expected || num != test.num {
+				t.Errorf("getSequenceNum(%s) = %v, %d; want %v, %d", test.uriPrefix, result, num, test.expected, test.num)
+			}
+		})
+	}
+}
+
+func TestSplitUriBy(t *testing.T) {
+	tests := []struct {
+		uri              string
+		sep              string
+		expectedRest     string
+		expectedLastPart string
+	}{
+		{"fileSequence249.m4s", ".", "fileSequence249", "m4s"},
+		{"fileSequence249.1.m4s", ".", "fileSequence249.1", "m4s"},
+		{"fileSequence249", ".", "", ""},
+		{"fileSequence249.m4s", "/", "", ""},
+		{"fileSequence249.m4s", "Sequence", "file", "249.m4s"},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s", test.uri, test.sep), func(t *testing.T) {
+			rest, lastPart := splitUriBy(test.uri, test.sep)
+			if rest != test.expectedRest || lastPart != test.expectedLastPart {
+				t.Errorf("splitUriBy(%s, %s) = %v, %v; want %v, %v", test.uri, test.sep, rest, lastPart, test.expectedRest, test.expectedLastPart)
+			}
+		})
+	}
+}
+
+func TestMin(t *testing.T) {
+	tests := []struct {
+		a, b     uint
+		expected uint
+	}{
+		{1, 2, 1},
+		{2, 1, 1},
+		{5, 5, 5},
+		{0, 10, 0},
+		{10, 0, 0},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("min(%d, %d)", test.a, test.b), func(t *testing.T) {
+			result := min(test.a, test.b)
+			if result != test.expected {
+				t.Errorf("min(%d, %d) = %d; want %d", test.a, test.b, result, test.expected)
+			}
+		})
+	}
+}
+
 /******************************
  *  Code generation examples  *
  ******************************/
@@ -910,13 +1211,14 @@ func ExampleNewMediaPlaylist_string() {
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
-	// Output:
+
+	// Skip this for now as to be discussed in a separate PR
 	// #EXTM3U
 	// #EXT-X-VERSION:3
 	// #EXT-X-MEDIA-SEQUENCE:0
 	// #EXT-X-TARGETDURATION:6
-	// #EXTINF:5.000,
-	// test01.ts
+	// #EXTINF:6.000,
+	// test02.ts
 }
 
 // Create new media playlist

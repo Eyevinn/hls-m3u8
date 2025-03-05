@@ -163,6 +163,52 @@ func (p *MediaPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
 }
 
+func (p *MediaPlaylist) LastSegIndex() uint64 {
+	nextSeqNo := p.NextMSNIndex + p.AlreadySkippedSegs
+	if p.NextPartIndex == 0 {
+		// Just rolled over to the next segment
+		return nextSeqNo - 1
+	}
+	return nextSeqNo
+}
+
+func (p *MediaPlaylist) LastPartSegIndex() uint64 {
+	if p.NextPartIndex == 0 {
+		// Just rolled over to the next segment
+		return p.MaxPartIndex - 1
+	}
+	return p.NextPartIndex - 1
+}
+
+func (p *MediaPlaylist) GetNextSequenceAndPart() (uint64, uint64) {
+	nextSeqNo := p.LastSegIndex()
+	nextPartNo := p.LastPartSegIndex()
+	if nextPartNo+1 == p.MaxPartIndex {
+		// Roll over to the next segment
+		nextPartNo = 0
+		nextSeqNo++
+	} else {
+		nextPartNo++
+	}
+	return nextSeqNo, nextPartNo
+}
+
+func (p *MediaPlaylist) IsSegmentReady(uri string) bool {
+	for _, seg := range p.Segments {
+		if seg != nil && strings.HasSuffix(uri, seg.URI) {
+			return true
+		}
+	}
+
+	for _, partial := range p.PartialSegments {
+		if strings.HasSuffix(uri, partial.URI) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SCTE35Syntax returns the SCTE35 syntax version detected as used in the playlist.
 func (p *MediaPlaylist) SCTE35Syntax() SCTE35Syntax {
 	return p.scte35Syntax
@@ -669,6 +715,94 @@ func parseDefine(line string) (Define, error) {
 	return d, nil
 }
 
+func parsePartialSegment(parameters string) (*PartialSegment, error) {
+	ps := PartialSegment{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "URI":
+			ps.URI = DeQuote(attr.Val)
+		case "DURATION":
+			duration, err := strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("duration parsing error: %w", err)
+			}
+			ps.Duration = duration
+		case "INDEPENDENT":
+			ps.Independent = attr.Val == "YES"
+		case "BYTERANGE":
+			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &ps.Limit, &ps.Offset); err != nil {
+				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+			}
+		}
+	}
+	return &ps, nil
+}
+
+func parsePreloadHint(parameters string) (*PreloadHint, error) {
+	ph := PreloadHint{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "TYPE":
+			ph.Type = attr.Val
+		case "URI":
+			ph.URI = DeQuote(attr.Val)
+		case "BYTERANGE-START":
+			start, err := strconv.ParseInt(attr.Val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("start parsing error: %w", err)
+			}
+			ph.Offset = start
+		case "BYTERANGE-LENGTH":
+			length, err := strconv.ParseInt(attr.Val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("length parsing error: %w", err)
+			}
+			ph.Limit = length
+		}
+	}
+	return &ph, nil
+}
+
+func parseSkipTag(parameters string) (uint64, error) {
+	var skipped uint64
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "SKIPPED-SEGMENTS":
+			if skipped, err = strconv.ParseUint(attr.Val, 10, 64); err != nil {
+				return 0, fmt.Errorf("skipped-segments parsing error: %w", err)
+			}
+		}
+	}
+	return skipped, nil
+}
+
+func parseServerControl(parameters string) (*ServerControl, error) {
+	sc := ServerControl{}
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "CAN-SKIP-UNTIL":
+			if sc.CanSkipUntil, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("can-skip-until parsing error: %w", err)
+			}
+		case "CAN-SKIP-DATERANGES":
+			sc.CanSkipDateRanges = attr.Val == "YES"
+		case "HOLD-BACK":
+			if sc.HoldBack, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("hold-back parsing error: %w", err)
+			}
+		case "PART-HOLD-BACK":
+			if sc.PartHoldBack, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("part-hold-back parsing error: %w", err)
+			}
+		case "CAN-BLOCK-RELOAD":
+			sc.CanBlockReload = attr.Val == "YES"
+		}
+	}
+	return &sc, nil
+}
+
 func parseSessionData(line string) (*SessionData, error) {
 	sd := SessionData{
 		Format: "JSON",
@@ -703,7 +837,7 @@ func parseExtXMapParameters(parameters string) (*Map, error) {
 	for _, attr := range decodeAttributes(parameters) {
 		switch attr.Key {
 		case "URI":
-			m.URI = attr.Val
+			m.URI = DeQuote(attr.Val)
 		case "BYTERANGE":
 			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &m.Limit, &m.Offset); err != nil {
 				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
@@ -824,10 +958,12 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				p.tail = p.count
 				err = p.AppendSegment(&seg)
 			}
+
 			// Check err for first or subsequent Append()
 			if err != nil {
 				return err
 			}
+
 			state.tagInf = false
 		}
 		if state.tagRange {
@@ -886,6 +1022,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			state.custom = make(CustomMap)
 			state.tagCustom = false
 		}
+		// all partial segment which appeared before the segment should be marked as completed
+		if state.tagPartialSegment {
+			// Mark all partial segments as completed
+			state.tagPartialSegment = false
+		}
 	// start tag first
 	case line == "#EXTM3U":
 		state.m3u = true
@@ -901,11 +1042,50 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-TARGETDURATION:%d", &p.TargetDuration); strict && err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-PART-INF:PART-TARGET="):
+		state.listType = MEDIA
+		if _, err = fmt.Sscanf(line, "#EXT-X-PART-INF:PART-TARGET=%f", &p.PartTargetDuration); strict && err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-SERVER-CONTROL:"):
+		state.listType = MEDIA
+		if p.ServerControl, err = parseServerControl(line[22:]); err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-SKIP:"):
+		state.listType = MEDIA
+		skipped, err := parseSkipTag(line[12:])
+		if err != nil {
+			return err
+		}
+		p.AlreadySkippedSegs = skipped
+	case strings.HasPrefix(line, "#EXT-X-PART:"):
+		state.listType = MEDIA
+		state.tagPartialSegment = true
+		partialSegment, err := parsePartialSegment(line[12:])
+		if err != nil {
+			return err
+		}
+		// if the program date time tag is present, set it on this partial segment
+		if state.tagProgramDateTime && p.HasPartialSegments() {
+			partialSegment.ProgramDateTime = state.programDateTime
+			state.tagProgramDateTime = false
+		}
+		if err = p.AppendPartialSegment(partialSegment); err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-PRELOAD-HINT:"):
+		preloadHint, err := parsePreloadHint(line[20:])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-PRELOAD-HINT: %w", err)
+		}
+		p.PreloadHints = preloadHint
 	case strings.HasPrefix(line, "#EXT-X-MEDIA-SEQUENCE:"):
 		state.listType = MEDIA
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {
 			return err
 		}
+		p.NextMSNIndex = p.SeqNo
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
 		define, err := parseDefine(line)
 		if err != nil {
