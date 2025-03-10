@@ -32,7 +32,8 @@ There is a function `Decode`, that decodes and autodetects the type of playlist,
 both in parallel, and stopping one, once the type is known.
 
 For generating playlists, one starts by calling either `NewMasterPlaylist` or `NewMediaPlaylist`.
-One can then `Set` or `Append` extra data.
+One can then `Set` or `Append` extra data. For example, one can `Append` a full media segment or
+`AppendPartial` a partial segment to Low-Latency HLS media playlists.
 
 For live media playlists with a fixed sliding window, one
 can set a `winsize` and it will be used to always output
@@ -41,6 +42,7 @@ the latest segments.
 For VOD or EVENT media playlists, the `winsize` should be 0.
 
 For writing, there are `Encode` methods that return a `*bytes.Buffer`. This buffer serves as a cache.
+It is also possible to call `EncodeWithSkip` to skip the first `n` segments.
 
 ## Installation / Usage
 

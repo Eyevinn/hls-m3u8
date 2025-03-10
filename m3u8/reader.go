@@ -163,6 +163,57 @@ func (p *MediaPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
 }
 
+// LastSegIndex returns the index of the last segment in the media playlist.
+// It calculates the index based on the next media sequence number
+// and the number of segments already skipped.
+// If the NextPartIndex is 0, indicating that it has just rolled over to the next segment,
+// it returns the previous sequence number. Otherwise, it returns the current sequence number.
+func (p *MediaPlaylist) LastSegIndex() uint64 {
+	nextSeqNo := p.SegmentIndexing.NextMSNIndex + p.AlreadySkippedSegs
+	if p.SegmentIndexing.NextPartIndex == 0 {
+		// Just rolled over to the next segment
+		return nextSeqNo - 1
+	}
+	return nextSeqNo
+}
+
+func (p *MediaPlaylist) LastPartSegIndex() uint64 {
+	if p.SegmentIndexing.NextPartIndex == 0 {
+		// Just rolled over to the next segment
+		return p.SegmentIndexing.MaxPartIndex
+	}
+	return p.SegmentIndexing.NextPartIndex - 1
+}
+
+func (p *MediaPlaylist) GetNextSequenceAndPart() (seq uint64, part uint64) {
+	seq = p.LastSegIndex()
+	part = p.LastPartSegIndex()
+	if part == p.SegmentIndexing.MaxPartIndex {
+		// Roll over to the next segment
+		part = 0
+		seq++
+	} else {
+		part++
+	}
+	return seq, part
+}
+
+func (p *MediaPlaylist) IsSegmentReady(uri string) bool {
+	for _, seg := range p.Segments {
+		if seg != nil && strings.HasSuffix(uri, seg.URI) {
+			return true
+		}
+	}
+
+	for _, partial := range p.PartialSegments {
+		if strings.HasSuffix(uri, partial.URI) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SCTE35Syntax returns the SCTE35 syntax version detected as used in the playlist.
 func (p *MediaPlaylist) SCTE35Syntax() SCTE35Syntax {
 	return p.scte35Syntax
@@ -510,9 +561,9 @@ func parseExtXStreamInf(line string, strict bool) (*Variant, error) {
 			}
 			variant.Score = val
 		case "CODECS":
-			variant.Codecs = DeQuote(a.Val)
+			variant.Codecs = deQuote(a.Val)
 		case "SUPPLEMENTAL-CODECS":
-			variant.SupplementalCodecs = DeQuote(a.Val)
+			variant.SupplementalCodecs = deQuote(a.Val)
 		case "RESOLUTION": // decimal-resolution WxH
 			variant.Resolution = a.Val
 		case "FRAME-RATE":
@@ -524,29 +575,29 @@ func parseExtXStreamInf(line string, strict bool) (*Variant, error) {
 		case "HDCP-LEVEL": // NONE, TYPE-0, TYPE-1
 			variant.HDCPLevel = a.Val
 		case "ALLOWED-CPC":
-			variant.AllowedCPC = DeQuote(a.Val)
+			variant.AllowedCPC = deQuote(a.Val)
 		case "VIDEO-RANGE": // SDR, HLG, PQ
 			variant.VideoRange = a.Val
 		case "REQ-VIDEO-LAYOUT":
-			variant.ReqVideoLayout = DeQuote(a.Val)
+			variant.ReqVideoLayout = deQuote(a.Val)
 		case "STABLE-VARIANT-ID":
-			variant.StableVariantId = DeQuote(a.Val)
+			variant.StableVariantId = deQuote(a.Val)
 		case "AUDIO": // Alternative renditions group ID
-			variant.Audio = DeQuote(a.Val)
+			variant.Audio = deQuote(a.Val)
 		case "VIDEO": // Alternative renditions group ID
-			variant.Video = DeQuote(a.Val)
+			variant.Video = deQuote(a.Val)
 		case "SUBTITLES": // Alternative renditions group ID
-			variant.Subtitles = DeQuote(a.Val)
+			variant.Subtitles = deQuote(a.Val)
 		case "CLOSED-CAPTIONS":
 			if a.Val == "NONE" {
 				variant.Captions = "NONE"
 			} else {
-				variant.Captions = DeQuote(a.Val)
+				variant.Captions = deQuote(a.Val)
 			}
 		case "PATHWAY-ID": // Content steering pathway ID
-			variant.PathwayId = DeQuote(a.Val)
+			variant.PathwayId = deQuote(a.Val)
 		case "URI":
-			variant.URI = DeQuote(a.Val)
+			variant.URI = deQuote(a.Val)
 		case "PROGRAM-ID": // Deprecated from version 6
 			val, err := strconv.Atoi(a.Val)
 			if strict && err != nil {
@@ -554,7 +605,7 @@ func parseExtXStreamInf(line string, strict bool) (*Variant, error) {
 			}
 			variant.ProgramId = &val
 		case "NAME":
-			variant.Name = DeQuote(a.Val)
+			variant.Name = deQuote(a.Val)
 		}
 	}
 	return &variant, nil
@@ -568,17 +619,17 @@ func parseDateRange(line string) (*DateRange, error) {
 	for _, attr := range decodeAttributes(line[17:]) {
 		switch attr.Key {
 		case "ID":
-			dr.ID = DeQuote(attr.Val)
+			dr.ID = deQuote(attr.Val)
 		case "CLASS":
-			dr.Class = DeQuote(attr.Val)
+			dr.Class = deQuote(attr.Val)
 		case "START-DATE":
-			startDate, err := time.Parse(DATETIME, DeQuote(attr.Val))
+			startDate, err := time.Parse(DATETIME, deQuote(attr.Val))
 			if err != nil {
 				return nil, fmt.Errorf("invalid START-DATE: %w", err)
 			}
 			dr.StartDate = startDate
 		case "END-DATE":
-			endDate, err := time.Parse(DATETIME, DeQuote(attr.Val))
+			endDate, err := time.Parse(DATETIME, deQuote(attr.Val))
 			if err != nil {
 				return nil, fmt.Errorf("invalid END-DATE: %w", err)
 			}
@@ -669,6 +720,94 @@ func parseDefine(line string) (Define, error) {
 	return d, nil
 }
 
+func parsePartialSegment(parameters string) (*PartialSegment, error) {
+	ps := PartialSegment{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "URI":
+			ps.URI = deQuote(attr.Val)
+		case "DURATION":
+			duration, err := strconv.ParseFloat(attr.Val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("duration parsing error: %w", err)
+			}
+			ps.Duration = duration
+		case "INDEPENDENT":
+			ps.Independent = attr.Val == "YES"
+		case "BYTERANGE":
+			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &ps.Limit, &ps.Offset); err != nil {
+				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+			}
+		}
+	}
+	return &ps, nil
+}
+
+func parsePreloadHint(parameters string) (*PreloadHint, error) {
+	ph := PreloadHint{}
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "TYPE":
+			ph.Type = attr.Val
+		case "URI":
+			ph.URI = deQuote(attr.Val)
+		case "BYTERANGE-START":
+			start, err := strconv.ParseInt(attr.Val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("start parsing error: %w", err)
+			}
+			ph.Offset = start
+		case "BYTERANGE-LENGTH":
+			length, err := strconv.ParseInt(attr.Val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("length parsing error: %w", err)
+			}
+			ph.Limit = length
+		}
+	}
+	return &ph, nil
+}
+
+func parseSkipTag(parameters string) (uint64, error) {
+	var skipped uint64
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "SKIPPED-SEGMENTS":
+			if skipped, err = strconv.ParseUint(attr.Val, 10, 64); err != nil {
+				return 0, fmt.Errorf("skipped-segments parsing error: %w", err)
+			}
+		}
+	}
+	return skipped, nil
+}
+
+func parseServerControl(parameters string) (*ServerControl, error) {
+	sc := ServerControl{}
+	var err error
+	for _, attr := range decodeAttributes(parameters) {
+		switch attr.Key {
+		case "CAN-SKIP-UNTIL":
+			if sc.CanSkipUntil, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("can-skip-until parsing error: %w", err)
+			}
+		case "CAN-SKIP-DATERANGES":
+			sc.CanSkipDateRanges = attr.Val == "YES"
+		case "HOLD-BACK":
+			if sc.HoldBack, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("hold-back parsing error: %w", err)
+			}
+		case "PART-HOLD-BACK":
+			if sc.PartHoldBack, err = strconv.ParseFloat(attr.Val, 64); err != nil {
+				return nil, fmt.Errorf("part-hold-back parsing error: %w", err)
+			}
+		case "CAN-BLOCK-RELOAD":
+			sc.CanBlockReload = attr.Val == "YES"
+		}
+	}
+	return &sc, nil
+}
+
 func parseSessionData(line string) (*SessionData, error) {
 	sd := SessionData{
 		Format: "JSON",
@@ -679,11 +818,11 @@ func parseSessionData(line string) (*SessionData, error) {
 	for _, attr := range decodeAttributes(line[len("EXT-X-SESSION_-DATA:"):]) {
 		switch attr.Key {
 		case "DATA-ID":
-			sd.DataId = DeQuote(attr.Val)
+			sd.DataId = deQuote(attr.Val)
 		case "VALUE":
-			sd.Value = DeQuote(attr.Val)
+			sd.Value = deQuote(attr.Val)
 		case "URI":
-			sd.URI = DeQuote(attr.Val)
+			sd.URI = deQuote(attr.Val)
 		case "FORMAT":
 			switch attr.Val {
 			case "JSON", "RAW":
@@ -692,7 +831,7 @@ func parseSessionData(line string) (*SessionData, error) {
 				return nil, fmt.Errorf("invalid FORMAT: %s", attr.Val)
 			}
 		case "LANGUAGE":
-			sd.Language = DeQuote(attr.Val)
+			sd.Language = deQuote(attr.Val)
 		}
 	}
 	return &sd, nil
@@ -703,7 +842,7 @@ func parseExtXMapParameters(parameters string) (*Map, error) {
 	for _, attr := range decodeAttributes(parameters) {
 		switch attr.Key {
 		case "URI":
-			m.URI = attr.Val
+			m.URI = deQuote(attr.Val)
 		case "BYTERANGE":
 			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &m.Limit, &m.Offset); err != nil {
 				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
@@ -720,13 +859,13 @@ func parseKeyParams(parameters string) *Key {
 		case "METHOD":
 			key.Method = attr.Val // NONE, AES-128, SAMPLE-AES, SAMPLE-AES-CTR
 		case "URI":
-			key.URI = DeQuote(attr.Val)
+			key.URI = deQuote(attr.Val)
 		case "IV":
 			key.IV = attr.Val // Hex value
 		case "KEYFORMAT":
-			key.Keyformat = DeQuote(attr.Val)
+			key.Keyformat = deQuote(attr.Val)
 		case "KEYFORMATVERSIONS":
-			key.Keyformatversions = DeQuote(attr.Val)
+			key.Keyformatversions = deQuote(attr.Val)
 		}
 	}
 	return &key
@@ -737,16 +876,16 @@ func parseContentSteering(params string) *ContentSteering {
 	for _, attr := range decodeAttributes(params) {
 		switch attr.Key {
 		case "SERVER-URI":
-			cs.ServerURI = DeQuote(attr.Val)
+			cs.ServerURI = deQuote(attr.Val)
 		case "PATHWAY-ID":
-			cs.PathwayId = DeQuote(attr.Val)
+			cs.PathwayId = deQuote(attr.Val)
 		}
 	}
 	return &cs
 }
 
-// DeQuote removes quotes from a string.
-func DeQuote(s string) string {
+// deQuote removes quotes from a string.
+func deQuote(s string) string {
 	if len(s) < 2 {
 		return s
 	}
@@ -824,10 +963,12 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				p.tail = p.count
 				err = p.AppendSegment(&seg)
 			}
+
 			// Check err for first or subsequent Append()
 			if err != nil {
 				return err
 			}
+
 			state.tagInf = false
 		}
 		if state.tagRange {
@@ -886,6 +1027,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			state.custom = make(CustomMap)
 			state.tagCustom = false
 		}
+		// all partial segment which appeared before the segment should be marked as completed
+		if state.tagPartialSegment {
+			// Mark all partial segments as completed
+			state.tagPartialSegment = false
+		}
 	// start tag first
 	case line == "#EXTM3U":
 		state.m3u = true
@@ -901,11 +1047,50 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if _, err = fmt.Sscanf(line, "#EXT-X-TARGETDURATION:%d", &p.TargetDuration); strict && err != nil {
 			return err
 		}
+	case strings.HasPrefix(line, "#EXT-X-PART-INF:PART-TARGET="):
+		state.listType = MEDIA
+		if _, err = fmt.Sscanf(line, "#EXT-X-PART-INF:PART-TARGET=%f", &p.PartTargetDuration); strict && err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-SERVER-CONTROL:"):
+		state.listType = MEDIA
+		if p.ServerControl, err = parseServerControl(line[22:]); err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-SKIP:"):
+		state.listType = MEDIA
+		skipped, err := parseSkipTag(line[12:])
+		if err != nil {
+			return err
+		}
+		p.AlreadySkippedSegs = skipped
+	case strings.HasPrefix(line, "#EXT-X-PART:"):
+		state.listType = MEDIA
+		state.tagPartialSegment = true
+		partialSegment, err := parsePartialSegment(line[12:])
+		if err != nil {
+			return err
+		}
+		// if the program date time tag is present, set it on this partial segment
+		if state.tagProgramDateTime && p.HasPartialSegments() {
+			partialSegment.ProgramDateTime = state.programDateTime
+			state.tagProgramDateTime = false
+		}
+		if err = p.AppendPartialSegment(partialSegment); err != nil {
+			return err
+		}
+	case strings.HasPrefix(line, "#EXT-X-PRELOAD-HINT:"):
+		preloadHint, err := parsePreloadHint(line[20:])
+		if err != nil {
+			return fmt.Errorf("error parsing EXT-X-PRELOAD-HINT: %w", err)
+		}
+		p.PreloadHints = preloadHint
 	case strings.HasPrefix(line, "#EXT-X-MEDIA-SEQUENCE:"):
 		state.listType = MEDIA
 		if _, err = fmt.Sscanf(line, "#EXT-X-MEDIA-SEQUENCE:%d", &p.SeqNo); strict && err != nil {
 			return err
 		}
+		p.SegmentIndexing.NextMSNIndex = p.SeqNo
 	case strings.HasPrefix(line, "#EXT-X-DEFINE:"): // Define tag
 		define, err := parseDefine(line)
 		if err != nil {

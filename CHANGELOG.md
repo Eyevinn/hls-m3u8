@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- EncodeWithSkip() to media playlist
+- EXT-X-PART support
+- EXT-X-PART-INF support
+- EXT-X-SERVER-CONTROL support
+- EXT-X-PRELOAD-HINT support
+- EXT-X-SKIP support
 - EXT-X-GAP support
 - EXT-X-SESSION-KEY support
 - EXT-X-CONTENT-STEERING support

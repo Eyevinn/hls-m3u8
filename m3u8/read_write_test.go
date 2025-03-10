@@ -399,6 +399,8 @@ func TestReadWritePlaylists(t *testing.T) {
 		"media-playlist-with-start-time.m3u8",
 		"master-with-independent-segments.m3u8",
 		"media-playlist-with-gap.m3u8",
+		"media-playlist-low-latency.m3u8",
+		"media-playlist-with-skip.m3u8",
 	}
 
 	for _, fileName := range files {

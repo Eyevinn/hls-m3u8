@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -862,6 +863,155 @@ func TestMediaPlaylistWithSCTE35Tag(t *testing.T) {
 	}
 }
 
+func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-low-latency-initial-sequence-num-5.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA)              // must be media playlist
+	is.Equal(pp.TargetDuration, uint(4))   // target duration must be 4
+	is.True(!pp.Closed)                    // live playlist
+	is.Equal(pp.SeqNo, uint64(11))         // sequence number must be 11
+	is.Equal(pp.Count(), uint(16))         // segment count must be 16
+	is.Equal(pp.PartTargetDuration, 1.002) // partial target duration must be 1.002
+	startIndex := uint(5)
+	pp.Map.URI = fmt.Sprintf("fileSequence%d.m4s", startIndex) // init segment should be fileSequence5.m4s
+
+	for i := uint(0); i < pp.Count(); i++ {
+		s := pp.Segments[i]
+		is.True(pp.IsSegmentReady(s.URI)) // all segments should be ready
+		// segment names should be in the following format fileSequence%d.m4s
+		expectedSeqNo := startIndex + uint(pp.SeqNo) + i + 1
+		expected := fmt.Sprintf("fileSequence%d.m4s", expectedSeqNo)
+		if s.URI != expected {
+			t.Errorf("Segment name mismatch: %s != %s", s.URI, expected)
+		}
+	}
+
+	// Existing segments
+	is.Equal(pp.LastSegIndex(), uint64(27))          // Last segment (fileSequence32.m4s) has index 27
+	is.True(pp.IsSegmentReady("fileSequence32.m4s")) // it should be ready
+
+	// Existing partial segments
+	is.Equal(pp.LastPartSegIndex(), uint64(1))     // Last partial segment (filePart33.2.m4s) has index 1
+	is.True(pp.IsSegmentReady("filePart33.2.m4s")) // it should be ready
+
+	seq, part := pp.GetNextSequenceAndPart()
+	is.Equal(seq, uint64(27))                       // Has seqId 27
+	is.Equal(part, uint64(2))                       // Has index 2
+	is.True(!pp.IsSegmentReady("filePart33.3.m4s")) // it should not be ready
+}
+
+func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-low-latency.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA)                  // must be media playlist
+	is.Equal(pp.TargetDuration, uint(4))       // target duration must be 4
+	is.True(!pp.Closed)                        // live playlist
+	is.Equal(pp.Count(), uint(8))              // segment count must be 8
+	is.Equal(pp.PartTargetDuration, 1.002)     // partial target duration must be 1.002
+	is.Equal(len(pp.PartialSegments), int(10)) // partial segment count must be 10
+
+	// The ProgramDateTime of the 4th segment should be: 2025-02-10T14:42:30.134Z
+	st, _ := time.Parse(time.RFC3339, "2025-02-10T14:43:10.134+00:00")
+	if !pp.Segments[3].ProgramDateTime.Equal(st) {
+		t.Errorf("The program date time of the 1st segment should be: %v, actual value: %v",
+			st, pp.Segments[1].ProgramDateTime)
+	}
+
+	for i, ps := range pp.PartialSegments {
+		is.Equal(ps.Duration, float64(1.0)) // partial segment duration must be 1.0
+		if i < 8 {
+			is.True(ps.Independent) // the first 8 partial segment must be independent
+		}
+		is.True(strings.HasPrefix(ps.URI, "filePart")) // partial segment names should be in the following format filePart%d.%d.m4s
+	}
+
+	// The ProgramDateTime of the 9th partial segment should be: 2025-02-10T14:43:30.134Z
+	st, _ = time.Parse(time.RFC3339, "2025-02-10T14:43:30.134+00:00")
+	if !pp.PartialSegments[8].ProgramDateTime.Equal(st) {
+		t.Errorf("The program date time of the 8st partial segment should be: %v, actual value: %v",
+			st, pp.PartialSegments[8].ProgramDateTime)
+	}
+
+	// Preload Hints
+	is.Equal(pp.PreloadHints.Type, "PART")             // preload hints type must be PART
+	is.Equal(pp.PreloadHints.URI, "filePart251.3.m4s") // preload hints uri must be filePart251.3.m4s
+
+	// Existing segments
+	is.Equal(pp.LastSegIndex(), uint64(250)) // Last segment index (fileSequence250.m4s has index 250)
+	// Existing partial segments
+	is.Equal(pp.LastPartSegIndex(), uint64(1)) // Last partial segment index (filePart251.2.m4s has index 1)
+
+	seq, part := pp.GetNextSequenceAndPart()
+	is.Equal(seq, uint64(250)) // Has seqId 250
+	is.Equal(part, uint64(2))  // Has index 2
+
+	{
+		// Test for appending partial segments
+		_ = pp.AppendPartial("filePart251.3.m4s", 1.0, false)
+		is.Equal(pp.LastPartSegIndex(), uint64(2)) // Last partial segment index (filePart251.3.m4s has index 2)
+		is.True(pp.IsSegmentReady("filePart251.3.m4s"))
+
+		_ = pp.AppendPartial("filePart251.4.m4s", 1.0, false)
+		_ = pp.Append("fileSequence251.m4s", 1.0, "")
+		is.Equal(pp.LastSegIndex(), uint64(250))   // Last segment index (filePart250.m4s has index 250)
+		is.Equal(pp.LastPartSegIndex(), uint64(3)) // Last partial segment index (filePart251.4.m4s has index 3)
+		is.True(pp.IsSegmentReady("filePart251.4.m4s"))
+		is.True(pp.IsSegmentReady("fileSequence251.m4s"))
+
+		// Rolled over
+		seq, part = pp.GetNextSequenceAndPart()
+		is.Equal(seq, uint64(251)) // Has seqId 251
+		is.Equal(part, uint64(0))  // Has index 0
+
+		// Add more
+		_ = pp.AppendPartial("filePart252.1.m4s", 1.0, false)
+		is.Equal(pp.LastSegIndex(), uint64(251))   // Last segment index (fileSequence251.m4s has index 251)
+		is.Equal(pp.LastPartSegIndex(), uint64(0)) // Last partial segment index (filePart252.1.m4s has index 0)
+
+		seq, part = pp.GetNextSequenceAndPart()
+		is.Equal(seq, uint64(251)) // Has seqId 251
+		is.Equal(part, uint64(1))  // Has index 1
+	}
+}
+
+func TestDecodeMediaPlaylistWithSkip(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-with-skip.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.Equal(listType, MEDIA)                  // must be media playlist
+	is.Equal(pp.TargetDuration, uint(4))       // target duration must be 4
+	is.True(!pp.Closed)                        // live playlist
+	is.Equal(pp.Count(), uint(6))              // segment count must be 6
+	is.Equal(pp.PartTargetDuration, 0.334)     // partial target duration must be 0.334
+	is.Equal(len(pp.PartialSegments), int(28)) // partial segment count must be 24
+	is.Equal(pp.SeqNo, uint64(264))            // seqNo is not 264
+	is.Equal(pp.AlreadySkippedSegs, uint64(3)) // skipped segments must be 3
+	is.Equal(pp.ServerControl.CanSkipUntil,
+		float64(pp.TargetDuration*6)) // Can skip 6 segments
+
+	seq, part := pp.GetNextSequenceAndPart() // filePart273.4.mp4
+	is.Equal(seq, uint64(273))               // Has seqId 273
+	is.Equal(part, uint64(4))                // Has index 4
+
+	// Try decoding the playlist with skip
+	_, err = pp.EncodeWithSkip(1)
+	is.True(err != nil) // must return an error
+}
+
 func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-program-date-time.m3u8")
@@ -1059,6 +1209,345 @@ func TestDecodeMediaPlaylistWithGaps(t *testing.T) {
 				is.NoErr(err)              // must decode playlist
 				is.True(p.Segments[0].Gap) // First segment should signal gap
 				is.True(p.Segments[4].Gap) // Fifth segment should signal gap
+			}
+		})
+	}
+}
+
+func TestDeQuote(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`"quoted"`, "quoted"},
+		{`"quoted with spaces"`, "quoted with spaces"},
+		{`"quoted with \"escaped\" quotes"`, `quoted with \"escaped\" quotes`},
+		{`"quoted with 'single' quotes"`, `quoted with 'single' quotes`},
+		{`"quoted with \n new line"`, `quoted with \n new line`},
+		{"not quoted", "not quoted"},
+		{"", ""},
+		{`"`, `"`},
+		{`"a`, `"a`},
+		{`a"`, `a"`},
+	}
+
+	for _, test := range tests {
+		result := deQuote(test.input)
+		if result != test.expected {
+			t.Errorf("DeQuote(%q) = %q; want %q", test.input, result, test.expected)
+		}
+	}
+}
+
+func TestParsePartialSegment(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       *PartialSegment
+		wantErr    bool
+	}{
+		{
+			name:       "Valid parameters",
+			parameters: `URI="segment.ts",DURATION=10.0,INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want: &PartialSegment{
+				URI:         "segment.ts",
+				Duration:    10.0,
+				Independent: true,
+				Limit:       1000,
+				Offset:      2000,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Invalid duration",
+			parameters: `URI="segment.ts",DURATION=invalid,INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid byterange",
+			parameters: `URI="segment.ts",DURATION=10.0,INDEPENDENT=YES,BYTERANGE=invalid`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing URI",
+			parameters: `DURATION=10.0,INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want: &PartialSegment{
+				URI:         "",
+				Duration:    10.0,
+				Independent: true,
+				Limit:       1000,
+				Offset:      2000,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing duration",
+			parameters: `URI="segment.ts",INDEPENDENT=YES,BYTERANGE=1000@2000`,
+			want: &PartialSegment{
+				URI:         "segment.ts",
+				Duration:    0,
+				Independent: true,
+				Limit:       1000,
+				Offset:      2000,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing byterange",
+			parameters: `URI="segment.ts",DURATION=10.0,INDEPENDENT=YES`,
+			want: &PartialSegment{
+				URI:         "segment.ts",
+				Duration:    10.0,
+				Independent: true,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePartialSegment(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePartialSegment() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parsePartialSegment() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParsePreloadHint(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       *PreloadHint
+		wantErr    bool
+	}{
+		{
+			name:       "Valid parameters",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=1234,BYTERANGE-LENGTH=5678`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "filePart273.4.m4s",
+				Offset: 1234,
+				Limit:  5678,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Invalid BYTERANGE-START",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=invalid,BYTERANGE-LENGTH=5678`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid BYTERANGE-LENGTH",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=1234,BYTERANGE-LENGTH=invalid`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing URI",
+			parameters: `TYPE=PART,BYTERANGE-START=1234,BYTERANGE-LENGTH=5678`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "",
+				Offset: 1234,
+				Limit:  5678,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing BYTERANGE-START",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-LENGTH=5678`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "filePart273.4.m4s",
+				Offset: 0,
+				Limit:  5678,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing BYTERANGE-LENGTH",
+			parameters: `TYPE=PART,URI="filePart273.4.m4s",BYTERANGE-START=1234`,
+			want: &PreloadHint{
+				Type:   "PART",
+				URI:    "filePart273.4.m4s",
+				Offset: 1234,
+				Limit:  0,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePreloadHint(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parsePreloadHint() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parsePreloadHint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseServerControl(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       *ServerControl
+		wantErr    bool
+	}{
+		{
+			name:       "Valid parameters",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Invalid CAN-SKIP-UNTIL",
+			parameters: `CAN-SKIP-UNTIL=invalid,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=invalid,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Invalid PART-HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=invalid,CAN-BLOCK-RELOAD=YES`,
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing CAN-SKIP-UNTIL",
+			parameters: `CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      0,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing CAN-SKIP-DATERANGES",
+			parameters: `CAN-SKIP-UNTIL=12.5,HOLD-BACK=10.0,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: false,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,PART-HOLD-BACK=5.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing PART-HOLD-BACK",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,CAN-BLOCK-RELOAD=YES`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      0,
+				CanBlockReload:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name:       "Missing CAN-BLOCK-RELOAD",
+			parameters: `CAN-SKIP-UNTIL=12.5,CAN-SKIP-DATERANGES=YES,HOLD-BACK=10.0,PART-HOLD-BACK=5.0`,
+			want: &ServerControl{
+				CanSkipUntil:      12.5,
+				CanSkipDateRanges: true,
+				HoldBack:          10.0,
+				PartHoldBack:      5.0,
+				CanBlockReload:    false,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseServerControl(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseServerControl() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseServerControl() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseSkipTag(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters string
+		want       uint64
+		wantErr    bool
+	}{
+		{
+			name:       "Valid SKIPPED-SEGMENTS",
+			parameters: `SKIPPED-SEGMENTS=5`,
+			want:       5,
+			wantErr:    false,
+		},
+		{
+			name:       "Invalid SKIPPED-SEGMENTS",
+			parameters: `SKIPPED-SEGMENTS=invalid`,
+			want:       0,
+			wantErr:    true,
+		},
+		{
+			name:       "Missing SKIPPED-SEGMENTS",
+			parameters: ``,
+			want:       0,
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSkipTag(tt.parameters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseSkipTag() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseSkipTag() = %v, want %v", got, tt.want)
 			}
 		})
 	}
