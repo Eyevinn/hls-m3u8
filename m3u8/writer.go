@@ -20,8 +20,8 @@ import (
 var ErrPlaylistFull = errors.New("playlist is full")
 var ErrPlaylistEmpty = errors.New("playlist is empty")
 var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
-var ErrAlreadySkipped = errors.New("playlist with skip tag can not skip again")
-var RegexpNum = regexp.MustCompile(`(\d+)$`)
+var ErrAlreadySkipped = errors.New("can not change the existing skip tag in a playlist")
+var regexpNum = regexp.MustCompile(`(\d+)$`)
 
 // updateVersion updates the version if it is higher than before.
 func updateVersion(ver *uint8, newVer uint8) {
@@ -669,8 +669,8 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	p.Segments[p.tail] = seg
 	p.tail = (p.tail + 1) % p.capacity
 	p.count++
-	p.NextMSNIndex++
-	p.NextPartIndex = 0
+	p.SegmentIndexing.NextMSNIndex++
+	p.SegmentIndexing.NextPartIndex = 0
 	if !p.targetDurLocked {
 		p.TargetDuration = calcNewTargetDuration(seg.Duration, p.ver, p.TargetDuration)
 	}
@@ -684,6 +684,7 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	return nil
 }
 
+// AppendPartial creates and and appends a partial segment to the media playlist.
 func (p *MediaPlaylist) AppendPartial(uri string, duration float64, independent bool) error {
 	seg := new(PartialSegment)
 	seg.URI = uri
@@ -692,6 +693,11 @@ func (p *MediaPlaylist) AppendPartial(uri string, duration float64, independent 
 	return p.AppendPartialSegment(seg)
 }
 
+// AppendPartialSegment appends a PartialSegment to the MediaPlaylist.
+// If the partial segment belongs to the last full segment, it assigns the same SeqID.
+// Otherwise, it assigns the SeqID of the next segment.
+// The MaxPartIndex is updated if necessary, and the NextPartIndex is incremented.
+// Finally, it removes any expired partial segments.
 func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
@@ -699,7 +705,7 @@ func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 
 	// Check if the partial segment belongs to the last full segment
 	fullSegUri := p.Segments[p.last()].URI
-	if IsPartOf(ps.URI, fullSegUri) {
+	if isPartOf(ps.URI, fullSegUri) {
 		ps.SeqID = p.Segments[p.last()].SeqId
 	} else {
 		// It belongs to the next segment
@@ -707,10 +713,10 @@ func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 	}
 
 	p.PartialSegments = append(p.PartialSegments, ps)
-	p.NextPartIndex++
-	if p.MaxPartIndex < p.NextPartIndex {
-		p.MaxPartIndex = p.NextPartIndex
+	if p.SegmentIndexing.MaxPartIndex < p.SegmentIndexing.NextPartIndex {
+		p.SegmentIndexing.MaxPartIndex = p.SegmentIndexing.NextPartIndex
 	}
+	p.SegmentIndexing.NextPartIndex++
 	p.removeExpiredPartials()
 
 	return nil
@@ -973,7 +979,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			fullSegUri := seg.URI
 			var remainingPartialSegments []*PartialSegment
 			for _, ps := range p.PartialSegments {
-				if IsPartOf(ps.URI, fullSegUri) {
+				if isPartOf(ps.URI, fullSegUri) {
 					// This partial segment is part of the current full segment
 					writePartialSegment(&p.buf, ps)
 				} else {
@@ -1350,27 +1356,29 @@ func splitUriBy(uri, sep string) (string, string) {
 	return rest, lastPart
 }
 
-// find the numbers in end of the string
-func getSequenceNum(uriPrefix string) (bool, uint64) {
+// getSequenceNum return the last number in uriPrefix
+func getSequenceNum(uriPrefix string) (num uint64, ok bool) {
 	if strings.Contains(uriPrefix, ".") {
-		return false, 0
+		return 0, false
 	}
 
 	// find the last number in the uri
-	numStr := RegexpNum.FindString(uriPrefix)
-	endWithNum := numStr != "" && strings.HasSuffix(uriPrefix, numStr)
+	numStr := regexpNum.FindString(uriPrefix)
+	// check if the uri ends with a number
+	ok = numStr != "" && strings.HasSuffix(uriPrefix, numStr)
 	if numStr == "" {
-		return endWithNum, 0
+		return 0, ok
 	}
 	num, err := strconv.ParseUint(numStr, 10, 64)
 	if err != nil {
-		return endWithNum, 0
+		return 0, false
 	}
-	return endWithNum, num
+
+	return num, ok
 }
 
-// check if a uri include the other
-func IsPartOf(partialSegUri, segUri string) bool {
+// isPartOf checks if partialSegUri matches segUri after removing the file extension
+func isPartOf(partialSegUri, segUri string) bool {
 	// check if the extension is the same
 	if filepath.Ext(partialSegUri) != filepath.Ext(segUri) {
 		return false
@@ -1382,8 +1390,8 @@ func IsPartOf(partialSegUri, segUri string) bool {
 	segUri = strings.TrimSuffix(segUri, filepath.Ext(segUri))
 
 	// check if the partial segment uri is part of the segment uri
-	parSegNumExist, parSegNum := getSequenceNum(partialSegUriPrefix)
-	segNumExist, segNum := getSequenceNum(segUri)
+	parSegNum, parSegNumExist := getSequenceNum(partialSegUriPrefix)
+	segNum, segNumExist := getSequenceNum(segUri)
 
 	return parSegNumExist && segNumExist && parSegNum == segNum
 }

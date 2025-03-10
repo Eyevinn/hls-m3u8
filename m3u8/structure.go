@@ -146,12 +146,10 @@ type MediaPlaylist struct {
 	independentSegments bool              // Global tag for EXT-X-INDEPENDENT-SEGMENTS
 	PartTargetDuration  float64           // EXT-X-PART-INF:PART-TARGET
 	PartialSegments     []*PartialSegment // List of partial segments in the playlist.
-	NextMSNIndex        uint64            // The index to be used for the next full segment
-	NextPartIndex       uint64            // The index to be used for the next partial segment (starts at 0)
-	MaxPartIndex        uint64            // To determine when to "roll over" on the NextPartIndex
+	SegmentIndexing     SegmentIndexing   // The indexing parameters for media and partial segments.
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 	ServerControl       *ServerControl    // EXT-X-SERVER-CONTROL tags, MAY appear in any Media Playlist
-	AlreadySkippedSegs  uint64            // EXT-X-SKIP:SKIPPED-SEGMENTS tag. Number of segments already skipped
+	AlreadySkippedSegs  uint64            // EXT-X-SKIP:SKIPPED-SEGMENTS tag parsed from the playlist. Read-only
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which
@@ -246,6 +244,8 @@ type MediaSegment struct {
 	Gap              bool
 }
 
+// PartialSegment represents a partial segment included in a low-latency
+// media playlist.
 type PartialSegment struct {
 	SeqID           uint64    // Sequence ID of the partial segment
 	URI             string    // EXT-X-PART:URI
@@ -255,6 +255,26 @@ type PartialSegment struct {
 	Offset          int64     // EXT-X-PART:BYTERANGE [@o] is offset from the start of the file under URI.
 	Limit           int64     // EXT-X-PART:BYTERANGE <n> is length in bytes for the file under URI.
 	Gap             bool      // EXT-X-PART:GAP enumerated-string ("YES" if the Partial Segment is not available)
+}
+
+// SegmentIndexing holds the indexing parameters for media and partial segments in the low-latency media playlist.
+type SegmentIndexing struct {
+	// NextMSNIndex represents the index to be used for the next full media segment in the playlist.
+	// It is incremented each time a new full media segment is appended to the playlist,
+	// maintaining the sequence number for the next media segment to be added.
+	NextMSNIndex uint64
+
+	// NextPartIndex represents the index to be used for the next partial segment in the playlist.
+	// It starts at 0 and is incremented each time a new partial segment is appended to the playlist.
+	// It helps in maintaining the sequence number for the next partial segment to be added.
+	// When a new full segment is added, this index is reset to 0.
+	NextPartIndex uint64
+
+	// MaxPartIndex represents the maximum index of a partial segment that has been added to the playlist.
+	// It is updated whenever a new partial segment is appended, ensuring that it always holds the highest
+	// index value of the partial segments. This helps in tracking the highest partial segment index for
+	// the current full segment.
+	MaxPartIndex uint64
 }
 
 type PreloadHint struct {

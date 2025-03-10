@@ -1121,7 +1121,7 @@ func TestIsPartOf(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%s_%s", test.partialSegUri, test.segUri), func(t *testing.T) {
-			result := IsPartOf(test.partialSegUri, test.segUri)
+			result := isPartOf(test.partialSegUri, test.segUri)
 			if result != test.expected {
 				t.Errorf("IsPartOf(%s, %s) = %v; want %v", test.partialSegUri, test.segUri, result, test.expected)
 			}
@@ -1132,20 +1132,20 @@ func TestIsPartOf(t *testing.T) {
 func TestGetSequenceNum(t *testing.T) {
 	tests := []struct {
 		uriPrefix string
-		expected  bool
 		num       uint64
+		expected  bool
 	}{
-		{"fileSequence249", true, 249},
-		{"fileSequence2490", true, 2490},
-		{"fileSequence", false, 0},
-		{"fileSequence249abc", false, 0},
-		{"fileSequence249.1", false, 0},
-		{"fileSequence0249", true, 249},
+		{"fileSequence249", 249, true},
+		{"fileSequence2490", 2490, true},
+		{"fileSequence", 0, false},
+		{"fileSequence249abc", 0, false},
+		{"fileSequence249.1", 0, false},
+		{"fileSequence0249", 249, true},
 	}
 
 	for _, test := range tests {
 		t.Run(test.uriPrefix, func(t *testing.T) {
-			result, num := getSequenceNum(test.uriPrefix)
+			num, result := getSequenceNum(test.uriPrefix)
 			if result != test.expected || num != test.num {
 				t.Errorf("getSequenceNum(%s) = %v, %d; want %v, %d", test.uriPrefix, result, num, test.expected, test.num)
 			}
