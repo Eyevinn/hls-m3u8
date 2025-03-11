@@ -149,7 +149,7 @@ type MediaPlaylist struct {
 	SegmentIndexing     SegmentIndexing   // The indexing parameters for media and partial segments.
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 	ServerControl       *ServerControl    // EXT-X-SERVER-CONTROL tags, MAY appear in any Media Playlist
-	AlreadySkippedSegs  uint64            // EXT-X-SKIP:SKIPPED-SEGMENTS tag parsed from the playlist. Read-only
+	skippedSegments     uint64            // EXT-X-SKIP:SKIPPED-SEGMENTS tag parsed from the playlist. Read-only
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which

@@ -879,7 +879,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	tail := p.tail
 	count := p.count
 	isVoDOrEvent := p.winsize == 0
-	durationSkipped := float64(p.AlreadySkippedSegs) * float64(p.TargetDuration)
+	durationSkipped := float64(p.SkippedSegments()) * float64(p.TargetDuration)
 	var outputCount uint     // number of segments to output
 	var start uint           // start index of segments to output
 	var lastSegId uint64 = 0 // last segment sequence number in live playlist
@@ -1059,7 +1059,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 // If skipped > 0, the first `skipped` segments will be skipped.
 // If playlist has a skip tag already, it will return an error.
 func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) (*bytes.Buffer, error) {
-	if p.AlreadySkippedSegs > 0 {
+	if p.SkippedSegments() > 0 {
 		return nil, ErrAlreadySkipped
 	}
 
@@ -1067,7 +1067,7 @@ func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) (*bytes.Buffer, error) {
 }
 
 func (p *MediaPlaylist) Encode() *bytes.Buffer {
-	return p.encode(p.AlreadySkippedSegs)
+	return p.encode(p.SkippedSegments())
 }
 
 // String provides the playlist fulfilling the Stringer interface.

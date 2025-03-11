@@ -169,7 +169,7 @@ func (p *MediaPlaylist) SetVersion(ver uint8) {
 // If the NextPartIndex is 0, indicating that it has just rolled over to the next segment,
 // it returns the previous sequence number. Otherwise, it returns the current sequence number.
 func (p *MediaPlaylist) LastSegIndex() uint64 {
-	nextSeqNo := p.SegmentIndexing.NextMSNIndex + p.AlreadySkippedSegs
+	nextSeqNo := p.SegmentIndexing.NextMSNIndex + p.SkippedSegments()
 	if p.SegmentIndexing.NextPartIndex == 0 {
 		// Just rolled over to the next segment
 		return nextSeqNo - 1
@@ -212,6 +212,11 @@ func (p *MediaPlaylist) IsSegmentReady(uri string) bool {
 	}
 
 	return false
+}
+
+// SkippedSegments returns the value of SKIPPED-SEGMENTS tag in the media playlist.
+func (p *MediaPlaylist) SkippedSegments() uint64 {
+	return p.skippedSegments
 }
 
 // SCTE35Syntax returns the SCTE35 syntax version detected as used in the playlist.
@@ -1063,7 +1068,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if err != nil {
 			return err
 		}
-		p.AlreadySkippedSegs = skipped
+		p.skippedSegments = skipped
 	case strings.HasPrefix(line, "#EXT-X-PART:"):
 		state.listType = MEDIA
 		state.tagPartialSegment = true

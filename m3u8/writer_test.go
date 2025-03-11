@@ -976,7 +976,7 @@ func TestEncodeMasterPlaylistWithStreamInfName(t *testing.T) {
 		e := p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 		is.NoErr(e) // Add segment to a media playlist should be successful
 	}
-	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000, Resolution: "1152x960", Name: "HD 960p"})
+	m.Append("chunklist1.m3u8", p, VariantParams{Bandwidth: 3000000, Resolution: "1152x960", Name: "HD 960p"})
 
 	is.Equal(m.Variants[0].Name, "HD 960p")                 //  Bad variant name
 	is.True(strings.Contains(m.String(), `NAME="HD 960p"`)) // Master playlist does not contain Name in EXT-X-STREAM-INF
