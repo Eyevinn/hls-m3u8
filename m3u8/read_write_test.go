@@ -176,7 +176,7 @@ func TestReadWriteDateRange(t *testing.T) {
 			}
 			is.NoErr(err) // parseDateRange did not succeed
 			out := bytes.Buffer{}
-			writeDateRange(&out, dr)
+			writeDateRange(&out, dr, DefaultFloatPrecision)
 			is.Equal(c.line, trimLineEnd(out.String())) // EXT-X-DATERANGE line must match
 		})
 	}
@@ -249,7 +249,7 @@ func TestReadWriteExtXStreamInf(t *testing.T) {
 			}
 			is.NoErr(err)
 			out := bytes.Buffer{}
-			writeExtXStreamInf(&out, vnt)
+			writeExtXStreamInf(&out, vnt, DefaultFloatPrecision)
 			outStr := trimLineEnd(out.String())
 			is.Equal(c.line, outStr) // EXT-X-STREAM-INF line must match
 		})
@@ -289,7 +289,7 @@ func TestReadWriteExtXIFrameStreamInf(t *testing.T) {
 			}
 			is.NoErr(err)
 			out := bytes.Buffer{}
-			writeExtXIFrameStreamInf(&out, vnt)
+			writeExtXIFrameStreamInf(&out, vnt, DefaultFloatPrecision)
 			outStr := trimLineEnd(out.String())
 			is.Equal(c.line, outStr) // EXT-X-STREAM-INF line must match
 		})
@@ -378,7 +378,7 @@ func TestReadWriteExtXStart(t *testing.T) {
 			out := bytes.Buffer{}
 			is.Equal(c.start, start)     // start time must match
 			is.Equal(c.precise, precise) // precise must match
-			writeExtXStart(&out, start, precise)
+			writeExtXStart(&out, start, precise, DefaultFloatPrecision)
 			outStr := trimLineEnd(out.String())
 			is.Equal(c.line, outStr) // EXT-X-START line must match
 		})

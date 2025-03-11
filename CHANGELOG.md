@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EXT-X-SESSION-KEY support
 - EXT-X-CONTENT-STEERING support
 - EXT-X-START to master playlist
+- SetWritePrecision() and WritePrecision() methods to set the number of decimal places for floating point numbers
 
 ### Fixed
 

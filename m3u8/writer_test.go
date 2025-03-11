@@ -183,13 +183,16 @@ func TestSetSCTEForMediaPlaylist(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		p, e := NewMediaPlaylist(1, 1)
-		is.NoErr(e) // Create media playlist should be successful
-		e = p.Append("test01.ts", 5.0, "")
-		is.NoErr(e) //  Add 1st segment to a media playlist should be successful
-		e = p.SetSCTE(test.Cue, test.ID, test.Time)
-		is.NoErr(e)                                          // Set SCTE to a media playlist should be successful
-		is.True(strings.Contains(p.String(), test.Expected)) // Check SCTE in a media playlist
+		t.Run(test.Cue, func(t *testing.T) {
+			p, e := NewMediaPlaylist(1, 1)
+			p.SetWritePrecision(-1) // As many decimals as needed
+			is.NoErr(e)             // Create media playlist should be successful
+			e = p.Append("test01.ts", 5.0, "")
+			is.NoErr(e) //  Add 1st segment to a media playlist should be successful
+			e = p.SetSCTE(test.Cue, test.ID, test.Time)
+			is.NoErr(e)                                          // Set SCTE to a media playlist should be successful
+			is.True(strings.Contains(p.String(), test.Expected)) // Check SCTE in a media playlist
+		})
 	}
 }
 
@@ -1312,10 +1315,10 @@ func ExampleDecode_mediaPlaylistSegmentsSCTE35OATCLS() {
 	// #EXT-X-MEDIA-SEQUENCE:0
 	// #EXT-X-TARGETDURATION:10
 	// #EXT-OATCLS-SCTE35:/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==
-	// #EXT-X-CUE-OUT:15
+	// #EXT-X-CUE-OUT:15.000
 	// #EXTINF:8.844,
 	// media0.ts
-	// #EXT-X-CUE-OUT-CONT:ElapsedTime=8.844,Duration=15,SCTE35=/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==
+	// #EXT-X-CUE-OUT-CONT:ElapsedTime=8.844,Duration=15.000,SCTE35=/DAlAAAAAAAAAP/wFAUAAAABf+/+ANgNkv4AFJlwAAEBAQAA5xULLA==
 	// #EXTINF:6.156,
 	// media1.ts
 	// #EXT-X-CUE-IN
@@ -1337,7 +1340,7 @@ func ExampleMediaPlaylist_Segments_scte35_67_2014() {
 	// media0.ts
 	// #EXTINF:10.000,
 	// media1.ts
-	// #EXT-SCTE35:CUE="/DAIAAAAAAAAAAAQAAZ/I0VniQAQAgBDVUVJQAAAAH+cAAAAAA==",ID="123",TIME=123.12
+	// #EXT-SCTE35:CUE="/DAIAAAAAAAAAAAQAAZ/I0VniQAQAgBDVUVJQAAAAH+cAAAAAA==",ID="123",TIME=123.120
 	// #EXTINF:10.000,
 	// media2.ts
 }

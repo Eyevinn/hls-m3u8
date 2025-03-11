@@ -20,6 +20,7 @@ type Playlist interface {
 	CalcMinVersion() (ver uint8, reason string)
 	Version() uint8
 	SetVersion(ver uint8)
+	WritePrecision() int
 }
 
 // CustomDecoder interface for decoding custom and unsupported tags
@@ -55,7 +56,10 @@ const (
 	// minVer is the minimum version of the HLS protocol supported by this package.
 	// Version 3, means that floating point EXTINF durations are used.
 	// [Protocol Version Compatibility]
-	minVer = uint8(3)
+	minVer uint8 = 3
+
+	// DefaultFloatPrecision is the default number of decimal places for float values (milliseconds)
+	DefaultFloatPrecision int = 3
 
 	// DATETIME represents format for EXT-X-PROGRAM-DATE-TIME timestamps.
 	// Format is [ISO/IEC 8601:2004] according to the [HLS spec].
@@ -150,6 +154,7 @@ type MediaPlaylist struct {
 	PreloadHints        *PreloadHint      // EXT-X-PRELOAD-HINT tags
 	ServerControl       *ServerControl    // EXT-X-SERVER-CONTROL tags, MAY appear in any Media Playlist
 	skippedSegments     uint64            // EXT-X-SKIP:SKIPPED-SEGMENTS tag parsed from the playlist. Read-only
+	writePrecision      int               // Output decimal places for float values (-1 provides necessary number)
 }
 
 // MasterPlaylist represents a master (multivariant) playlist which
@@ -169,6 +174,7 @@ type MasterPlaylist struct {
 	independentSegments bool             // Global tag for EXT-X-INDEPENDENT-SEGMENTS
 	Custom              CustomMap        // Custom-provided tags for encoding
 	customDecoders      []CustomDecoder  // customDecoders provided custom tags for decoding
+	writePrecision      int              // Output decimal places for float values (-1 provides necessary number)
 }
 
 // Variant structure represents media playlist variants in master playlists.

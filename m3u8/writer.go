@@ -38,6 +38,7 @@ func strVer(ver uint8) string {
 func NewMasterPlaylist() *MasterPlaylist {
 	p := new(MasterPlaylist)
 	p.ver = minVer
+	p.writePrecision = DefaultFloatPrecision
 	return p
 }
 
@@ -88,7 +89,7 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	}
 
 	if p.StartTime != 0.0 { // Both negative and positive values are allowed. Negative values are relative to the end.
-		writeExtXStart(&p.buf, p.StartTime, p.StartTimePrecise)
+		writeExtXStart(&p.buf, p.StartTime, p.StartTimePrecise, p.WritePrecision())
 	}
 
 	if len(p.Defines) > 0 {
@@ -119,9 +120,9 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 
 	for _, vnt := range p.Variants {
 		if vnt.Iframe {
-			writeExtXIFrameStreamInf(&p.buf, vnt)
+			writeExtXIFrameStreamInf(&p.buf, vnt, p.WritePrecision())
 		} else {
-			writeExtXStreamInf(&p.buf, vnt)
+			writeExtXStreamInf(&p.buf, vnt, p.WritePrecision())
 			p.buf.WriteString(vnt.URI)
 			if p.Args != "" {
 				if strings.Contains(vnt.URI, "?") {
@@ -184,7 +185,7 @@ func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 	buf.WriteRune('\n')
 }
 
-func writeExtXStreamInf(buf *bytes.Buffer, vnt *Variant) {
+func writeExtXStreamInf(buf *bytes.Buffer, vnt *Variant, writePrecision int) {
 	buf.WriteString("#EXT-X-STREAM-INF:BANDWIDTH=")
 	buf.WriteString(strconv.FormatUint(uint64(vnt.Bandwidth), 10))
 	if vnt.AverageBandwidth != 0 {
@@ -192,7 +193,7 @@ func writeExtXStreamInf(buf *bytes.Buffer, vnt *Variant) {
 		buf.WriteString(strconv.FormatUint(uint64(vnt.AverageBandwidth), 10))
 	}
 	if vnt.Score > 0 {
-		writeFloat(buf, "SCORE", vnt.Score)
+		writeFloat(buf, "SCORE", vnt.Score, writePrecision)
 	}
 	if vnt.Codecs != "" {
 		writeQuoted(buf, "CODECS", vnt.Codecs)
@@ -204,7 +205,7 @@ func writeExtXStreamInf(buf *bytes.Buffer, vnt *Variant) {
 		writeUnQuoted(buf, "RESOLUTION", vnt.Resolution)
 	}
 	if vnt.FrameRate != 0 {
-		writeFloat(buf, "FRAME-RATE", vnt.FrameRate)
+		writeFloat(buf, "FRAME-RATE", vnt.FrameRate, writePrecision)
 	}
 	if vnt.HDCPLevel != "" {
 		writeUnQuoted(buf, "HDCP-LEVEL", vnt.HDCPLevel)
@@ -250,7 +251,7 @@ func writeExtXStreamInf(buf *bytes.Buffer, vnt *Variant) {
 	buf.WriteRune('\n')
 }
 
-func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant) {
+func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant, writePrecision int) {
 	buf.WriteString("#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=")
 	buf.WriteString(strconv.FormatUint(uint64(vnt.Bandwidth), 10))
 	if vnt.AverageBandwidth != 0 {
@@ -258,7 +259,7 @@ func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant) {
 		buf.WriteString(strconv.FormatUint(uint64(vnt.AverageBandwidth), 10))
 	}
 	if vnt.Score > 0 {
-		writeFloat(buf, "SCORE", vnt.Score)
+		writeFloat(buf, "SCORE", vnt.Score, writePrecision)
 	}
 	if vnt.Codecs != "" {
 		writeQuoted(buf, "CODECS", vnt.Codecs)
@@ -301,7 +302,7 @@ func writeExtXIFrameStreamInf(buf *bytes.Buffer, vnt *Variant) {
 	buf.WriteRune('\n')
 }
 
-func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment) {
+func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment, writePrecision int) {
 	if !ps.ProgramDateTime.IsZero() {
 		buf.WriteString("#EXT-X-PROGRAM-DATE-TIME:")
 		buf.WriteString(ps.ProgramDateTime.Format(DATETIME))
@@ -309,7 +310,7 @@ func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment) {
 	}
 	buf.WriteString("#EXT-X-PART:")
 	buf.WriteString("DURATION=")
-	buf.WriteString(strconv.FormatFloat(ps.Duration, 'f', 3, 64))
+	buf.WriteString(strconv.FormatFloat(ps.Duration, 'f', writePrecision, 64))
 	if ps.Independent {
 		buf.WriteString(",INDEPENDENT=YES")
 	}
@@ -349,20 +350,23 @@ func writeSkip(buf *bytes.Buffer, skippedSegments uint64) {
 	buf.WriteRune('\n')
 }
 
-func writeServerControl(buf *bytes.Buffer, sc *ServerControl) {
+func writeServerControl(buf *bytes.Buffer, sc *ServerControl, writePrecision int) {
 	buf.WriteString("#EXT-X-SERVER-CONTROL:")
 	stringsToWrite := []string{}
 	if sc.CanSkipUntil > 0 {
-		stringsToWrite = append(stringsToWrite, ("CAN-SKIP-UNTIL=" + strconv.FormatFloat(sc.CanSkipUntil, 'f', 3, 64)))
+		stringsToWrite = append(stringsToWrite, ("CAN-SKIP-UNTIL=" + strconv.FormatFloat(sc.CanSkipUntil,
+			'f', writePrecision, 64)))
 		if sc.CanSkipDateRanges {
 			stringsToWrite = append(stringsToWrite, ("CAN-SKIP-DATERANGES=YES"))
 		}
 	}
 	if sc.HoldBack > 0 {
-		stringsToWrite = append(stringsToWrite, ("HOLD-BACK=" + strconv.FormatFloat(sc.HoldBack, 'f', 3, 64)))
+		stringsToWrite = append(stringsToWrite, ("HOLD-BACK=" + strconv.FormatFloat(sc.HoldBack,
+			'f', writePrecision, 64)))
 	}
 	if sc.PartHoldBack > 0 {
-		stringsToWrite = append(stringsToWrite, ("PART-HOLD-BACK=" + strconv.FormatFloat(sc.PartHoldBack, 'f', 3, 64)))
+		stringsToWrite = append(stringsToWrite, ("PART-HOLD-BACK=" + strconv.FormatFloat(sc.PartHoldBack,
+			'f', writePrecision, 64)))
 	}
 	if sc.CanBlockReload {
 		stringsToWrite = append(stringsToWrite, ("CAN-BLOCK-RELOAD=YES"))
@@ -374,7 +378,7 @@ func writeServerControl(buf *bytes.Buffer, sc *ServerControl) {
 }
 
 // writeDateRange writes an EXT-X-DATERANGE tag line including \n to the buffer.
-func writeDateRange(buf *bytes.Buffer, dr *DateRange) {
+func writeDateRange(buf *bytes.Buffer, dr *DateRange, writePrecision int) {
 	buf.WriteString(`#EXT-X-DATERANGE:ID="`)
 	buf.WriteString(dr.ID)
 	buf.WriteRune('"')
@@ -391,10 +395,10 @@ func writeDateRange(buf *bytes.Buffer, dr *DateRange) {
 		writeQuoted(buf, "END-DATE", str)
 	}
 	if dr.Duration != nil {
-		writeFloat(buf, "DURATION", *dr.Duration)
+		writeFloat(buf, "DURATION", *dr.Duration, writePrecision)
 	}
 	if dr.PlannedDuration != nil {
-		writeFloat(buf, "PLANNED-DURATION", *dr.PlannedDuration)
+		writeFloat(buf, "PLANNED-DURATION", *dr.PlannedDuration, writePrecision)
 	}
 	if dr.SCTE35Cmd != "" {
 		writeUnQuoted(buf, "SCTE35-CMD", dr.SCTE35Cmd)
@@ -456,9 +460,9 @@ func writeSessionData(buf *bytes.Buffer, sd *SessionData) {
 	buf.WriteRune('\n')
 }
 
-func writeExtXStart(buf *bytes.Buffer, startTime float64, precise bool) {
+func writeExtXStart(buf *bytes.Buffer, startTime float64, precise bool, writePrecision int) {
 	buf.WriteString("#EXT-X-START:TIME-OFFSET=")
-	buf.WriteString(strconv.FormatFloat(startTime, 'f', 3, 64))
+	writeFloatValue(buf, startTime, writePrecision)
 	if precise {
 		buf.WriteString(",PRECISE=YES")
 	}
@@ -524,7 +528,7 @@ func writeQuoted(buf *bytes.Buffer, key, value string) {
 func writeUnQuoted(buf *bytes.Buffer, key, value string) {
 	buf.WriteRune(',')
 	buf.WriteString(key)
-	buf.WriteString(`=`)
+	buf.WriteRune('=')
 	buf.WriteString(value)
 }
 
@@ -536,11 +540,17 @@ func writeUint(buf *bytes.Buffer, key string, value uint) {
 	buf.WriteString(strconv.FormatUint(uint64(value), 10))
 }
 
-func writeFloat(buf *bytes.Buffer, key string, value float64) {
-	buf.WriteRune(',')
-	buf.WriteString(key)
-	buf.WriteRune('=')
-	buf.WriteString(strconv.FormatFloat(value, 'f', 3, 64))
+func writeFloatValue(buf *bytes.Buffer, value float64, writePrecision int) {
+	buf.WriteString(strconv.FormatFloat(value, 'f', writePrecision, 64))
+}
+
+func writeFloat(buf *bytes.Buffer, key string, value float64, writePrecision int) {
+	if key != "" {
+		buf.WriteRune(',')
+		buf.WriteString(key)
+		buf.WriteRune('=')
+	}
+	writeFloatValue(buf, value, writePrecision)
 }
 
 func writeYESorNO(buf *bytes.Buffer, b bool) {
@@ -606,13 +616,15 @@ func (p *MasterPlaylist) GetAllAlternatives() []*Alternative {
 // playlists.  Capacity is the total size of the backing segment list..
 // For VOD playlists, call Close() after the last segment is added.
 func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
+	if capacity < winsize {
+		return nil, ErrWinSizeTooSmall
+	}
 	p := new(MediaPlaylist)
 	p.ver = minVer
+	p.winsize = winsize
 	p.capacity = capacity
-	if err := p.SetWinSize(winsize); err != nil {
-		return nil, err
-	}
 	p.Segments = make([]*MediaSegment, capacity)
+	p.writePrecision = DefaultFloatPrecision
 	return p, nil
 }
 
@@ -832,12 +844,12 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	}
 
 	if p.ServerControl != nil {
-		writeServerControl(&p.buf, p.ServerControl)
+		writeServerControl(&p.buf, p.ServerControl, p.WritePrecision())
 	}
 
 	if p.PartTargetDuration > 0 {
 		p.buf.WriteString("#EXT-X-PART-INF:PART-TARGET=")
-		p.buf.WriteString(strconv.FormatFloat(p.PartTargetDuration, 'f', 3, 64))
+		p.buf.WriteString(strconv.FormatFloat(p.PartTargetDuration, 'f', p.WritePrecision(), 64))
 		p.buf.WriteRune('\n')
 	}
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
@@ -847,7 +859,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	p.buf.WriteString(strconv.FormatInt(int64(p.TargetDuration), 10))
 	p.buf.WriteRune('\n')
 	if p.StartTime != 0.0 { // Both negative and positive values are allowed. Negative values are relative to the end.
-		writeExtXStart(&p.buf, p.StartTime, p.StartTimePrecise)
+		writeExtXStart(&p.buf, p.StartTime, p.StartTimePrecise, p.WritePrecision())
 	}
 	if p.DiscontinuitySeq != 0 {
 		p.buf.WriteString("#EXT-X-DISCONTINUITY-SEQUENCE:")
@@ -923,7 +935,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 				}
 				if seg.SCTE.Time != 0 {
 					p.buf.WriteString(",TIME=")
-					p.buf.WriteString(strconv.FormatFloat(seg.SCTE.Time, 'f', -1, 64))
+					writeFloatValue(&p.buf, seg.SCTE.Time, p.WritePrecision())
 				}
 				p.buf.WriteRune('\n')
 			case SCTE35_OATCLS:
@@ -935,25 +947,23 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 						p.buf.WriteRune('\n')
 					}
 					p.buf.WriteString("#EXT-X-CUE-OUT:")
-					p.buf.WriteString(strconv.FormatFloat(seg.SCTE.Time, 'f', -1, 64))
+					writeFloatValue(&p.buf, seg.SCTE.Time, p.WritePrecision())
 					p.buf.WriteRune('\n')
 				case SCTE35Cue_Mid:
-					p.buf.WriteString("#EXT-X-CUE-OUT-CONT:")
-					p.buf.WriteString("ElapsedTime=")
-					p.buf.WriteString(strconv.FormatFloat(seg.SCTE.Elapsed, 'f', -1, 64))
+					p.buf.WriteString("#EXT-X-CUE-OUT-CONT:ElapsedTime=")
+					writeFloatValue(&p.buf, seg.SCTE.Elapsed, p.WritePrecision())
 					p.buf.WriteString(",Duration=")
-					p.buf.WriteString(strconv.FormatFloat(seg.SCTE.Time, 'f', -1, 64))
+					writeFloatValue(&p.buf, seg.SCTE.Time, p.WritePrecision())
 					p.buf.WriteString(",SCTE35=")
 					p.buf.WriteString(seg.SCTE.Cue)
 					p.buf.WriteRune('\n')
 				case SCTE35Cue_End:
-					p.buf.WriteString("#EXT-X-CUE-IN")
-					p.buf.WriteRune('\n')
+					p.buf.WriteString("#EXT-X-CUE-IN\n")
 				}
 			}
 		}
 		for i := range seg.SCTE35DateRanges {
-			writeDateRange(&p.buf, seg.SCTE35DateRanges[i])
+			writeDateRange(&p.buf, seg.SCTE35DateRanges[i], p.WritePrecision())
 		}
 		// check for key change
 		if seg.Key != nil && (p.Key == nil || *seg.Key != *p.Key) {
@@ -982,7 +992,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			for _, ps := range p.PartialSegments {
 				if isPartOf(ps.URI, fullSegUri) {
 					// This partial segment is part of the current full segment
-					writePartialSegment(&p.buf, ps)
+					writePartialSegment(&p.buf, ps, p.WritePrecision())
 				} else {
 					// This partial segment does not belong to current full segment
 					// Keep it to be written later
@@ -1008,16 +1018,8 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			}
 		}
 
-		p.buf.WriteString("#EXTINF:")
-		if str, ok := durationCache[seg.Duration]; ok {
-			p.buf.WriteString(str)
-		} else {
-			durationCache[seg.Duration] = strconv.FormatFloat(seg.Duration, 'f', 3, 32)
-			p.buf.WriteString(durationCache[seg.Duration])
-		}
-		p.buf.WriteRune(',')
-		p.buf.WriteString(seg.Title)
-		p.buf.WriteRune('\n')
+		writeExtInfWithCache(&p.buf, seg.Duration, seg.Title, p.WritePrecision(), durationCache)
+
 		p.buf.WriteString(seg.URI)
 		if p.Args != "" {
 			p.buf.WriteRune('?')
@@ -1031,7 +1033,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		for _, ps := range p.PartialSegments {
 			if ps.SeqID >= lastSegId {
 				// This partial segment is part of the next segment
-				writePartialSegment(&p.buf, ps)
+				writePartialSegment(&p.buf, ps, p.WritePrecision())
 			} else {
 				// This partial segment does not belong to any segment
 				// and should be ignored
@@ -1048,7 +1050,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
 	}
 	for _, dr := range p.DateRanges {
-		writeDateRange(&p.buf, dr)
+		writeDateRange(&p.buf, dr, p.WritePrecision())
 	}
 	return &p.buf
 }
@@ -1066,6 +1068,25 @@ func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) (*bytes.Buffer, error) {
 
 func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	return p.encode(p.SkippedSegments())
+
+}
+
+// writeExtInfWithCache writes the EXTINF tag and value to the buffer.
+// If the duration is already in the cache, it uses the cached value.
+// Otherwise, it formats the duration and caches it.
+func writeExtInfWithCache(buf *bytes.Buffer, duration float64, title string, writePrecision int,
+	cache map[float64]string) {
+	buf.WriteString("#EXTINF:")
+	if str, ok := cache[duration]; ok {
+		buf.WriteString(str)
+	} else {
+		fstr := strconv.FormatFloat(duration, 'f', writePrecision, 64)
+		cache[duration] = fstr
+		buf.WriteString(fstr)
+	}
+	buf.WriteRune(',')
+	buf.WriteString(title)
+	buf.WriteRune('\n')
 }
 
 // String provides the playlist fulfilling the Stringer interface.
@@ -1333,6 +1354,30 @@ func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
 		buf = append(buf, p.Segments[i])
 	}
 	return buf
+}
+
+// SetWritePrecision sets the number of decimal places used when writing float values.
+// Default is 3 (milliseconds). Set to -1 to use the necessary number of decimal places.
+func (p *MediaPlaylist) SetWritePrecision(nrDecimals int) {
+	p.writePrecision = nrDecimals
+	p.ResetCache()
+}
+
+// WritePrecision returns the current write precision for float values.
+func (p *MediaPlaylist) WritePrecision() int {
+	return p.writePrecision
+}
+
+// SetWritePrecision sets the number of decimal places used when writing float values.
+// Default is 3 (milliseconds). Set to -1 to use the necessary number of decimal places.
+func (p *MasterPlaylist) SetWritePrecision(nrDecimals int) {
+	p.writePrecision = nrDecimals
+	p.buf.Reset()
+}
+
+// WritePrecision returns the current write precision for float values.
+func (p *MasterPlaylist) WritePrecision() int {
+	return p.writePrecision
 }
 
 /*
