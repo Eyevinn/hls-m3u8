@@ -1017,13 +1017,14 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		// If EXT-X-KEY appeared before reference to segment (EXTINF) then it linked to this segment
 		if state.tagKey {
-			p.Segments[p.last()].Key = &Key{state.xkey.Method, state.xkey.URI, state.xkey.IV, state.xkey.Keyformat,
-				state.xkey.Keyformatversions}
+			p.Segments[p.last()].Keys = state.xkeys
 			// First EXT-X-KEY may appeared in the header of the playlist and linked to first segment
 			// but for convenient playlist generation it also linked as default playlist key
-			if p.Key == nil {
-				p.Key = state.xkey
+			if len(p.Keys) == 0 {
+				p.Keys = state.xkeys
 			}
+			// reset state
+			state.xkeys = nil
 			state.tagKey = false
 		}
 		// if segment custom tag appeared before EXTINF then it links to this segment
@@ -1130,7 +1131,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case strings.HasPrefix(line, "#EXT-X-KEY:"):
 		state.listType = MEDIA
-		state.xkey = parseKeyParams(line[11:])
+		xkey := parseKeyParams(line[11:])
+		state.xkeys = append(state.xkeys, *xkey)
 		state.tagKey = true
 	case strings.HasPrefix(line, "#EXT-X-MAP:"):
 		state.listType = MEDIA

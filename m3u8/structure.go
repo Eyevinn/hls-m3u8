@@ -132,7 +132,7 @@ type MediaPlaylist struct {
 	DiscontinuitySeq    uint64            // EXT-X-DISCONTINUITY-SEQUENCE
 	StartTime           float64           // EXT-X-START:TIME-OFFSET=<n> (positive or negative)
 	StartTimePrecise    bool              // EXT-X-START:PRECISE=YES
-	Key                 *Key              // EXT-X-KEY is initial key tag for encrypted segments
+	Keys                []Key             // EXT-X-KEY is initial key tag for encrypted segments
 	Map                 *Map              // EXT-X-MAP provides a Media Initialization Section. Segments can redefine.
 	DateRanges          []*DateRange      // EXT-X-DATERANGE tags not associated with SCTE-35
 	AllowCache          *bool             // EXT-X-ALLOW-CACHE tag YES/NO, removed in version 7
@@ -240,7 +240,7 @@ type MediaSegment struct {
 	Title            string       // EXTINF optional second parameter.
 	Limit            int64        // EXT-X-BYTERANGE <n> is length in bytes for the file under URI.
 	Offset           int64        // EXT-X-BYTERANGE [@o] is offset from the start of the file under URI.
-	Key              *Key         // EXT-X-KEY  changes the key for encryption until next EXT-X-KEY tag.
+	Keys             []Key        // EXT-X-KEY  changes the key for encryption until next EXT-X-KEY tag.
 	Map              *Map         // EXT-X-MAP changes the Media Initialization Section until next EXT-X-MAP tag.
 	Discontinuity    bool         // EXT-X-DISCONTINUITY signals a discontinuity between the surrounding segments.
 	SCTE             *SCTE        // SCTE-35 used for Ad signaling in HLS.
@@ -365,7 +365,7 @@ type decodingState struct {
 	title              string
 	variant            *Variant
 	alternatives       []*Alternative
-	xkey               *Key
+	xkeys              []Key
 	lastReadMap        *Map
 	lastStoredMap      *Map
 	scte               *SCTE

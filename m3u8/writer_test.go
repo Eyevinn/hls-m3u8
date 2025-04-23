@@ -641,11 +641,27 @@ func TestEncryptionKeysInMediaPlaylist(t *testing.T) {
 			Keyformat:         "identity",
 			Keyformatversions: "1",
 		}
+		secondExpected := &Key{
+			Method:            "SAMPLE-AES",
+			URI:               uri,
+			IV:                fmt.Sprintf("%d", i),
+			Keyformat:         "com.apple.streamingkeydelivery",
+			Keyformatversions: "1",
+		}
 		_ = p.Append(uri+".ts", 4, "")
 		_ = p.SetKey(expected.Method, expected.URI, expected.IV, expected.Keyformat, expected.Keyformatversions)
 
-		is.True(p.Segments[i].Key != nil)     // Key was not set on segment
-		is.Equal(p.Segments[i].Key, expected) // Key does not match expected
+		if i == 3 {
+			_ = p.SetKey(secondExpected.Method, secondExpected.URI, secondExpected.IV,
+				secondExpected.Keyformat, secondExpected.Keyformatversions)
+		}
+
+		is.True(len(p.Segments[i].Keys) != 0)      // Key was not set on segment
+		is.Equal(p.Segments[i].Keys[0], *expected) // Key does not match expected
+		if i == 3 {
+			is.Equal(len(p.Segments[i].Keys), 2)             // Key was not set on segment
+			is.Equal(p.Segments[i].Keys[1], *secondExpected) // Key does not match expected
+		}
 	}
 }
 
@@ -655,6 +671,7 @@ func TestEncryptionKeyMethodNoneInMediaPlaylist(t *testing.T) {
 	is.NoErr(e) // Create media playlist should be successful
 	_ = p.Append("segment-1.ts", 4, "")
 	_ = p.SetKey("AES-128", "key-uri", "iv", "identity", "1")
+	_ = p.SetKey("SAMPLE-AES", "other-uri", "iv", "com.apple.streamingkeydelivery", "1")
 	_ = p.Append("segment-2.ts", 4, "")
 	_ = p.SetKey("NONE", "", "", "", "")
 	expected := `#EXT-X-KEY:METHOD=NONE
@@ -1011,9 +1028,13 @@ func TestMasterVersion(t *testing.T) {
 
 func TestKeyIsNotDuplicated(t *testing.T) {
 	encoded := decodeEncode(t, "sample-playlists/media-playlist-with-key.m3u8")
-	count := strings.Count(encoded, "#EXT-X-KEY")
-	if count != 1 {
-		t.Errorf("Expected number of EXT-X-KEY: 1 actual: %d", count)
+	sampleAesCount := strings.Count(encoded, "#EXT-X-KEY:METHOD=SAMPLE-AES")
+	if sampleAesCount != 1 {
+		t.Errorf("Expected number of EXT-X-KEY with SAMPLE-AES method: 1 actual: %d", sampleAesCount)
+	}
+	aes128Count := strings.Count(encoded, "#EXT-X-KEY:METHOD=AES-128")
+	if aes128Count != 1 {
+		t.Errorf("Expected number of EXT-X-KEY with AES-128 method: 1 actual: %d", aes128Count)
 	}
 }
 

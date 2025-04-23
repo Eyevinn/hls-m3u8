@@ -80,10 +80,13 @@ func (p *MediaPlaylist) CalcMinVersion() (ver uint8, reason string) {
 	if p.Iframe {
 		updateMin(&ver, &reason, 4, "EXT-X-I-FRAMES-ONLY tag")
 	}
-	if p.Key != nil {
-		if p.Key.Method == "SAMPLE-AES" || p.Key.Keyformat != "" || p.Key.Keyformatversions != "" {
-			updateMin(&ver, &reason, 5,
-				"EXT-X-KEY tag with a METHOD of SAMPLE-AES, KEYFORMAT or KEYFORMATVERSIONS attributes")
+	if p.Keys != nil {
+		for _, key := range p.Keys {
+			if key.Method == "SAMPLE-AES" || key.Keyformat != "" || key.Keyformatversions != "" {
+				updateMin(&ver, &reason, 5,
+					"EXT-X-KEY tag with a METHOD of SAMPLE-AES, KEYFORMAT or KEYFORMATVERSIONS attributes")
+				break
+			}
 		}
 	}
 	if p.Map != nil {
@@ -101,11 +104,14 @@ func (p *MediaPlaylist) CalcMinVersion() (ver uint8, reason string) {
 		if p.winsize > 0 { // skip for VOD playlists, where winsize = 0
 			i++
 		}
-		if seg.Key != nil {
-			if seg.Key.Method == "SAMPLE-AES" || seg.Key.Keyformat != "" ||
-				seg.Key.Keyformatversions != "" {
-				updateMin(&ver, &reason, 5,
-					"EXT-X-KEY tag with a METHOD of SAMPLE-AES, KEYFORMAT or KEYFORMATVERSIONS attributes")
+		if seg.Keys != nil {
+			for _, key := range seg.Keys {
+				if key.Method == "SAMPLE-AES" || key.Keyformat != "" ||
+					key.Keyformatversions != "" {
+					updateMin(&ver, &reason, 5,
+						"EXT-X-KEY tag with a METHOD of SAMPLE-AES, KEYFORMAT or KEYFORMATVERSIONS attributes")
+					break
+				}
 			}
 		}
 		if seg.Map != nil {

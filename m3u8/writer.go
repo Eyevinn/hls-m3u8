@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -829,8 +830,10 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	}
 
 	// default key before any segment
-	if p.Key != nil {
-		writeKey("#EXT-X-KEY:", &p.buf, p.Key)
+	if len(p.Keys) != 0 {
+		for _, key := range p.Keys {
+			writeKey("#EXT-X-KEY:", &p.buf, &key)
+		}
 	}
 
 	if p.MediaType > 0 {
@@ -966,8 +969,10 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			writeDateRange(&p.buf, seg.SCTE35DateRanges[i], p.WritePrecision())
 		}
 		// check for key change
-		if seg.Key != nil && (p.Key == nil || *seg.Key != *p.Key) {
-			writeKey("#EXT-X-KEY:", &p.buf, seg.Key)
+		if len(seg.Keys) != 0 && (p.Keys == nil || !reflect.DeepEqual(seg.Keys, p.Keys)) {
+			for _, key := range seg.Keys {
+				writeKey("#EXT-X-KEY:", &p.buf, &key)
+			}
 		}
 		if seg.Discontinuity {
 			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
@@ -1173,7 +1178,7 @@ func (p *MediaPlaylist) SetDefaultKey(method, uri, iv, keyformat, keyformatversi
 	if keyformat != "" || keyformatversions != "" {
 		updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	}
-	p.Key = &Key{method, uri, iv, keyformat, keyformatversions}
+	p.Keys = append(p.Keys, Key{method, uri, iv, keyformat, keyformatversions})
 	return nil
 }
 
@@ -1200,7 +1205,7 @@ func (p *MediaPlaylist) SetKey(method, uri, iv, keyformat, keyformatversions str
 		updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	}
 
-	p.Segments[p.last()].Key = &Key{method, uri, iv, keyformat, keyformatversions}
+	p.Segments[p.last()].Keys = append(p.Segments[p.last()].Keys, Key{method, uri, iv, keyformat, keyformatversions})
 	return nil
 }
 
