@@ -80,7 +80,7 @@ func (p *MediaPlaylist) CalcMinVersion() (ver uint8, reason string) {
 	if p.Iframe {
 		updateMin(&ver, &reason, 4, "EXT-X-I-FRAMES-ONLY tag")
 	}
-	if p.Keys != nil {
+	if len(p.Keys) != 0 {
 		for _, key := range p.Keys {
 			if key.Method == "SAMPLE-AES" || key.Keyformat != "" || key.Keyformatversions != "" {
 				updateMin(&ver, &reason, 5,
@@ -104,7 +104,7 @@ func (p *MediaPlaylist) CalcMinVersion() (ver uint8, reason string) {
 		if p.winsize > 0 { // skip for VOD playlists, where winsize = 0
 			i++
 		}
-		if seg.Keys != nil {
+		if len(seg.Keys) != 0 {
 			for _, key := range seg.Keys {
 				if key.Method == "SAMPLE-AES" || key.Keyformat != "" ||
 					key.Keyformatversions != "" {

@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -969,7 +969,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			writeDateRange(&p.buf, seg.SCTE35DateRanges[i], p.WritePrecision())
 		}
 		// check for key change
-		if len(seg.Keys) != 0 && (p.Keys == nil || !reflect.DeepEqual(seg.Keys, p.Keys)) {
+		if len(seg.Keys) != 0 && (p.Keys == nil || !slices.Equal(seg.Keys, p.Keys)) {
 			for _, key := range seg.Keys {
 				writeKey("#EXT-X-KEY:", &p.buf, &key)
 			}
