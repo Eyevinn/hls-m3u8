@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - EXT-X-DISCONTINUITY is now written before other segment-level tags to ensure that no information is lost to players
 
+## [v0.5.0] 2025-04-23
+
+### ⚠️ Breaking changes ⚠️
+
+- Now requires go 1.21 or newer.
+- MediaPlaylist.Key changed to MediaPlaylist.Keys, is now []Key instead of *Key.
+- MediaSegment.Key changed to MediaPlaylist.Keys, is now []Key instead of *Key.
+
+### Added
+
+- Support for multiple Keys on media playlist level
+- Support for multiple EXT-X-KEY tags per segment
+
+### Chore
+
+- Bumped minimum go version to 1.21
+
+
 ## [v0.4.0] 2025-03-11
 
 ### Added
@@ -107,7 +125,7 @@ The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 - initial version of the repo
 
 [Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.5.1...HEAD
-[v0.5.1]  https://github.com/Eyevinn/hls-m3u8/compare/v0.4.0...v0.5.0
+[v0.5.0]  https://github.com/Eyevinn/hls-m3u8/compare/v0.4.0...v0.5.0
 [v0.4.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.1.0...v0.2.0
