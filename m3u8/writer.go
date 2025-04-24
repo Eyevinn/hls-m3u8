@@ -924,6 +924,9 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			durationSkipped += seg.Duration
 			continue
 		}
+		if seg.Discontinuity {
+			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
+		}
 		if seg.SCTE != nil {
 			switch seg.SCTE.Syntax {
 			case SCTE35_67_2014:
@@ -968,14 +971,12 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		for i := range seg.SCTE35DateRanges {
 			writeDateRange(&p.buf, seg.SCTE35DateRanges[i], p.WritePrecision())
 		}
+
 		// check for key change
 		if len(seg.Keys) != 0 && (p.Keys == nil || !slices.Equal(seg.Keys, p.Keys)) {
 			for _, key := range seg.Keys {
 				writeKey("#EXT-X-KEY:", &p.buf, &key)
 			}
-		}
-		if seg.Discontinuity {
-			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
 		}
 		if seg.Gap {
 			p.buf.WriteString("#EXT-X-GAP\n")

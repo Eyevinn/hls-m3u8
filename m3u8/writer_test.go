@@ -164,6 +164,30 @@ func TestGap(t *testing.T) {
 	}
 }
 
+func TestKeysAndDiscontinuity(t *testing.T) {
+	is := is.New(t)
+	p, err := NewMediaPlaylist(0, 10)
+	is.NoErr(err)
+	err = p.Append("test01.ts", 5.0, "")
+	is.NoErr(err)
+	err = p.SetKey("AES-128", "https://example.com", "iv", "", "")
+	is.NoErr(err)
+	err = p.Append("test02.ts", 5.0, "")
+	is.NoErr(err)
+	err = p.SetDiscontinuity()
+	is.NoErr(err)
+	err = p.SetKey("AES-128", "https://example.com", "iv", "", "")
+	is.NoErr(err)
+	expected := `#EXT-X-KEY:METHOD=AES-128,URI="https://example.com",IV=iv
+#EXTINF:5.000,
+test01.ts
+#EXT-X-DISCONTINUITY
+#EXT-X-KEY:METHOD=AES-128,URI="https://example.com",IV=iv
+#EXTINF:5.000,
+test02.ts`
+	is.True(strings.Contains(p.String(), expected)) // Key is not included in the playlist
+}
+
 // Create new media playlist
 // Add segment to media playlist
 // Set SCTE
