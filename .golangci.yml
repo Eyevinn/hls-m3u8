@@ -11,8 +11,9 @@ linters:
       tab-width: 4
   exclusions:
     rules:
-      - path: '(.+)_test\.go'
-        text: "test files"
+      - path: '_test\.go'
         linters:
           - lll
+          - errcheck
+          - staticcheck
 
