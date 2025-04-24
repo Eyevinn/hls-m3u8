@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.5.0] 2025-04-23
+
+### ⚠️ Breaking changes ⚠️
+
+- Now requires go 1.21 or newer.
+- MediaPlaylist.Key changed to MediaPlaylist.Keys, is now []Key instead of *Key.
+- MediaSegment.Key changed to MediaPlaylist.Keys, is now []Key instead of *Key.
+
+### Added
+
+- Support for multiple Keys on media playlist level
+- Support for multiple EXT-X-KEY tags per segment
+
+### Chore
+
+- Bumped minimum go version to 1.21
+
+
 ## [v0.4.0] 2025-03-11
 
 ### Added
