@@ -984,18 +984,17 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		if state.tagSCTE35 {
 			state.tagSCTE35 = false
-			switch state.scte {
-			case nil:
-				p.Segments[p.last()].SCTE35DateRanges = state.scte35DateRanges
-				state.scte35DateRanges = nil
-				p.scte35Syntax = SCTE35_DATERANGE
-			default:
-				if err = p.SetSCTE35(state.scte); strict && err != nil {
-					return err
-				}
-				p.scte35Syntax = state.scte.Syntax
-				state.scte = nil
+			if err = p.SetSCTE35(state.scte); strict && err != nil {
+				return err
 			}
+			p.scte35Syntax = state.scte.Syntax
+			state.scte = nil
+
+		}
+		if len(state.scte35DateRanges) > 0 {
+			p.Segments[p.last()].SCTE35DateRanges = state.scte35DateRanges
+			state.scte35DateRanges = nil
+			p.scte35Syntax = SCTE35_DATERANGE
 		}
 		if state.tagDiscontinuity {
 			state.tagDiscontinuity = false
@@ -1229,7 +1228,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		isSCTE35 := dr.SCTE35Cmd != "" || dr.SCTE35Out != "" || dr.SCTE35In != ""
 		if isSCTE35 {
-			state.tagSCTE35 = true
 			state.scte35DateRanges = append(state.scte35DateRanges, dr)
 		} else { // Other EXT-X-DATERANGE
 			p.DateRanges = append(p.DateRanges, dr)
