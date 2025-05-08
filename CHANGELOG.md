@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.5.2] 2025-05-08
+
+### Fixed
+
+- SCTE decoding state is now decoupled from daterange decoding, fixing an issue where segments with CUE and DATERANGE tags lost the data from one whike retaining data from the other.
+
 ## [v0.5.1] 2025-04-24
 
 ### Fixed
