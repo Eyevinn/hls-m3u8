@@ -873,10 +873,8 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		p.buf.WriteString("#EXT-X-I-FRAMES-ONLY\n")
 	}
 
-	skipDuration := 0.0
 	if segmentsToSkipInTotal > 0 {
 		writeSkip(&p.buf, segmentsToSkipInTotal)
-		skipDuration = float64(segmentsToSkipInTotal) * float64(p.TargetDuration)
 	} else {
 		// Ignore the Media Initialization Section (EXT-X-MAP) tag
 		// in presence of skip (EXT-X-SKIP) tag
@@ -895,7 +893,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	tail := p.tail
 	count := p.count
 	isVoDOrEvent := p.winsize == 0
-	durationSkipped := float64(p.SkippedSegments()) * float64(p.TargetDuration)
+	segmentsSkipped := p.SkippedSegments()
 	var outputCount uint     // number of segments to output
 	var start uint           // start index of segments to output
 	var lastSegId uint64 = 0 // last segment sequence number in live playlist
@@ -920,8 +918,8 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		if seg == nil { // protection from badly filled chunklists
 			continue
 		}
-		if durationSkipped < skipDuration {
-			durationSkipped += seg.Duration
+		if segmentsSkipped < segmentsToSkipInTotal {
+			segmentsSkipped += 1
 			continue
 		}
 		if seg.Discontinuity {
