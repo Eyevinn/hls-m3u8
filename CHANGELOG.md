@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.5.3] 2025-06-02
+
+### Fixed
+- Calculate skips based on amount of segments rather than target duration (#46)
+
 ## [v0.5.2] 2025-05-08
 
 ### Fixed
