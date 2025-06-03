@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.5.4] 2025-06-03
+### Added
+Support for setting skippedsegments on a MediaPlaylist
+
 ## [v0.5.3] 2025-06-02
 
 ### Fixed
