@@ -1290,6 +1290,13 @@ func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 	p.Custom[tag.TagName()] = tag
 }
 
+// SetSkipped sets the number of segments that have been skipped in the playlist.
+// This method should only be used when converting some custom representation to a MediaPlaylist,
+// and the skipping of segments has already been handled.
+func (p *MediaPlaylist) SetSkipped(skipped uint64) {
+	p.skippedSegments = skipped
+}
+
 // SetCustomSegmentTag sets the provided tag on the current media segment for its TagName.
 func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	if p.count == 0 {

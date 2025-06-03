@@ -286,6 +286,17 @@ func TestSetDefaultMapForMediaPlaylist(t *testing.T) {
 }
 
 // Create new media playlist
+// Set amount of skipped segments
+func TestSetSkippedForMediaPlaylist(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(3, 5)
+	is.NoErr(e) // Create media playlist should be successful
+	p.SetSkipped(2)
+	expected := `#EXT-X-SKIP:SKIPPED-SEGMENTS=2`
+	is.True(strings.Contains(p.String(), expected))
+}
+
+// Create new media playlist
 // Add segment to media playlist
 // Set map on segment
 func TestSetMapForMediaPlaylist(t *testing.T) {
