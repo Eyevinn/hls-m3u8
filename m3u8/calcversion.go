@@ -28,6 +28,7 @@ func (p *MasterPlaylist) CalcMinVersion() (ver uint8, reason string) {
 			}
 		}
 	}
+
 	// A Playlist MUST indicate an EXT-X-VERSION of 11 or higher if it contains:
 	// *  An EXT-X-DEFINE tag with a QUERYPARAM attribute.
 	for _, define := range p.Defines {
@@ -43,6 +44,20 @@ func (p *MasterPlaylist) CalcMinVersion() (ver uint8, reason string) {
 	for _, variant := range p.Variants {
 		if variant.ReqVideoLayout != "" {
 			updateMin(&ver, &reason, 12, "REQ- attribute")
+		}
+	}
+
+	// 	A Playlist MUST indicate an EXT-X-VERSION of 13 or higher if it
+	// contains:
+	// * An EXT-X-MEDIA tag with INSTREAM-ID attribute for non CLOSED-
+	// CAPTIONS TYPE.
+	for _, variant := range p.Variants {
+		for _, alt := range variant.Alternatives {
+			if (alt.Type != "CLOSED-CAPTIONS") && (alt.InstreamId != "") {
+				updateMin(&ver, &reason, 13,
+					"EXT-X-MEDIA tag with INSTREAM-ID attribute for non CLOSED-CAPTIONS TYPE")
+				break
+			}
 		}
 	}
 
