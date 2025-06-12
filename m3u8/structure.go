@@ -214,21 +214,27 @@ type VariantParams struct {
 // Alternative represents an EXT-X-MEDIA tag.
 // Attributes are listed in same order as in specification for easy comparison.
 type Alternative struct {
-	Type              string // TYPE parameter
-	URI               string // URI parameter
-	GroupId           string // GROUP-ID parameter
-	Language          string // LANGUAGE parameter
-	AssocLanguage     string // ASSOC-LANGUAGE parameter
-	Name              string // NAME parameter
-	StableRenditionId string // STABLE-RENDITION-ID parameter
-	Default           bool   // DEFAULT parameter
-	Autoselect        bool   // AUTOSELECT parameter
-	Forced            bool   // FORCED parameter
-	InstreamId        string // INSTREAM-ID parameter
-	BitDepth          byte   // BIT-DEPTH parameter
-	SampleRate        uint32 // SAMPLE-RATE parameter
-	Characteristics   string // CHARACTERISTICS parameter
-	Channels          string // CHANNELS parameter
+	Type              string    // TYPE parameter
+	URI               string    // URI parameter
+	GroupId           string    // GROUP-ID parameter
+	Language          string    // LANGUAGE parameter
+	AssocLanguage     string    // ASSOC-LANGUAGE parameter
+	Name              string    // NAME parameter
+	StableRenditionId string    // STABLE-RENDITION-ID parameter
+	Default           bool      // DEFAULT parameter
+	Autoselect        bool      // AUTOSELECT parameter
+	Forced            bool      // FORCED parameter
+	InstreamId        string    // INSTREAM-ID parameter
+	BitDepth          byte      // BIT-DEPTH parameter
+	SampleRate        uint32    // SAMPLE-RATE parameter
+	Characteristics   string    // CHARACTERISTICS parameter
+	Channels          *Channels // CHANNELS parameter
+}
+
+type Channels struct {
+	Amount                  int
+	SpatialAudioIdentifiers string // Comma-separated list of spatial audio identifiers
+	ChannelUsageIndicators  string // Comma-separated list of channel usage indicators
 }
 
 // MediaSegment represents a media segment included in a

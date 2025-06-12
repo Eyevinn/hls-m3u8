@@ -527,7 +527,10 @@ func parseExtXMedia(line string, strict bool) (Alternative, error) {
 		case "CHARACTERISTICS":
 			alt.Characteristics = v
 		case "CHANNELS":
-			alt.Channels = v
+			alt.Channels, err = parseChannels(v)
+			if err != nil {
+				return alt, fmt.Errorf("invalid CHANNELS: %w", err)
+			}
 		}
 	}
 	return alt, nil
@@ -887,6 +890,35 @@ func parseContentSteering(params string) *ContentSteering {
 		}
 	}
 	return &cs
+}
+
+func parseChannels(line string) (*Channels, error) {
+	c := &Channels{}
+	// split the parameters
+	params := strings.Split(line, "/")
+	paramAmt := len(params)
+	channels, err := strconv.Atoi(params[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid attribute value. first parameter of CHANNELS must be an integer: %s", params[0])
+	}
+	c.Amount = channels
+	if paramAmt >= 2 {
+		// if there is more than one parameter, the second one is a list of spatial audio identifiers
+		c.SpatialAudioIdentifiers = params[1]
+	}
+	if paramAmt == 3 {
+		// if there are three parameters, the third one is a list of channel usage indicators
+		//This parameter is optional, however if it is present the second parameter MUST be non-empty.
+		if c.SpatialAudioIdentifiers == "" {
+			return nil, fmt.Errorf(
+				"invalid attribute value. if CHANNELS contains 3 parameters,"+
+					" the second MUST be non-empty: %s",
+				line,
+			)
+		}
+		c.ChannelUsageIndicators = params[2]
+	}
+	return c, nil
 }
 
 // deQuote removes quotes from a string.

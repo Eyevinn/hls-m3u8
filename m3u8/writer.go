@@ -177,8 +177,8 @@ func writeExtXMedia(buf *bytes.Buffer, alt *Alternative) {
 	if alt.Characteristics != "" {
 		writeQuoted(buf, "CHARACTERISTICS", alt.Characteristics)
 	}
-	if alt.Channels != "" {
-		writeQuoted(buf, "CHANNELS", alt.Channels)
+	if alt.Channels != nil {
+		writeChannels(buf, alt.Channels)
 	}
 	if alt.URI != "" {
 		writeQuoted(buf, "URI", alt.URI)
@@ -560,6 +560,21 @@ func writeYESorNO(buf *bytes.Buffer, b bool) {
 	} else {
 		buf.WriteString("NO")
 	}
+}
+
+func writeChannels(buf *bytes.Buffer, channels *Channels) {
+	buf.WriteRune(',')
+	buf.WriteString("CHANNELS=\"")
+	buf.WriteString(strconv.Itoa(channels.Amount))
+	if channels.SpatialAudioIdentifiers != "" {
+		buf.WriteRune('/')
+		buf.WriteString(channels.SpatialAudioIdentifiers)
+	}
+	if channels.ChannelUsageIndicators != "" {
+		buf.WriteRune('/')
+		buf.WriteString(channels.ChannelUsageIndicators)
+	}
+	buf.WriteRune('"')
 }
 
 // SetCustomTag sets the provided tag on the master playlist for its TagName
