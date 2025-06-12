@@ -32,6 +32,12 @@ func TestReadWriteAlternative(t *testing.T) {
 			error:  "",
 		},
 		{
+			desc: "spatial audio",
+			line: `#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="English (spatial audio)",DEFAULT=YES,` +
+				`AUTOSELECT=YES,CHANNELS="20/3OA/BED-4",URI="english-spatial.m3u8"`,
+			strict: true,
+		},
+		{
 			desc: "closed captions",
 			line: `#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS,GROUP-ID="cc",NAME="English",LANGUAGE="en",DEFAULT=NO,INSTREAM-ID="CC1"`,
 		},

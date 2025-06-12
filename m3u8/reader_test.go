@@ -1104,12 +1104,18 @@ func TestDecodeMasterChannels(t *testing.T) {
 	pp := p.(*MasterPlaylist)
 
 	alt0 := pp.Variants[0].Alternatives[0]
-	is.Equal(alt0.Type, "AUDIO") // Expected AUDIO track in test input Alternatives[0]
-	is.Equal(alt0.Channels, "2") // Expected 2 channels track in test input Alternatives[0]
+	is.Equal(alt0.Type, "AUDIO")      // Expected AUDIO track in test input Alternatives[0]
+	is.Equal(alt0.Channels.Amount, 2) // Expected 2 channels track in test input Alternatives[0]
 
 	alt1 := pp.Variants[1].Alternatives[0]
-	is.Equal(alt1.Type, "AUDIO") // Expected AUDIO track in test input Alternatives[1]
-	is.Equal(alt1.Channels, "6") // Expected 6 channels track in test input Alternatives[1]
+	is.Equal(alt1.Type, "AUDIO")      // Expected AUDIO track in test input Alternatives[1]
+	is.Equal(alt1.Channels.Amount, 6) // Expected 6 channels track in test input Alternatives[1]
+
+	alt2 := pp.Variants[2].Alternatives[0]
+	is.Equal(alt2.Type, "AUDIO")       // Expected AUDIO track in test input Alternatives[2]
+	is.Equal(alt2.Channels.Amount, 20) // Expected 20 channels track in test input Alternatives[2]
+	is.Equal(alt2.Channels.ChannelUsageIndicators, "BED-6")
+	is.Equal(alt2.Channels.SpatialAudioIdentifiers, "OA")
 }
 
 func TestDecodeRenditionsAndIframes(t *testing.T) {
