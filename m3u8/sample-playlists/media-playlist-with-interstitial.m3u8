@@ -6,4 +6,5 @@
 #EXTINF:6.000,
 main1.0.ts
 #EXT-X-ENDLIST
+#EXT-X-DATERANGE:ID="preload1",CLASS="com.apple.hls.preload",START-DATE="2020-01-02T21:55:44Z",DURATION=15.000,X-URI="http://example.com/ad1.m3u8",X-TARGET-ID="ad1",X-TARGET-CLASS="com.apple.hls.interstitial"
 #EXT-X-DATERANGE:ID="ad1",CLASS="com.apple.hls.interstitial",START-DATE="2020-01-02T21:55:44Z",DURATION=15.000,X-ASSET-URI="http://example.com/ad1.m3u8",X-RESUME-OFFSET=0,X-RESTRICT="SKIP,JUMP",X-COM-EXAMPLE-BEACON=123

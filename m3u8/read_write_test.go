@@ -122,8 +122,15 @@ func TestReadWriteDateRange(t *testing.T) {
 			desc: "Interstitials from rfc8216bis-16",
 			line: `#EXT-X-DATERANGE:ID="ad1",CLASS="com.apple.hls.interstitial",` +
 				`START-DATE="2020-01-02T21:55:44.12Z",DURATION=15.000,` +
-				`X-ASSET-URI="http://example.com/ad1.m3u8",X-RESUME-OFFSET=0,` +
+				`X-URI="http://example.com/ad1.m3u8",X-RESUME-OFFSET=0,` +
 				`X-RESTRICT="SKIP,JUMP",X-COM-EXAMPLE-BEACON=123`,
+		},
+		{
+			desc: "Preload interstitials from rfc8216bis-18",
+			line: `#EXT-X-DATERANGE:ID="preload",CLASS="com.apple.hls.preload",` +
+				`START-DATE="2020-01-02T21:55:44.12Z",DURATION=15.000,` +
+				`X-ASSET-URI="http://example.com/preload.m3u8",X-TARGET-ID="ad1",` +
+				`X-TARGET-CLASS="com.apple.hls.interstitial"`,
 		},
 		{
 			desc:        "Bad start date",
