@@ -17,7 +17,7 @@ func TestCalcMinVersionMasterPlaylist(t *testing.T) {
 	pl7 := NewMasterPlaylist()
 	pl7.Variants = append(pl7.Variants, &Variant{
 		VariantParams: VariantParams{
-			Alternatives: []*Alternative{{InstreamId: "SERVICE1"}},
+			Alternatives: []*Alternative{{InstreamId: "SERVICE1", Type: "CLOSED-CAPTIONS"}},
 		},
 	})
 
@@ -26,6 +26,9 @@ func TestCalcMinVersionMasterPlaylist(t *testing.T) {
 
 	pl12, err := readTestMasterPlaylist(t, "sample-playlists/master-with-req-video-layout.m3u8")
 	is.NoErr(err) // must decode sample-playlists/master-with-req-video-layout.m3u8
+
+	pl13, err := readTestMasterPlaylist(t, "sample-playlists/master-with-non-closed-captions-instream-id.m3u8")
+	is.NoErr(err) // must decode sample-playlists/master-with-non-closed-captions-instream-id.m3u8
 
 	cases := []struct {
 		playlist        Playlist
@@ -36,6 +39,7 @@ func TestCalcMinVersionMasterPlaylist(t *testing.T) {
 		{pl7, 7, "SERVICE value for the INSTREAM-ID attribute of the EXT-X-MEDIA"},
 		{pl11, 11, "EXT-X-DEFINE tag with a QUERYPARAM attribute"},
 		{pl12, 12, "REQ- attribute"},
+		{pl13, 13, "EXT-X-MEDIA tag with INSTREAM-ID attribute for non CLOSED-CAPTIONS TYPE"},
 	}
 
 	for i, c := range cases {
