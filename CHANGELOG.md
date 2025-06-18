@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.6.0] 2025-06-18
+### ⚠️ Breaking changes ⚠️
+- `Alternative.Channels` changed from `string` to `*Channels`.
+### Added
+- Support for `INSTREAM-ID` for non-CC tracks.
+- Support for new `CHANNELS` parameters (spatial audio identifiers and channel usage indicators).
+
+### Chore
+- Verify support for preload date ranges.
+
 ## [v0.5.4] 2025-06-03
 ### Added
 Support for setting skippedsegments on a MediaPlaylist
