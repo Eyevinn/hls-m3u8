@@ -28,24 +28,24 @@ var regexpNum = regexp.MustCompile(`(\d+)$`)
 var segmentSlices = sync.Pool{}
 var buffers = sync.Pool{
 	New: func() any {
-		return bytes.Buffer{}
+		return &bytes.Buffer{}
 	},
 }
 
 func getBuffer() bytes.Buffer {
-	b := buffers.Get().(bytes.Buffer)
+	b := buffers.Get().(*bytes.Buffer)
 	b.Reset()
-	return b
+	return *b
 }
 
 func putBuffer(buf bytes.Buffer) {
-	buffers.Put(buf)
+	buffers.Put(&buf)
 }
 
 func getSegmentSlice(size uint) []*MediaSegment {
-	s, ok := segmentSlices.Get().([]*MediaSegment)
-	if ok && s != nil && cap(s) >= int(size) {
-		return s[:size]
+	s, ok := segmentSlices.Get().(*[]*MediaSegment)
+	if ok && s != nil && cap(*s) >= int(size) {
+		return (*s)[:size]
 	}
 	// Nothing in the pool or too small, make a new one
 	return make([]*MediaSegment, size)
@@ -59,7 +59,7 @@ func putSegmentSlice(s []*MediaSegment) {
 	for i := range s {
 		s[i] = nil
 	}
-	segmentSlices.Put(s)
+	segmentSlices.Put(&s)
 }
 
 // updateVersion updates the version if it is higher than before.
