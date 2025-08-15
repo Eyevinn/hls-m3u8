@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +24,43 @@ var ErrPlaylistEmpty = errors.New("playlist is empty")
 var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
 var ErrAlreadySkipped = errors.New("can not change the existing skip tag in a playlist")
 var regexpNum = regexp.MustCompile(`(\d+)$`)
+
+var segmentSlices = sync.Pool{}
+var buffers = sync.Pool{
+	New: func() any {
+		return bytes.Buffer{}
+	},
+}
+
+func getBuffer() bytes.Buffer {
+	b := buffers.Get().(bytes.Buffer)
+	b.Reset()
+	return b
+}
+
+func putBuffer(buf bytes.Buffer) {
+	buffers.Put(buf)
+}
+
+func getSegmentSlice(size uint) []*MediaSegment {
+	s, ok := segmentSlices.Get().([]*MediaSegment)
+	if ok && s != nil && cap(s) >= int(size) {
+		return s[:size]
+	}
+	// Nothing in the pool or too small, make a new one
+	return make([]*MediaSegment, size)
+}
+
+func putSegmentSlice(s []*MediaSegment) {
+	// Set all elements to nil before returning it to pool
+	// Lets GC clean up any referenced segments
+	capLen := cap(s)
+	s = s[:capLen]
+	for i := range s {
+		s[i] = nil
+	}
+	segmentSlices.Put(s)
+}
 
 // updateVersion updates the version if it is higher than before.
 func updateVersion(ver *uint8, newVer uint8) {
@@ -37,10 +75,18 @@ func strVer(ver uint8) string {
 
 // NewMasterPlaylist creates a new empty master playlist.
 func NewMasterPlaylist() *MasterPlaylist {
-	p := new(MasterPlaylist)
+	p := &MasterPlaylist{
+		buf: getBuffer(),
+	}
 	p.ver = minVer
 	p.writePrecision = DefaultFloatPrecision
 	return p
+}
+
+// ReleasePlaylist returns buffer to pool for reuse
+// Do not use the playlist after this
+func (p *MasterPlaylist) ReleasePlaylist() {
+	putBuffer(p.buf)
 }
 
 // Append appends a variant to master playlist. This operation resets the cache.
@@ -635,13 +681,23 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 	if capacity < winsize {
 		return nil, ErrWinSizeTooSmall
 	}
-	p := new(MediaPlaylist)
+	p := &MediaPlaylist{
+		Segments: getSegmentSlice(capacity),
+		buf:      getBuffer(),
+	}
 	p.ver = minVer
 	p.winsize = winsize
 	p.capacity = capacity
 	p.Segments = make([]*MediaSegment, capacity)
 	p.writePrecision = DefaultFloatPrecision
 	return p, nil
+}
+
+// ReleasePlaylist returns buffer and segment slice to pool for reuse
+// Do not use the playlist after this
+func (p *MediaPlaylist) ReleasePlaylist() {
+	putBuffer(p.buf)
+	putSegmentSlice(p.Segments)
 }
 
 // last returns the previously written segment's index

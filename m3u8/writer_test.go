@@ -1264,6 +1264,74 @@ func TestMin(t *testing.T) {
 	}
 }
 
+func TestBufferSyncPool(t *testing.T) {
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			b := getBuffer()
+			defer putBuffer(b)
+
+			//Ensure it is empty
+			if b.Len() != 0 {
+				t.Error("buffer not empty")
+			}
+			b.WriteString("test")
+		}()
+	}
+	wg.Wait()
+
+}
+
+func TestSegmentSliceSyncPool(t *testing.T) {
+
+	//Abuse the sync.Pool
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := getSegmentSlice(100)
+			defer putSegmentSlice(s)
+
+			if len(s) != 100 {
+				t.Error("length of segment slice is not as expected")
+			}
+
+			for _, sp := range s {
+				if sp != nil {
+					t.Error("segment not nil")
+				}
+			}
+		}()
+	}
+
+	//Check that we can get a smaller slice from sync.Pool
+	s := getSegmentSlice(10)
+	if len(s) != 10 {
+		t.Error("length of segment slice is not as expected")
+	}
+	for _, sp := range s {
+		if sp != nil {
+			t.Error("segment not nil")
+		}
+	}
+
+	//Check that we can get a larger slice from sync.Pool
+	s = getSegmentSlice(1000)
+	if len(s) != 1000 {
+		t.Error("length of segment slice is not as expected")
+	}
+	for _, sp := range s {
+		if sp != nil {
+			t.Error("segment not nil")
+		}
+	}
+
+}
+
 /******************************
  *  Code generation examples  *
  ******************************/
@@ -1273,6 +1341,7 @@ func TestMin(t *testing.T) {
 // Print it
 func ExampleNewMediaPlaylist_string() {
 	p, _ := NewMediaPlaylist(1, 2)
+	defer p.ReleasePlaylist()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
@@ -1291,6 +1360,7 @@ func ExampleNewMediaPlaylist_string() {
 // Print it
 func ExampleNewMediaPlaylist_stringWinsize0() {
 	p, _ := NewMediaPlaylist(0, 2)
+	defer p.ReleasePlaylist()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
@@ -1310,6 +1380,7 @@ func ExampleNewMediaPlaylist_stringWinsize0() {
 // Print it
 func ExampleNewMediaPlaylist_stringWinsize0VOD() {
 	p, _ := NewMediaPlaylist(0, 2)
+	defer p.ReleasePlaylist()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	p.Close()
@@ -1332,6 +1403,7 @@ func ExampleNewMediaPlaylist_stringWinsize0VOD() {
 func ExampleNewMasterPlaylist_string() {
 	m := NewMasterPlaylist()
 	p, _ := NewMediaPlaylist(3, 5)
+	defer p.ReleasePlaylist()
 	for i := 0; i < 5; i++ {
 		_ = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 	}
@@ -1351,6 +1423,7 @@ func ExampleNewMasterPlaylist_string() {
 
 func ExampleNewMasterPlaylist_stringWithHLSv7() {
 	m := NewMasterPlaylist()
+	defer m.ReleasePlaylist()
 	m.SetVersion(7)
 	m.SetIndependentSegments(true)
 	p, _ := NewMediaPlaylist(3, 5)
@@ -1370,6 +1443,7 @@ func ExampleDecode_mediaPlaylistSegmentsSCTE35OATCLS() {
 	f, _ := os.Open("sample-playlists/media-playlist-with-oatcls-scte35.m3u8")
 	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
 	pp := p.(*MediaPlaylist)
+	defer pp.ReleasePlaylist()
 	fmt.Print(pp)
 	// Output:
 	// #EXTM3U
@@ -1392,6 +1466,7 @@ func ExampleMediaPlaylist_Segments_scte35_67_2014() {
 	f, _ := os.Open("sample-playlists/media-playlist-with-scte35.m3u8")
 	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
 	pp := p.(*MediaPlaylist)
+	defer pp.ReleasePlaylist()
 	fmt.Print(pp)
 	// Output:
 	// #EXTM3U
@@ -1411,6 +1486,7 @@ func ExampleMediaPlaylist_Segments_scte35_67_2014() {
 // cases.
 func ExampleNewMediaPlaylist_getAllSegments() {
 	m, _ := NewMediaPlaylist(3, 3)
+	defer m.ReleasePlaylist()
 	_ = m.Append("t00.ts", 10, "")
 	_ = m.Append("t01.ts", 10, "")
 	_ = m.Append("t02.ts", 10, "")
@@ -1477,5 +1553,36 @@ func BenchmarkEncodeMediaPlaylist(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		p.ResetCache()
 		_ = p.Encode() // disregard output
+	}
+}
+
+func BenchmarkCreateAndEncodeMediaPlaylist(b *testing.B) {
+	testSize := 1000
+	seg := MediaSegment{
+		URI:      "http://example-domain.com/one/quite/long/example/segmenturl.mp4",
+		Duration: 1,
+	}
+	for i := 0; i < b.N; i++ {
+		p, _ := NewMediaPlaylist(0, uint(testSize))
+		for j := 0; j < testSize; j++ {
+			p.AppendSegment(&seg)
+		}
+		_ = p.Encode()
+	}
+}
+
+func BenchmarkCreateAndEncodeMediaPlaylistPooled(b *testing.B) {
+	testSize := 1000
+	seg := MediaSegment{
+		URI:      "http://example-domain.com/one/quite/long/example/segmenturl.mp4",
+		Duration: 1,
+	}
+	for i := 0; i < b.N; i++ {
+		p, _ := NewMediaPlaylist(0, uint(testSize))
+		for j := 0; j < testSize; j++ {
+			p.AppendSegment(&seg)
+		}
+		_ = p.Encode()
+		p.ReleasePlaylist()
 	}
 }
