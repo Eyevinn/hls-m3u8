@@ -1337,7 +1337,7 @@ func TestSegmentSliceSyncPool(t *testing.T) {
  ******************************/
 
 // Create new media playlist
-// Add two segments to media playlist
+// Add two segments, but to a window-limited list, so only the last is kept
 // Print it
 func ExampleNewMediaPlaylist_string() {
 	// Set winsize to 1 so there will be only one segment in the playlist
