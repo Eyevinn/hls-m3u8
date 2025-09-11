@@ -11,17 +11,23 @@ HLS (HTTP Live Streaming) is an evolving protocol with multiple versions.
 Versions 1-7 are described in [IETF RFC8216][rfc8216], but the protocol has continued
 to evolve with new features and versions in a
 series of [Internet Drafts rfc8216bis][rfc8216bis].
-The current version (Jan 3 2025) is [rfc8216bis-16][rfc8216bis].
 
 One of the major libraries in Go for parsing and generating HLS playlists,
 aka m3u8 files, has been the Github project [grafov/m3u8][grafov].
 However, the majority of that code was written up to version 5,
 It was finally archived in Dec. 2024.
 
-The goal of this library, `hls-m3u8`,  is to provide an up-to-date replacement and improvement
-of  the [m3u8][grafov] library. The aim is to follow the HLS specification
+The goal of this library, `hls-m3u8`,  is to provide an up-to-date replacement and improvement of the [grafov/m3u8][grafov] library. The aim is to follow the HLS specification
 as it evolves and add all new elements and do other updates in order that
 all m3u8 documents (from version 3 and forward) can be parsed and generated.
+There is typically a new draft every 6 months.
+The current version (Sep 11 2025) is [rfc8216bis-18][rfc8216bis].
+Its specification should be supported by this repo, but all parameter
+values are not validated.
+
+The HLS protocol has different versions, and there are rules for what minimal
+version to signal depending on features being used. That mechanism is implemented
+in the `CalcMinVersion()` method of the `Playlist` interface.
 
 ## Structure and design of the code
 
@@ -42,7 +48,8 @@ the latest segments.
 For VOD or EVENT media playlists, the `winsize` should be 0.
 
 For writing, there are `Encode` methods that return a `*bytes.Buffer`. This buffer serves as a cache.
-It is also possible to call `EncodeWithSkip` to skip the first `n` segments.
+It is also possible to call `EncodeWithSkip` to signal skipping of the first `n` segments.
+The `String` method makes it easy to use the standard `fmt.Print` functions.
 
 ## Installation / Usage
 
@@ -61,6 +68,40 @@ import github.com/Eyevinn/hls-m3u8/m3u8
 ```
 
 to your source files.
+
+### Examples
+
+Testable examples can be found in m3u8/*_test.go files. For nicer browser formatting, see
+[pkg.go.dev][m3u8-examples].
+
+Sample playlists are provided in `m3u8/sample-playlists`.
+
+In addition, there are some simple examples below (without error handling)
+
+#### Create simple media playlist
+
+This uses a sliding window of 3 segments and
+maximum of 50 segments.
+
+	p, _ := NewMediaPlaylist(3, 50)
+	for i := 0; i < 5; i++ {
+	  _ = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
+	}
+	fmt.Println(p)
+
+We add 5 testX.ts segments to the playlist before encoding it to M3U8 format and converting to string.
+Due to the sliding window, only the last three
+segments will be included.
+
+#### Parsing of a master playlist:
+
+	f, _ := os.Open("sample-playlists/master.m3u8")
+	p := NewMasterPlaylist()
+	_ = p.DecodeFrom(bufio.NewReader(f), true /*strict*/)
+	fmt.Printf("Playlist object: %+v\n", p)
+
+Here the `strict` parameter is set to true. If false, the parser
+allows more errors.
 
 ## Development
 
@@ -99,7 +140,8 @@ Replace `import github.com/grafov/m3u8` with
 `import github.com/Eyevinn/hls-m3u8/m3u8` and you should
 hopefully be fine to go.
 
-Later versions do more changes and additions.
+Later versions have more changes and additions, so it is likely
+that more changes are needed to legacy code.
 
 See [CHANGELOG](CHANGELOG) for a list of changes.
 
@@ -142,3 +184,4 @@ Want to know more about Eyevinn and how it is to work here. Contact us at work@e
 [issues]: https://github.com/Eyevinn/hls-m3u8/issues
 [discussions]: https://github.com/Eyevinn/hls-m3u8/discussions
 [is]: https://github.com/matryer/is
+[m3u8-examples]: https://pkg.go.dev/github.com/Eyevinn/hls-m3u8/m3u8#pkg-examples

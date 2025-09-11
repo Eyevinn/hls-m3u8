@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- reduced memory allocations using sync.Pool for playlists
+- Reduced memory allocations using sync.Pool for playlists
+- More documentation of examples
 
 ## [v0.6.0] 2025-06-18
 ### ⚠️ Breaking changes ⚠️
