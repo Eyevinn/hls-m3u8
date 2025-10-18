@@ -1511,12 +1511,23 @@ func ExampleNewMediaPlaylist_getAllSegments() {
 	for _, v := range m.GetAllSegments() {
 		fmt.Printf("%s\n", v.URI)
 	}
+	_ = m.Append("t07.ts", 10, "")
+	_ = m.Append("t08.ts", 10, "")
+	_ = m.Append("t09.ts", 10, "")
+	_ = m.Remove()
+	_ = m.Append("t10.ts", 10, "")
+	for _, v := range m.GetAllSegments() {
+		fmt.Printf("%s\n", v.URI)
+	}
 	// Output:
 	// t00.ts
 	// t01.ts
 	// t02.ts
 	// t03.ts
 	// t04.ts
+	// t08.ts
+	// t09.ts
+	// t10.ts
 }
 
 /****************
