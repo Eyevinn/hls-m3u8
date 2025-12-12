@@ -140,8 +140,8 @@ type MediaPlaylist struct {
 	customDecoders      []CustomDecoder   // customDecoders provides custom tags for decoding
 	winsize             uint              // max number of segments encoded sliding playlist, set to 0 for VOD and EVENT
 	capacity            uint              // total capacity of slice used for the playlist
-	head                uint              // head of FIFO, we add segments to head
-	tail                uint              // tail of FIFO, we remove segments from tail
+	head                uint              // head of FIFO (ring buffer), we remove segments from head
+	tail                uint              // tail of FIFO (ring buffer), we add segments to tail
 	count               uint              // number of segments added to the playlist
 	buf                 bytes.Buffer      // buffer used for encoding and caching playlist output
 	scte35Syntax        SCTE35Syntax      // SCTE-35 syntax used in the playlist

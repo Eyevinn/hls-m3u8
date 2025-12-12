@@ -716,7 +716,8 @@ func (p *MediaPlaylist) IndependentSegments() bool {
 	return p.independentSegments
 }
 
-// Remove current segment from the head of chunk slice form a media playlist. Useful for sliding playlists.
+// Remove removes the first/oldest segment which is at the head of chunk slice form a media playlist.
+// Useful for sliding playlists.
 // This operation resets playlist cache.
 func (p *MediaPlaylist) Remove() (err error) {
 	if p.count == 0 {
@@ -1429,10 +1430,10 @@ func (p *MediaPlaylist) GetAllSegments() []*MediaSegment {
 		}
 		return buf
 	}
-	for i := uint(0); i < p.tail; i++ {
+	for i := p.head; i < p.capacity; i++ {
 		buf = append(buf, p.Segments[i])
 	}
-	for i := p.head; i < p.capacity; i++ {
+	for i := uint(0); i < p.tail; i++ {
 		buf = append(buf, p.Segments[i])
 	}
 	return buf

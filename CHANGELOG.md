@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.6.1] 2025-10-28
+
+### Added
+
+- Reduced memory allocations using sync.Pool for playlists
+- More documentation of examples
+
+### Fixed
+
+- Wrap-around bug in segment order returned from GetAllSegments (Issue #65)
+
 ## [v0.6.0] 2025-06-18
 ### ⚠️ Breaking changes ⚠️
 - `Alternative.Channels` changed from `string` to `*Channels`.
@@ -149,8 +160,10 @@ The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 
 - initial version of the repo
 
-[Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.5.1...HEAD
-[v0.5.0]  https://github.com/Eyevinn/hls-m3u8/compare/v0.4.0...v0.5.0
+[Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.1...HEAD
+[v0.6.1]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.0...v0.6.1
+[v0.6.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.5.0...v0.6.0
+[v0.5.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.4.0...v0.5.0
 [v0.4.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.1.0...v0.2.0

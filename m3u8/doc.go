@@ -39,26 +39,28 @@ For writing, there are Encode methods that return a [*bytes.Buffer]. This buffer
 Library coded accordingly with IETF draft
 http://tools.ietf.org/html/draft-pantos-http-live-streaming
 
-Examples of usage may be found in *_test.go files of a package. Also
-see below some simple examples (without error handling)
+Examples of usage may be found in *_test.go files.
 
-Create simple media playlist with sliding window of 3 segments and
-maximum of 50 segments.
+There are also some simple examples below (without error handling).
+
+Example 1: Create simple media playlist with sliding window of
+  3 segments and maximum of 50 segments
 
 	p, _ := NewMediaPlaylist(3, 50)
 	for i := 0; i < 5; i++ {
-	  _ = p.Add(fmt.Sprintf("test%d.ts", i), 5.0)
+	  _ = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 	}
-	fmt.Println(p.Encode(true).String())
+	fmt.Println(p)
 
-We add 5 testX.ts segments to playlist then encode it to M3U8 format
-and convert to string.
+We add 5 testX.ts segments to the playlist before encoding it to M3U8 format and converting to string.
+Due to the sliding window, only the last three
+segments will be included.
 
-Next example shows parsing of a master playlist:
+Example 2: Parsing of a master playlist
 
 	f, _ := os.Open("sample-playlists/master.m3u8")
 	p := NewMasterPlaylist()
-	_ = p.DecodeFrom(bufio.NewReader(f), false)
+	_ = p.DecodeFrom(bufio.NewReader(f), true)
 	fmt.Printf("Playlist object: %+v\n", p)
 
 [grafov/m3u8]: https://github.com/grafov/m3u8
