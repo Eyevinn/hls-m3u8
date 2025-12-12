@@ -26,6 +26,7 @@ var ErrAlreadySkipped = errors.New("can not change the existing skip tag in a pl
 var regexpNum = regexp.MustCompile(`(\d+)$`)
 
 var segmentSlices = sync.Pool{}
+var segments = sync.Pool{}
 var buffers = sync.Pool{
 	New: func() any {
 		return &bytes.Buffer{}
@@ -60,6 +61,24 @@ func putSegmentSlice(s *[]*MediaSegment) {
 		(*s)[i] = nil
 	}
 	segmentSlices.Put(s)
+}
+
+func getSegment() *MediaSegment {
+	s, ok := segments.Get().(*MediaSegment)
+	if ok && s != nil {
+		return s
+	}
+	// Nothing in the pool make a new one
+	return &MediaSegment{}
+}
+
+func putSegment(s *MediaSegment) {
+	// Clean the segment
+	// Make sure we don't put nil pointers in there
+	if s != nil {
+		*s = MediaSegment{}
+		segments.Put(s)
+	}
 }
 
 // updateVersion updates the version if it is higher than before.
@@ -695,6 +714,9 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 // ReleasePlaylist returns buffer and segment slice to pool for reuse
 // Do not use the playlist after this
 func (p *MediaPlaylist) ReleasePlaylist() {
+	for _, s := range p.Segments {
+		putSegment(s)
+	}
 	putBuffer(&p.buf)
 	putSegmentSlice(&p.Segments)
 }

@@ -1633,6 +1633,23 @@ func BenchmarkDecodeMediaPlaylist(b *testing.B) {
 	}
 }
 
+func BenchmarkDecodeMediaPlaylistPooled(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
+		if err != nil {
+			b.Fatal(err)
+		}
+		p, err := NewMediaPlaylist(50000, 50000)
+		if err != nil {
+			b.Fatalf("Create media playlist failed: %s", err)
+		}
+		if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
+			b.Fatal(err)
+		}
+		p.ReleasePlaylist()
+	}
+}
+
 func readTestMasterPlaylist(t *testing.T, fileName string) (*MasterPlaylist, error) {
 	t.Helper()
 	f, err := os.Open(fileName)

@@ -1285,6 +1285,27 @@ func TestBufferSyncPool(t *testing.T) {
 
 }
 
+func TestSegmentSyncPool(t *testing.T) {
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := getSegment()
+			defer putSegment(s)
+
+			//Ensure it is empty
+			if s.SeqId != 0 {
+				t.Error("segment not reset")
+			}
+			s.SeqId = 42
+		}()
+	}
+	wg.Wait()
+
+}
+
 func TestSegmentSliceSyncPool(t *testing.T) {
 
 	//Abuse the sync.Pool
