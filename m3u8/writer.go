@@ -38,8 +38,8 @@ func getBuffer() bytes.Buffer {
 	return *b
 }
 
-func putBuffer(buf bytes.Buffer) {
-	buffers.Put(&buf)
+func putBuffer(buf *bytes.Buffer) {
+	buffers.Put(buf)
 }
 
 func getSegmentSlice(size uint) []*MediaSegment {
@@ -51,15 +51,15 @@ func getSegmentSlice(size uint) []*MediaSegment {
 	return make([]*MediaSegment, size)
 }
 
-func putSegmentSlice(s []*MediaSegment) {
+func putSegmentSlice(s *[]*MediaSegment) {
 	// Set all elements to nil before returning it to pool
 	// Lets GC clean up any referenced segments
-	capLen := cap(s)
-	s = s[:capLen]
-	for i := range s {
-		s[i] = nil
+	capLen := cap(*s)
+	*s = (*s)[:capLen]
+	for i := range *s {
+		(*s)[i] = nil
 	}
-	segmentSlices.Put(&s)
+	segmentSlices.Put(s)
 }
 
 // updateVersion updates the version if it is higher than before.
@@ -86,7 +86,7 @@ func NewMasterPlaylist() *MasterPlaylist {
 // ReleasePlaylist returns buffer to pool for reuse
 // Do not use the playlist after this
 func (p *MasterPlaylist) ReleasePlaylist() {
-	putBuffer(p.buf)
+	putBuffer(&p.buf)
 }
 
 // Append appends a variant to master playlist. This operation resets the cache.
@@ -688,7 +688,6 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 	p.ver = minVer
 	p.winsize = winsize
 	p.capacity = capacity
-	p.Segments = make([]*MediaSegment, capacity)
 	p.writePrecision = DefaultFloatPrecision
 	return p, nil
 }
@@ -696,8 +695,8 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 // ReleasePlaylist returns buffer and segment slice to pool for reuse
 // Do not use the playlist after this
 func (p *MediaPlaylist) ReleasePlaylist() {
-	putBuffer(p.buf)
-	putSegmentSlice(p.Segments)
+	putBuffer(&p.buf)
+	putSegmentSlice(&p.Segments)
 }
 
 // last returns the previously written segment's index
