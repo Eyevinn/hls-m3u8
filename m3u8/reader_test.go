@@ -1583,6 +1583,8 @@ func ExampleDecodeFrom_withDiscontinuityAndOutput() {
 	f, _ := os.Open("sample-playlists/media-playlist-with-discontinuity.m3u8")
 	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
 	pp := p.(*MediaPlaylist)
+	defer pp.ReleasePlaylist()
+	defer pp.ReleaseSegments()
 	fmt.Printf("%s", pp)
 	// Output:
 	// #EXTM3U
@@ -1646,6 +1648,7 @@ func BenchmarkDecodeMediaPlaylistPooled(b *testing.B) {
 		if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
 			b.Fatal(err)
 		}
+		p.ReleaseSegments()
 		p.ReleasePlaylist()
 	}
 }

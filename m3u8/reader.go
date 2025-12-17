@@ -980,7 +980,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case !strings.HasPrefix(line, "#"):
 		if state.tagInf {
-			seg := getSegment()
+			seg := GetSegment()
 			seg.URI = line
 			seg.Duration = state.duration
 			seg.Title = state.title

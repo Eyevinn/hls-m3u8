@@ -63,7 +63,8 @@ func putSegmentSlice(s *[]*MediaSegment) {
 	segmentSlices.Put(s)
 }
 
-func getSegment() *MediaSegment {
+// Get a segment using a sync.Pool. When done using a segment, return it to the pool with Release()
+func GetSegment() *MediaSegment {
 	s, ok := segments.Get().(*MediaSegment)
 	if ok && s != nil {
 		return s
@@ -72,7 +73,8 @@ func getSegment() *MediaSegment {
 	return &MediaSegment{}
 }
 
-func putSegment(s *MediaSegment) {
+// Returns the segment to pool for reuse. Do not use the segment after this
+func ReleaseSegment(s *MediaSegment) {
 	// Clean the segment
 	// Make sure we don't put nil pointers in there
 	if s != nil {
@@ -102,8 +104,7 @@ func NewMasterPlaylist() *MasterPlaylist {
 	return p
 }
 
-// ReleasePlaylist returns buffer to pool for reuse
-// Do not use the playlist after this
+// ReleasePlaylist returns buffer to pool for reuse. Do not use the playlist after this
 func (p *MasterPlaylist) ReleasePlaylist() {
 	putBuffer(&p.buf)
 }
@@ -711,14 +712,17 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 	return p, nil
 }
 
-// ReleasePlaylist returns buffer and segment slice to pool for reuse
-// Do not use the playlist after this
+// ReleasePlaylist returns buffer and segment slice to pool for reuse. Do not use the playlist after this
 func (p *MediaPlaylist) ReleasePlaylist() {
-	for _, s := range p.Segments {
-		putSegment(s)
-	}
 	putBuffer(&p.buf)
 	putSegmentSlice(&p.Segments)
+}
+
+// ReleaseSegments returns all segments to pool for reuse. Do not use the segments after this.
+func (p *MediaPlaylist) ReleaseSegments() {
+	for _, s := range p.Segments {
+		ReleaseSegment(s)
+	}
 }
 
 // last returns the previously written segment's index
@@ -756,7 +760,7 @@ func (p *MediaPlaylist) Remove() (err error) {
 // Append general chunk to the tail of chunk slice for a media playlist.
 // This operation resets playlist cache.
 func (p *MediaPlaylist) Append(uri string, duration float64, title string) error {
-	seg := new(MediaSegment)
+	seg := GetSegment()
 	seg.URI = uri
 	seg.Duration = duration
 	seg.Title = title
