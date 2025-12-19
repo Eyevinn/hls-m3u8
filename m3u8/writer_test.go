@@ -1373,7 +1373,6 @@ func ExampleNewMediaPlaylist_string() {
 	// Set winsize to 1 so there will be only one segment in the playlist
 	p, _ := NewMediaPlaylist(1, 2)
 	defer p.ReleasePlaylist()
-	defer p.ReleaseSegments()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
@@ -1392,7 +1391,6 @@ func ExampleNewMediaPlaylist_string() {
 func ExampleNewMediaPlaylist_stringWinsize0() {
 	p, _ := NewMediaPlaylist(0, 2)
 	defer p.ReleasePlaylist()
-	defer p.ReleaseSegments()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
@@ -1413,7 +1411,6 @@ func ExampleNewMediaPlaylist_stringWinsize0() {
 func ExampleNewMediaPlaylist_stringWinsize0VOD() {
 	p, _ := NewMediaPlaylist(0, 2)
 	defer p.ReleasePlaylist()
-	defer p.ReleaseSegments()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	p.Close()
@@ -1437,7 +1434,6 @@ func ExampleNewMasterPlaylist_string() {
 	m := NewMasterPlaylist()
 	p, _ := NewMediaPlaylist(3, 5)
 	defer p.ReleasePlaylist()
-	defer p.ReleaseSegments()
 	for i := 0; i < 5; i++ {
 		_ = p.Append(fmt.Sprintf("test%d.ts", i), 5.0, "")
 	}
@@ -1478,7 +1474,6 @@ func ExampleDecode_mediaPlaylistSegmentsSCTE35OATCLS() {
 	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
 	pp := p.(*MediaPlaylist)
 	defer pp.ReleasePlaylist()
-	defer pp.ReleaseSegments()
 	fmt.Print(pp)
 	// Output:
 	// #EXTM3U
@@ -1502,7 +1497,6 @@ func ExampleMediaPlaylist_Segments_scte35_67_2014() {
 	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
 	pp := p.(*MediaPlaylist)
 	defer pp.ReleasePlaylist()
-	defer pp.ReleaseSegments()
 	fmt.Print(pp)
 	// Output:
 	// #EXTM3U
@@ -1523,7 +1517,6 @@ func ExampleMediaPlaylist_Segments_scte35_67_2014() {
 func ExampleNewMediaPlaylist_getAllSegments() {
 	m, _ := NewMediaPlaylist(3, 3)
 	defer m.ReleasePlaylist()
-	defer m.ReleaseSegments()
 	_ = m.Append("t00.ts", 10, "")
 	_ = m.Append("t01.ts", 10, "")
 	_ = m.Append("t02.ts", 10, "")

@@ -63,7 +63,9 @@ func putSegmentSlice(s *[]*MediaSegment) {
 	segmentSlices.Put(s)
 }
 
-// Get a segment using a sync.Pool. When done using a segment, return it to the pool with Release()
+// GetSegment returns a segment using a sync.Pool.
+// A new segment is created if the pool is empty.
+// Segments used in a playlisy get recycled back to the pool when ReleasePlaylist is called
 func GetSegment() *MediaSegment {
 	s, ok := segments.Get().(*MediaSegment)
 	if ok && s != nil {
@@ -73,7 +75,9 @@ func GetSegment() *MediaSegment {
 	return &MediaSegment{}
 }
 
-// Returns the segment to pool for reuse. Do not use the segment after this
+// ReleaseSegment returns the segment to the pool for reuse.
+// Normally be called by ReleasePlaylist.
+// Only use explicitly if Segment is not used anymore.
 func ReleaseSegment(s *MediaSegment) {
 	// Clean the segment
 	// Make sure we don't put nil pointers in there
@@ -712,17 +716,14 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 	return p, nil
 }
 
-// ReleasePlaylist returns buffer and segment slice to pool for reuse. Do not use the playlist after this
+// ReleasePlaylist returns ,buffer, segment slice, and all segments to pool for reuse.
+// Do not use the playlist or segments after this
 func (p *MediaPlaylist) ReleasePlaylist() {
-	putBuffer(&p.buf)
-	putSegmentSlice(&p.Segments)
-}
-
-// ReleaseSegments returns all segments to pool for reuse. Do not use the segments after this.
-func (p *MediaPlaylist) ReleaseSegments() {
 	for _, s := range p.Segments {
 		ReleaseSegment(s)
 	}
+	putBuffer(&p.buf)
+	putSegmentSlice(&p.Segments)
 }
 
 // last returns the previously written segment's index
