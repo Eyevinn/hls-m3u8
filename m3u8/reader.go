@@ -980,16 +980,15 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 	case !strings.HasPrefix(line, "#"):
 		if state.tagInf {
-			seg := MediaSegment{
-				URI:      line,
-				Duration: state.duration,
-				Title:    state.title,
-			}
+			seg := GetSegment()
+			seg.URI = line
+			seg.Duration = state.duration
+			seg.Title = state.title
 			if state.lastReadMap != nil && !state.lastReadMap.Equal(state.lastStoredMap) {
 				seg.Map = state.lastReadMap
 				state.lastStoredMap = state.lastReadMap
 			}
-			err := p.AppendSegment(&seg)
+			err := p.AppendSegment(seg)
 			if err == ErrPlaylistFull {
 				// Extend playlist by doubling size, reset internal state, try again.
 				// If the second Append fails, the if err block will handle it.
@@ -998,7 +997,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				p.Segments = append(p.Segments, make([]*MediaSegment, p.Count())...)
 				p.capacity = uint(len(p.Segments))
 				p.tail = p.count
-				err = p.AppendSegment(&seg)
+				err = p.AppendSegment(seg)
 			}
 
 			// Check err for first or subsequent Append()

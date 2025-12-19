@@ -1272,13 +1272,43 @@ func TestBufferSyncPool(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			b := getBuffer()
-			defer putBuffer(b)
+			defer putBuffer(&b)
 
 			//Ensure it is empty
 			if b.Len() != 0 {
 				t.Error("buffer not empty")
 			}
 			b.WriteString("test")
+		}()
+	}
+	wg.Wait()
+
+}
+
+func TestSegmentSyncPool(t *testing.T) {
+
+	// Check that nil segments work
+	var sNil *MediaSegment
+	releaseSegment(sNil)
+
+	// Test the segment pool
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s := GetSegment()
+			if s == nil {
+				t.Error("segment is nil")
+			}
+
+			defer releaseSegment(s)
+
+			//Ensure it is empty
+			if s.SeqId != 0 {
+				t.Error("segment not reset")
+			}
+			s.SeqId = 42
 		}()
 	}
 	wg.Wait()
@@ -1294,7 +1324,7 @@ func TestSegmentSliceSyncPool(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			s := getSegmentSlice(100)
-			defer putSegmentSlice(s)
+			defer putSegmentSlice(&s)
 
 			if len(s) != 100 {
 				t.Error("length of segment slice is not as expected")
