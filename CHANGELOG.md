@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet
 
+## [v0.6.2] 2025-12-19
+
+### Fixed
+
+- Better pooling of segments when decoding. Released by ReleasePlaylist (PR #70)
+
 ## [v0.6.1] 2025-10-28
 
 ### Added
@@ -160,7 +166,8 @@ The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 
 - initial version of the repo
 
-[Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.2...HEAD
+[v0.6.2]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.1...v0.6.2
 [v0.6.1]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.0...v0.6.1
 [v0.6.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.5.0...v0.6.0
 [v0.5.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.4.0...v0.5.0
