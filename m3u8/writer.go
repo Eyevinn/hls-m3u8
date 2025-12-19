@@ -75,10 +75,8 @@ func GetSegment() *MediaSegment {
 	return &MediaSegment{}
 }
 
-// ReleaseSegment returns the segment to the pool for reuse.
-// Normally be called by ReleasePlaylist.
-// Only use explicitly if Segment is not used anymore.
-func ReleaseSegment(s *MediaSegment) {
+// releaseSegment returns the segment to the pool for reuse.
+func releaseSegment(s *MediaSegment) {
 	// Clean the segment
 	// Make sure we don't put nil pointers in there
 	if s != nil {
@@ -720,7 +718,7 @@ func NewMediaPlaylist(winsize uint, capacity uint) (*MediaPlaylist, error) {
 // Do not use the playlist or segments after this
 func (p *MediaPlaylist) ReleasePlaylist() {
 	for _, s := range p.Segments {
-		ReleaseSegment(s)
+		releaseSegment(s)
 	}
 	putBuffer(&p.buf)
 	putSegmentSlice(&p.Segments)

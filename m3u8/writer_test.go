@@ -1289,7 +1289,7 @@ func TestSegmentSyncPool(t *testing.T) {
 
 	// Check that nil segments work
 	var sNil *MediaSegment
-	ReleaseSegment(sNil)
+	releaseSegment(sNil)
 
 	// Test the segment pool
 	wg := sync.WaitGroup{}
@@ -1302,7 +1302,7 @@ func TestSegmentSyncPool(t *testing.T) {
 				t.Error("segment is nil")
 			}
 
-			defer ReleaseSegment(s)
+			defer releaseSegment(s)
 
 			//Ensure it is empty
 			if s.SeqId != 0 {
