@@ -422,14 +422,14 @@ func decodeAttributes(line string) []Attribute {
 		}
 		key := string(b[start:i])
 
-		if i >= n || b[i] != '=' {
+		if i >= n-1 || b[i] != '=' {
 			break // malformed - stop
 		}
 		i++ // =
 
 		start = i
 		inQuote := b[i] == '"' // Need to include "," if in a quote
-		i++
+		i++                    // Safe because we checked one extra when checking for malformed
 		for i < n && (b[i] != ',' || inQuote) {
 			if b[i] == '"' {
 				inQuote = false
@@ -439,6 +439,7 @@ func decodeAttributes(line string) []Attribute {
 		val := string(b[start:i])
 
 		attrs = append(attrs, Attribute{Key: key, Val: val})
+		i++ // skip commas
 	}
 
 	return attrs
