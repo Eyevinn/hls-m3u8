@@ -1606,13 +1606,20 @@ func ExampleDecodeFrom_withDiscontinuityAndOutput() {
  ****************/
 
 func BenchmarkDecodeMasterPlaylist(b *testing.B) {
+	f, err := os.Open("sample-playlists/master-with-hlsv7.m3u8")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	buf := bytes.Buffer{}
+	buf.ReadFrom(f)
+	data := buf.Bytes()
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f, err := os.Open("sample-playlists/master-with-hlsv7.m3u8")
-		if err != nil {
-			b.Fatal(err)
-		}
+
 		p := NewMasterPlaylist()
-		if err := p.DecodeFrom(bufio.NewReader(f), false); err != nil {
+		if err := p.DecodeFrom(bytes.NewBuffer(data), false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -1635,32 +1642,44 @@ func BenchmarkDecodeAttributesNoRegex(b *testing.B) {
 }
 
 func BenchmarkDecodeMediaPlaylist(b *testing.B) {
+
+	f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
+	if err != nil {
+		b.Fatal(err)
+	}
+	buf := bytes.Buffer{}
+	buf.ReadFrom(f)
+	data := buf.Bytes()
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
-		if err != nil {
-			b.Fatal(err)
-		}
 		p, err := NewMediaPlaylist(50000, 50000)
 		if err != nil {
 			b.Fatalf("Create media playlist failed: %s", err)
 		}
-		if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
+		if err = p.DecodeFrom(bytes.NewBuffer(data), true); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
 func BenchmarkDecodeMediaPlaylistPooled(b *testing.B) {
+
+	f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
+	if err != nil {
+		b.Fatal(err)
+	}
+	buf := bytes.Buffer{}
+	buf.ReadFrom(f)
+	data := buf.Bytes()
+
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
-		if err != nil {
-			b.Fatal(err)
-		}
 		p, err := NewMediaPlaylist(50000, 50000)
 		if err != nil {
 			b.Fatalf("Create media playlist failed: %s", err)
 		}
-		if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
+		if err = p.DecodeFrom(bytes.NewBuffer(data), true); err != nil {
 			b.Fatal(err)
 		}
 		p.ReleasePlaylist()
