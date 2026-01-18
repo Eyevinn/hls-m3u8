@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,8 +18,6 @@ var ErrExtM3UAbsent = errors.New("#EXTM3U absent")
 var ErrNotYesOrNo = errors.New("value must be YES or NO")
 var ErrCannotDetectPlaylistType = errors.New("cannot detect playlist type")
 var ErrDanglingSCTE35DateRange = errors.New("dangling SCTE-35 DateRange tag after last segment not supported")
-
-var reKeyValue = regexp.MustCompile(`([a-zA-Z0-9_-]+)=("[^"]+"|[^",]+)`)
 
 // TimeParse allows globally apply and/or override Time Parser function.
 // Available variants:
@@ -365,35 +362,12 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	return nil, state.listType, ErrCannotDetectPlaylistType
 }
 
-// decodeAndTrimAttributes decodes a line of attributes into a map.
-// It removes any quotes and spaces around the values.
-func decodeAndTrimAttributesRegex(line string) map[string]string {
-	out := make(map[string]string)
-	for _, kv := range reKeyValue.FindAllStringSubmatch(line, -1) {
-		k, v := kv[1], kv[2]
-		out[k] = strings.Trim(v, ` "`)
-	}
-	return out
-}
-
 func decodeAndTrimAttributes(line string) map[string]string {
 	out := make(map[string]string)
 	for _, attr := range decodeAttributes(line) {
 		out[attr.Key] = strings.Trim(attr.Val, ` "`)
 	}
 	return out
-}
-
-// decodeAttributes decodes a line containing attributes.
-// The values are left as verbatim strings, including quotes if present.
-func decodeAttributesRegex(line string) []Attribute {
-	matches := reKeyValue.FindAllStringSubmatch(line, -1)
-	attrs := make([]Attribute, 0, len(matches))
-	for _, kv := range matches {
-		k, v := kv[1], kv[2]
-		attrs = append(attrs, Attribute{Key: k, Val: v})
-	}
-	return attrs
 }
 
 // decodeAttributes decodes a line containing attributes.
@@ -427,6 +401,7 @@ func decodeAttributes(line string) []Attribute {
 		}
 		i++ // =
 
+		// value
 		start = i
 		inQuote := b[i] == '"' // Need to include "," if in a quote
 		i++                    // Safe because we checked one extra when checking for malformed

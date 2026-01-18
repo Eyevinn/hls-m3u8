@@ -1625,15 +1625,7 @@ func BenchmarkDecodeMasterPlaylist(b *testing.B) {
 	}
 }
 
-func BenchmarkDecodeAttributesRegex(b *testing.B) {
-	line := `AVERAGE-BANDWIDTH=20985770,BANDWIDTH=28058971,VIDEO-RANGE=SDR,CODECS="hvc1.2.4.L150.B0",RESOLUTION=3840x2160,FRAME-RATE=23.976,CLOSED-CAPTIONS=NONE,HDCP-LEVEL=TYPE-1`
-
-	for i := 0; i < b.N; i++ {
-		_ = decodeAttributesRegex(line)
-	}
-}
-
-func BenchmarkDecodeAttributesNoRegex(b *testing.B) {
+func BenchmarkDecodeAttributes(b *testing.B) {
 	line := `AVERAGE-BANDWIDTH=20985770,BANDWIDTH=28058971,VIDEO-RANGE=SDR,CODECS="hvc1.2.4.L150.B0",RESOLUTION=3840x2160,FRAME-RATE=23.976,CLOSED-CAPTIONS=NONE,HDCP-LEVEL=TYPE-1`
 
 	for i := 0; i < b.N; i++ {
