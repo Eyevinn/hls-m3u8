@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -23,7 +22,6 @@ var ErrPlaylistFull = errors.New("playlist is full")
 var ErrPlaylistEmpty = errors.New("playlist is empty")
 var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
 var ErrAlreadySkipped = errors.New("can not change the existing skip tag in a playlist")
-var regexpNum = regexp.MustCompile(`(\d+)$`)
 
 var segmentSlices = sync.Pool{}
 var segments = sync.Pool{}
@@ -1506,17 +1504,16 @@ func splitUriBy(uri, sep string) (string, string) {
 	return rest, lastPart
 }
 
-// getSequenceNum return the last number in uriPrefix
+// getSequenceNum return the last number in uriPrefix if it ends in a number
 func getSequenceNum(uriPrefix string) (num uint64, ok bool) {
 	if strings.Contains(uriPrefix, ".") {
 		return 0, false
 	}
 
 	// find the last number in the uri
-	numStr := regexpNum.FindString(uriPrefix)
 	// check if the uri ends with a number
-	ok = numStr != "" && strings.HasSuffix(uriPrefix, numStr)
-	if numStr == "" {
+	numStr, ok := findEndsInNumber(uriPrefix)
+	if !ok {
 		return 0, ok
 	}
 	num, err := strconv.ParseUint(numStr, 10, 64)
