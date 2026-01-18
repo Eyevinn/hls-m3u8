@@ -1607,7 +1607,7 @@ func ExampleDecodeFrom_withDiscontinuityAndOutput() {
 
 func BenchmarkDecodeMasterPlaylist(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		f, err := os.Open("sample-playlists/master.m3u8")
+		f, err := os.Open("sample-playlists/master-with-hlsv7.m3u8")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -1615,6 +1615,22 @@ func BenchmarkDecodeMasterPlaylist(b *testing.B) {
 		if err := p.DecodeFrom(bufio.NewReader(f), false); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func BenchmarkDecodeAttributesRegex(b *testing.B) {
+	line := `AVERAGE-BANDWIDTH=20985770,BANDWIDTH=28058971,VIDEO-RANGE=SDR,CODECS="hvc1.2.4.L150.B0",RESOLUTION=3840x2160,FRAME-RATE=23.976,CLOSED-CAPTIONS=NONE,HDCP-LEVEL=TYPE-1`
+
+	for i := 0; i < b.N; i++ {
+		_ = decodeAttributesRegex(line)
+	}
+}
+
+func BenchmarkDecodeAttributesNoRegex(b *testing.B) {
+	line := `AVERAGE-BANDWIDTH=20985770,BANDWIDTH=28058971,VIDEO-RANGE=SDR,CODECS="hvc1.2.4.L150.B0",RESOLUTION=3840x2160,FRAME-RATE=23.976,CLOSED-CAPTIONS=NONE,HDCP-LEVEL=TYPE-1`
+
+	for i := 0; i < b.N; i++ {
+		_ = decodeAttributes(line)
 	}
 }
 

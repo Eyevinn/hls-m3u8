@@ -367,7 +367,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 
 // decodeAndTrimAttributes decodes a line of attributes into a map.
 // It removes any quotes and spaces around the values.
-func decodeAndTrimAttributes(line string) map[string]string {
+func decodeAndTrimAttributesRegex(line string) map[string]string {
 	out := make(map[string]string)
 	for _, kv := range reKeyValue.FindAllStringSubmatch(line, -1) {
 		k, v := kv[1], kv[2]
@@ -376,9 +376,17 @@ func decodeAndTrimAttributes(line string) map[string]string {
 	return out
 }
 
+func decodeAndTrimAttributes(line string) map[string]string {
+	out := make(map[string]string)
+	for _, attr := range decodeAttributes(line) {
+		out[attr.Key] = strings.Trim(attr.Val, ` "`)
+	}
+	return out
+}
+
 // decodeAttributes decodes a line containing attributes.
 // The values are left as verbatim strings, including quotes if present.
-func decodeAttributes(line string) []Attribute {
+func decodeAttributesRegex(line string) []Attribute {
 	matches := reKeyValue.FindAllStringSubmatch(line, -1)
 	attrs := make([]Attribute, 0, len(matches))
 	for _, kv := range matches {
@@ -386,6 +394,61 @@ func decodeAttributes(line string) []Attribute {
 		attrs = append(attrs, Attribute{Key: k, Val: v})
 	}
 	return attrs
+}
+
+// decodeAttributes decodes a line containing attributes.
+// The values are left as verbatim strings, including quotes if present.
+func decodeAttributes(line string) []Attribute {
+	if line == "" {
+		return nil
+	}
+
+	b := []byte(line)
+	attrs := make([]Attribute, 10)
+
+	i := 0
+	n := len(b)
+
+	for i < n {
+
+		// key
+		start := i
+		for i < n && isKeyByte(b[i]) {
+			i++
+		}
+		if i == start {
+			i++ // skip bad char
+			continue
+		}
+		key := string(b[start:i])
+
+		if i >= n || b[i] != '=' {
+			break // malformed - stop
+		}
+		i++ // =
+
+		start = i
+		inQuote := b[i] == '"' // Need to include "," if in a quote
+		i++
+		for i < n && (b[i] != ',' || inQuote) {
+			if b[i] == '"' {
+				inQuote = false
+			}
+			i++
+		}
+		val := string(b[start:i])
+
+		attrs = append(attrs, Attribute{Key: key, Val: val})
+	}
+
+	return attrs
+}
+
+func isKeyByte(c byte) bool {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == '_' || c == '-'
 }
 
 // Parse one line of master playlist.
