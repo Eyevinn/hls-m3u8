@@ -374,7 +374,7 @@ func decodeAndTrimAttributes(line string) map[string]string {
 // The values are left as verbatim strings, including quotes if present.
 func decodeAttributes(line string) []Attribute {
 	if line == "" {
-		return nil
+		return []Attribute{}
 	}
 
 	b := []byte(line)
