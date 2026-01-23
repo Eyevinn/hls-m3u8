@@ -1090,8 +1090,10 @@ func TestDecodeMediaPlaylistWithCueInAndDateRange(t *testing.T) {
 	is.Equal(listType, MEDIA)                              // must be media playlist
 	is.Equal(pp.Segments[0].SCTE.CueType, SCTE35Cue_Start) // EXT-CUE-OUT must result in SCTE35Cue_Start
 	is.Equal(pp.Segments[0].SCTE.Time, 7.44)
-	is.True(len(pp.Segments[0].SCTE35DateRanges) > 0)
-	is.True(pp.Segments[3].SCTE.CueType == SCTE35Cue_End) // EXT-CUE-IN must result in SCTE35Cue_End
+	is.Equal(len(pp.Segments[0].SCTE35DateRanges), 1)
+	is.True(pp.Segments[3].SCTE.CueType == SCTE35Cue_End)  // EXT-CUE-IN must result in SCTE35Cue_End
+	is.Equal(pp.Segments[5].SCTE.CueType, SCTE35Cue_Start) // EXT-CUE-OUT must result in SCTE35Cue_Start
+	is.Equal(pp.Segments[5].SCTE.Time, 4.96)
 }
 
 func TestDecodeMasterChannels(t *testing.T) {
