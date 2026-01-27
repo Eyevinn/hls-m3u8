@@ -1244,7 +1244,18 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.scte.Syntax = SCTE35_OATCLS
 		state.scte.CueType = SCTE35Cue_Start
 		lenLine := len(line)
-		if lenLine > 14 {
+		// EXT-X-CUE-OUT may have DURATION attribute or just a duration value.
+		// It's not part of the standard, and different vendors use different formats.
+		// We support decoding both, but only encode the version with just the value.
+		hasDurationAttr := strings.Contains(line, "DURATION=")
+		if hasDurationAttr {
+			for attribute, value := range decodeAndTrimAttributes(line[15:]) {
+				switch attribute {
+				case "DURATION":
+					state.scte.Time, _ = strconv.ParseFloat(value, 64)
+				}
+			}
+		} else if lenLine > 14 {
 			state.scte.Time, _ = strconv.ParseFloat(line[15:], 64)
 		}
 	case !state.tagSCTE35 && line == "#EXT-X-CUE-IN":
