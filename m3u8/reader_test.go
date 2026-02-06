@@ -18,6 +18,20 @@ import (
 	"github.com/matryer/is"
 )
 
+func TestMultiXMaps(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-with-multi-x-maps.m3u8")
+	is.NoErr(err) // must open file
+	// decode playlist
+	p, err := NewMediaPlaylist(100, 300)
+	is.NoErr(err) // must create playlist
+	err = p.DecodeFrom(bufio.NewReader(f), false)
+	is.NoErr(err) // must decode playlist
+	is.True(p.Segments[0].Map != nil)
+	is.True(p.Segments[1].Map == nil)
+	is.True(p.Segments[2].Map != nil)
+}
+
 func TestDecodeMasterPlaylist(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/master.m3u8")
