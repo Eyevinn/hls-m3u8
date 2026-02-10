@@ -21,7 +21,7 @@ The goal of this library, `hls-m3u8`,  is to provide an up-to-date replacement a
 as it evolves and add all new elements and do other updates in order that
 all m3u8 documents (from version 3 and forward) can be parsed and generated.
 There is typically a new draft every 6 months.
-The current version (Sep 11 2025) is [rfc8216bis-18][rfc8216bis].
+The current version (Jan 9 2026) is [rfc8216bis-19][rfc8216bis].
 Its specification should be supported by this repo, but all parameter
 values are not validated.
 
