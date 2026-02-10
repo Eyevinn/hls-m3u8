@@ -1170,10 +1170,6 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		if err != nil {
 			return fmt.Errorf("error parsing EXT-X-MAP: %w", err)
 		}
-		//if state.lastReadMap == nil && p.Count() == 0 {
-		//	p.Map = xMap
-		//	state.lastStoredMap = xMap
-		//}
 		p.Map = xMap
 		if state.lastReadMap == nil || !state.lastReadMap.Equal(xMap) {
 			state.lastReadMap = xMap
