@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - Nothing Yet
 
+## [v0.6.4] 2026-02-12
+### Fixed
+- Remove uses of regex to improve performance (PR #73)
+
 ## [v0.6.3] 2026-01-27
 
 ### Fixed
