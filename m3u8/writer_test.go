@@ -281,7 +281,7 @@ func TestSetDefaultMapForMediaPlaylist(t *testing.T) {
 	is.NoErr(e) // Create media playlist should be successful
 	p.SetDefaultMap("https://example.com", 1000*1024, 1024*1024)
 
-	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE=1024000@1048576`
+	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE="1024000@1048576"`
 	is.True(strings.Contains(p.String(), expected)) // map is not included in the playlist
 }
 
@@ -308,7 +308,7 @@ func TestSetMapForMediaPlaylist(t *testing.T) {
 	e = p.SetMap("https://example.com", 1000*1024, 1024*1024)
 	is.NoErr(e) // Set map to a media playlist should be successful
 
-	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE=1024000@1048576
+	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE="1024000@1048576"
 #EXTINF:5.000,
 test01.ts`
 	is.True(strings.Contains(p.String(), expected)) // map is included in the playlist with segment
@@ -343,16 +343,16 @@ func TestEncodeMediaPlaylistWithDefaultMap(t *testing.T) {
 	is.NoErr(err) // Set map to a media playlist should be successful, but not set since same as already set.
 
 	encoded := p.String()
-	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE=1024000@1048576`
+	expected := `EXT-X-MAP:URI="https://example.com",BYTERANGE="1024000@1048576"`
 	is.Equal(1, strings.Count(encoded, expected)) // default map is included in the playlist just once
 
-	expected = `EXT-X-MAP:URI="https://example2.com",BYTERANGE=1024000@1048576`
+	expected = `EXT-X-MAP:URI="https://example2.com",BYTERANGE="1024000@1048576"`
 	is.Equal(1, strings.Count(encoded, expected)) // new map is included in the playlist just once
 
 	split := strings.Split(encoded, "#EXT-X-DISCONTINUITY")
 	is.Equal(2, len(split)) // discontinuity tag is included one time
 
-	expected = `EXT-X-MAP:URI="https://example2.com",BYTERANGE=1024000@1048576`
+	expected = `EXT-X-MAP:URI="https://example2.com",BYTERANGE="1024000@1048576"`
 	is.Equal(1, strings.Count(split[1], expected)) // new map should be after discontinuity tag
 }
 
@@ -587,7 +587,7 @@ func TestEncodePartialSegments(t *testing.T) {
 #EXT-X-BYTERANGE:100@0
 #EXTINF:4.000,
 test00.m4s
-#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,GAP=YES,BYTERANGE=100@0,URI="test01.1.m4s"
+#EXT-X-PART:DURATION=1.000,INDEPENDENT=YES,GAP=YES,BYTERANGE="100@0",URI="test01.1.m4s"
 #EXT-X-PRELOAD-HINT:TYPE=PART,URI="test01.2.m4s",BYTERANGE-START=0,BYTERANGE-LENGTH=100
 `
 	out := p.String()
