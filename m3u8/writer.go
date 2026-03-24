@@ -386,7 +386,7 @@ func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment, writePrecision i
 		writeYESorNO(buf, ps.Gap)
 	}
 	if ps.Limit > 0 {
-		writeRange(buf, ",BYTERANGE=", ps.Limit, ps.Offset)
+		writeRange(buf, ",BYTERANGE=", true, ps.Limit, ps.Offset)
 	}
 	buf.WriteString(",URI=\"")
 	buf.WriteString(ps.URI)
@@ -542,7 +542,7 @@ func writeExtXMap(buf *bytes.Buffer, m *Map) {
 	buf.WriteString(m.URI)
 	buf.WriteRune('"')
 	if m.Limit > 0 {
-		writeRange(buf, ",BYTERANGE=", m.Limit, m.Offset)
+		writeRange(buf, ",BYTERANGE=", true, m.Limit, m.Offset)
 	}
 	buf.WriteRune('\n')
 }
@@ -576,11 +576,17 @@ func writeContentSteering(buf *bytes.Buffer, cs *ContentSteering) {
 	buf.WriteRune('\n')
 }
 
-func writeRange(buf *bytes.Buffer, tag string, limit, offset int64) {
+func writeRange(buf *bytes.Buffer, tag string, quoted bool, limit, offset int64) {
 	buf.WriteString(tag)
+	if quoted {
+		buf.WriteRune('"')
+	}
 	buf.WriteString(strconv.FormatInt(limit, 10))
 	buf.WriteRune('@')
 	buf.WriteString(strconv.FormatInt(offset, 10))
+	if quoted {
+		buf.WriteRune('"')
+	}
 }
 
 // writeQuoted writes a quoted key-value pair to the buffer preceded by a comma.
@@ -1102,7 +1108,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		}
 
 		if seg.Limit > 0 {
-			writeRange(&p.buf, "#EXT-X-BYTERANGE:", seg.Limit, seg.Offset)
+			writeRange(&p.buf, "#EXT-X-BYTERANGE:", false, seg.Limit, seg.Offset)
 			p.buf.WriteRune('\n')
 		}
 

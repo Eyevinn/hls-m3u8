@@ -727,7 +727,7 @@ func parsePartialSegment(parameters string) (*PartialSegment, error) {
 		case "INDEPENDENT":
 			ps.Independent = attr.Val == "YES"
 		case "BYTERANGE":
-			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &ps.Limit, &ps.Offset); err != nil {
+			if _, err := fmt.Sscanf(deQuote(attr.Val), "%d@%d", &ps.Limit, &ps.Offset); err != nil {
 				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
 			}
 		}
@@ -836,7 +836,7 @@ func parseExtXMapParameters(parameters string) (*Map, error) {
 		case "URI":
 			m.URI = deQuote(attr.Val)
 		case "BYTERANGE":
-			if _, err := fmt.Sscanf(attr.Val, "%d@%d", &m.Limit, &m.Offset); err != nil {
+			if _, err := fmt.Sscanf(deQuote(attr.Val), "%d@%d", &m.Limit, &m.Offset); err != nil {
 				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
 			}
 		}
