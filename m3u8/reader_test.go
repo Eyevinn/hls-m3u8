@@ -1000,6 +1000,10 @@ func TestDecodeMediaPlaylistWithSkip(t *testing.T) {
 	is.Equal(len(pp.PartialSegments), int(28)) // partial segment count must be 24
 	is.Equal(pp.SeqNo, uint64(264))            // seqNo is not 264
 	is.Equal(pp.SkippedSegments(), uint64(3))  // skipped segments must be 3
+	is.Equal(pp.Segments[0].SeqId, uint64(267))
+	is.Equal(pp.Segments[5].SeqId, uint64(272))
+	is.Equal(pp.PartialSegments[0].SeqID, uint64(271))
+	is.Equal(pp.PartialSegments[24].SeqID, uint64(273))
 	is.Equal(pp.ServerControl.CanSkipUntil,
 		float64(pp.TargetDuration*6)) // Can skip 6 segments
 
