@@ -1252,12 +1252,17 @@ func (p *MediaPlaylist) CalculateTargetDuration(hlsVer uint8) uint {
 }
 
 // calcNewTargetDuration calculates a new target duration based on a segment duration.
+// Per rfc8216bis the EXT-X-TARGETDURATION value MUST be at least 1, so a segment that
+// would otherwise round down to 0 still yields a target duration of 1.
 func calcNewTargetDuration(segDur float64, hlsVer uint8, oldTargetDuration uint) uint {
 	var new uint
 	if hlsVer < 6 {
 		new = uint(math.Ceil(segDur))
 	} else {
 		new = uint(math.Round(segDur))
+	}
+	if new < 1 {
+		new = 1
 	}
 	if new > oldTargetDuration {
 		return new
@@ -1267,7 +1272,11 @@ func calcNewTargetDuration(segDur float64, hlsVer uint8, oldTargetDuration uint)
 
 // SetTargetDuration sets the target duration for the playlist and stops automatic calculation.
 // Since the target duration is not allowed to change, it is locked after the first call.
+// Per rfc8216bis the EXT-X-TARGETDURATION value MUST be at least 1, so a value of 0 is raised to 1.
 func (p *MediaPlaylist) SetTargetDuration(duration uint) {
+	if duration < 1 {
+		duration = 1
+	}
 	p.TargetDuration = duration
 	p.targetDurLocked = true
 }

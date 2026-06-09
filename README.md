@@ -21,7 +21,7 @@ The goal of this library, `hls-m3u8`,  is to provide an up-to-date replacement a
 as it evolves and add all new elements and do other updates in order that
 all m3u8 documents (from version 3 and forward) can be parsed and generated.
 There is typically a new draft every 6 months.
-The current version (Jan 9 2026) is [rfc8216bis-19][rfc8216bis].
+This repo is aligned with [rfc8216bis-22][rfc8216bis-22] (checked Jun 9 2026).
 Its specification should be supported by this repo, but all parameter
 values are not validated.
 
@@ -180,6 +180,7 @@ Want to know more about Eyevinn and how it is to work here. Contact us at work@e
 [rfc8216bis-07]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-07
 [rfc8216bis-10]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-10
 [rfc8216bis-16]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-16
+[rfc8216bis-22]: https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-22
 [grafov]: https://github.com/grafov/m3u8
 [issues]: https://github.com/Eyevinn/hls-m3u8/issues
 [discussions]: https://github.com/Eyevinn/hls-m3u8/discussions

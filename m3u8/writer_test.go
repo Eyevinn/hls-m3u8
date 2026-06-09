@@ -1113,6 +1113,9 @@ func TestCalculateTargetDuration(t *testing.T) {
 		{desc: "HLSv5Wrap", hlsVersion: 5, segDur: 5.1, nrSlides: 6, wantedTargetDur: 6},
 		{desc: "HLSv6Wrap", hlsVersion: 6, segDur: 5.1, nrSlides: 6, wantedTargetDur: 6},
 		{desc: "Zero segments", hlsVersion: 5, segDur: 5.1, nrSlides: 0, wantedTargetDur: 0},
+		// rfc8216bis: EXT-X-TARGETDURATION value MUST be at least 1, so a sub-second
+		// segment that would round down to 0 (HLS v6+) is raised to 1.
+		{desc: "HLSv6SubSecond", hlsVersion: 6, segDur: 0.4, nrSlides: 1, wantedTargetDur: 1},
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
@@ -1133,6 +1136,16 @@ func TestCalculateTargetDuration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSetTargetDurationMinimum verifies that SetTargetDuration enforces the
+// rfc8216bis rule that the EXT-X-TARGETDURATION value MUST be at least 1.
+func TestSetTargetDurationMinimum(t *testing.T) {
+	is := is.New(t)
+	p, err := NewMediaPlaylist(3, 5)
+	is.NoErr(err) // Create media playlist should be successful
+	p.SetTargetDuration(0)
+	is.Equal(p.TargetDuration, uint(1)) // A target duration of 0 must be raised to 1
 }
 
 // Create new master and media playlist
