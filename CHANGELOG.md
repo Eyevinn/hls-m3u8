@@ -6,8 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Fixed
 - Quote byte ranges when used as attributes in `EXT-X-MAP` and `EXT-X-PART` (PR #80)
+- Enforce that the calculated/written `EXT-X-TARGETDURATION` value is at least 1, as required since rfc8216bis-20
+
+### Chore
+
+- Verified alignment with rfc8216bis-22 (no new tags, attributes, or version rules vs. -19)
 
 ## [v0.6.4] 2026-02-12
 ### Fixed
