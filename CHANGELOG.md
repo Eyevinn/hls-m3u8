@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.5] 2026-06-10
+
 ### Fixed
 - Quote byte ranges when used as attributes in `EXT-X-MAP` and `EXT-X-PART` (PR #80)
 - Enforce that the calculated/written `EXT-X-TARGETDURATION` value is at least 1, as required since rfc8216bis-20
@@ -181,7 +183,10 @@ The following changes are wrt to initial copy of [grafov/m3u8][grafov] files:
 
 - initial version of the repo
 
-[Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.5...HEAD
+[v0.6.5]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.4...v0.6.5
+[v0.6.4]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.3...v0.6.4
+[v0.6.3]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.2...v0.6.3
 [v0.6.2]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.1...v0.6.2
 [v0.6.1]: https://github.com/Eyevinn/hls-m3u8/compare/v0.6.0...v0.6.1
 [v0.6.0]: https://github.com/Eyevinn/hls-m3u8/compare/v0.5.0...v0.6.0
