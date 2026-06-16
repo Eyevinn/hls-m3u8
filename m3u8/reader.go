@@ -17,6 +17,10 @@ import (
 var ErrExtM3UAbsent = errors.New("#EXTM3U absent")
 var ErrNotYesOrNo = errors.New("value must be YES or NO")
 var ErrCannotDetectPlaylistType = errors.New("cannot detect playlist type")
+
+// Deprecated: ErrDanglingSCTE35DateRange is never returned anymore.
+// SCTE-35 DATERANGE tags after the last segment are accepted and stored
+// in MediaPlaylist.TrailingSCTE35DateRanges.
 var ErrDanglingSCTE35DateRange = errors.New("dangling SCTE-35 DateRange tag after last segment not supported")
 
 // TimeParse allows globally apply and/or override Time Parser function.
@@ -246,12 +250,19 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 	if strict && !state.m3u {
 		return ErrExtM3UAbsent
 	}
-	// SCTE-35 DATERANGE tags after last segment are not allowed
-	// since we associate each SCTE-35 tag with the next segment.
-	if len(state.scte35DateRanges) > 0 {
-		return ErrDanglingSCTE35DateRange
-	}
+	p.storeTrailingSCTE35DateRanges(state)
 	return nil
+}
+
+// storeTrailingSCTE35DateRanges moves SCTE-35 DATERANGE tags left in the decoding
+// state after the last segment to the playlist's TrailingSCTE35DateRanges.
+func (p *MediaPlaylist) storeTrailingSCTE35DateRanges(state *decodingState) {
+	if len(state.scte35DateRanges) == 0 {
+		return
+	}
+	p.TrailingSCTE35DateRanges = append(p.TrailingSCTE35DateRanges, state.scte35DateRanges...)
+	state.scte35DateRanges = nil
+	p.scte35Syntax = SCTE35_DATERANGE
 }
 
 // Decode detects type of playlist and decodes it.
@@ -352,11 +363,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 			// VoD and Event's should show the entire playlist
 			_ = media.SetWinSize(0)
 		}
-		// SCTE-35 DATERANGE tags after last segment are not allowed
-		// since we associate each SCTE-35 tag with the next segment.
-		if len(state.scte35DateRanges) > 0 {
-			return nil, MEDIA, ErrDanglingSCTE35DateRange
-		}
+		media.storeTrailingSCTE35DateRanges(state)
 		return media, MEDIA, nil
 	}
 	return nil, state.listType, ErrCannotDetectPlaylistType
