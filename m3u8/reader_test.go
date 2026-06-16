@@ -1141,23 +1141,87 @@ func TestDecodeRenditionsAndIframes(t *testing.T) {
 	is.Equal(len(allRenditions), 2) // Expected 2 renditions
 }
 
-// Check that dangling SCTE35 DateRange tags is reported as error since not supported.
-func TestDanglingScte35DateRange(t *testing.T) {
-	is := is.New(t)
-	f1, err := os.Open("testdata/bad-playlists/media-playlist-dangling-scte35-daterange.m3u8")
-	is.NoErr(err) // must open file
-	defer f1.Close()
-	_, listType, err := DecodeFrom(bufio.NewReader(f1), true)
-	is.Equal(listType, MEDIA)                 // must be media playlist
-	is.Equal(ErrDanglingSCTE35DateRange, err) // must return ErrDanglingSCTE35DateRange
+func TestTrailingScte35DateRange(t *testing.T) {
+	const fixture = "sample-playlists/media-playlist-trailing-scte35-daterange.m3u8"
+	for _, strict := range []bool{false, true} {
+		t.Run(fmt.Sprintf("strict=%v/DecodeFrom", strict), func(t *testing.T) {
+			is := is.New(t)
+			f, err := os.Open(fixture)
+			is.NoErr(err)
+			defer f.Close()
+			pl, listType, err := DecodeFrom(bufio.NewReader(f), strict)
+			is.NoErr(err)
+			is.Equal(listType, MEDIA)
+			p := pl.(*MediaPlaylist)
+			is.Equal(p.Count(), uint(1))                     // single segment preserved
+			is.Equal(len(p.Segments[0].SCTE35DateRanges), 1) // first DATERANGE attached to seg[0]
+			is.Equal(len(p.TrailingSCTE35DateRanges), 1)     // trailing DATERANGE bucketed
+			is.Equal(p.TrailingSCTE35DateRanges[0].ID, "78")
+			is.Equal(p.SCTE35Syntax(), SCTE35_DATERANGE)
+		})
+		t.Run(fmt.Sprintf("strict=%v/MediaPlaylist.DecodeFrom", strict), func(t *testing.T) {
+			is := is.New(t)
+			f, err := os.Open(fixture)
+			is.NoErr(err)
+			defer f.Close()
+			pl, err := NewMediaPlaylist(0, 5)
+			is.NoErr(err)
+			err = pl.DecodeFrom(bufio.NewReader(f), strict)
+			is.NoErr(err)
+			is.Equal(len(pl.TrailingSCTE35DateRanges), 1)
+			is.Equal(pl.TrailingSCTE35DateRanges[0].ID, "78")
+		})
+	}
+}
 
-	f2, err := os.Open("testdata/bad-playlists/media-playlist-dangling-scte35-daterange.m3u8")
-	is.NoErr(err) // must open file
-	defer f2.Close()
-	pl, err := NewMediaPlaylist(0, 5)
-	is.NoErr(err) // must create playlist
-	err = pl.DecodeFrom(bufio.NewReader(f2), true)
-	is.Equal(ErrDanglingSCTE35DateRange, err) // must return ErrDanglingSCTE35DateRange
+func TestTrailingScte35DateRangeRoundTrip(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-trailing-scte35-daterange.m3u8")
+	is.NoErr(err)
+	defer f.Close()
+	pl, _, err := DecodeFrom(bufio.NewReader(f), false)
+	is.NoErr(err)
+	p := pl.(*MediaPlaylist)
+	encoded := p.Encode().String()
+	uriIdx := strings.Index(encoded, "video1.mp4")
+	is.True(uriIdx >= 0)
+	tail := encoded[uriIdx:]
+	is.True(strings.Contains(tail, `ID="78"`)) // trailing DATERANGE re-emitted after the last segment
+	is.True(strings.Contains(tail, "SCTE35-OUT="))
+	is.True(strings.Contains(tail, "DURATION="))
+
+	p2, _, err := DecodeFrom(strings.NewReader(encoded), false)
+	is.NoErr(err)
+	m2 := p2.(*MediaPlaylist)
+	is.Equal(len(m2.TrailingSCTE35DateRanges), 1)
+	is.Equal(m2.TrailingSCTE35DateRanges[0].ID, "78")
+	is.Equal(m2.TrailingSCTE35DateRanges[0].SCTE35Out, "0xFC00")
+}
+
+func TestTrailingScte35DateRangeAfterEndlist(t *testing.T) {
+	is := is.New(t)
+	const playlist = `#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-TARGETDURATION:6
+#EXT-X-MEDIA-SEQUENCE:0
+#EXTINF:5.760,
+video1.mp4
+#EXT-X-ENDLIST
+#EXT-X-DATERANGE:ID="79",START-DATE="2024-11-25T14:57:19.680000Z",PLANNED-DURATION=30,SCTE35-OUT=0xFC00
+`
+	pl, listType, err := DecodeFrom(strings.NewReader(playlist), true)
+	is.NoErr(err)
+	is.Equal(listType, MEDIA)
+	p := pl.(*MediaPlaylist)
+	is.True(p.Closed)
+	is.Equal(len(p.TrailingSCTE35DateRanges), 1)
+	is.Equal(p.TrailingSCTE35DateRanges[0].ID, "79")
+	encoded := p.Encode().String()
+	drIdx := strings.Index(encoded, `#EXT-X-DATERANGE:ID="79"`)
+	segIdx := strings.Index(encoded, "video1.mp4")
+	is.True(drIdx >= 0)
+	is.True(segIdx >= 0)
+	is.True(drIdx > segIdx) // trailing DATERANGE re-emitted after the last segment
 }
 
 func TestDecodeMasterPlaylistWithDefines(t *testing.T) {

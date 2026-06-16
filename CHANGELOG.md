@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `MediaPlaylist.TrailingSCTE35DateRanges` provides SCTE-35 `EXT-X-DATERANGE` tags found after the last segment
+- `MediaPlaylist.AppendTrailingSCTE35DateRange` to add such a tag when generating a playlist
+
 ### Fixed
 - `Encode` no longer shifts the media playlist head pointer, so it is not destructive (PR #90)
 - Panic when encoding a media playlist whose segment ring buffer has wrapped around,
@@ -18,9 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expired partial segments are now also removed when a full segment is appended, so
   they no longer linger, and are no longer reported by `IsSegmentReady` (PR #91)
 
+
 ### Changed
 - Encoded output of a live media playlist with more segments than `winsize` changes,
   since `EXT-X-MEDIA-SEQUENCE` now matches the first segment written (PR #91)
+- Decoding no longer fails on SCTE-35 `EXT-X-DATERANGE` tags after the last segment
+
+### Deprecated
+- `ErrDanglingSCTE35DateRange` is never returned anymore
 
 ## [v0.6.5] 2026-06-10
 

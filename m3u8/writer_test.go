@@ -147,6 +147,24 @@ func TestSetSCTE35(t *testing.T) {
 	}
 }
 
+func TestAppendTrailingScte35DateRange(t *testing.T) {
+	is := is.New(t)
+	p, err := NewMediaPlaylist(0, 5)
+	is.NoErr(err)
+	is.NoErr(p.Append("video1.mp4", 5.76, ""))
+	_ = p.Encode() // fill the cache
+	plannedDur := 30.0
+	p.AppendTrailingSCTE35DateRange(&DateRange{
+		ID:              "80",
+		StartDate:       time.Date(2024, 11, 25, 14, 57, 19, 0, time.UTC),
+		PlannedDuration: &plannedDur,
+		SCTE35Out:       "0xFC00",
+	})
+	is.Equal(p.SCTE35Syntax(), SCTE35_DATERANGE)
+	encoded := p.Encode().String()
+	is.True(strings.Contains(encoded, `#EXT-X-DATERANGE:ID="80"`)) // cache reset and trailing tag written
+}
+
 // Create new media playlist
 // Don't add segments
 // Expect error when trying to set EXT-X-GAP

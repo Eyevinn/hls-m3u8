@@ -1170,6 +1170,10 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		writePreloadHint(&p.buf, p.PreloadHints)
 	}
 
+	for _, dr := range p.TrailingSCTE35DateRanges {
+		writeDateRange(&p.buf, dr, p.WritePrecision())
+	}
+
 	if p.Closed {
 		p.buf.WriteString("#EXT-X-ENDLIST\n")
 	}
@@ -1372,6 +1376,14 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 	}
 	p.Segments[p.last()].SCTE = scte35
 	return nil
+}
+
+// AppendTrailingSCTE35DateRange appends an SCTE-35 EXT-X-DATERANGE tag to be
+// written after the last segment. This operation resets the playlist cache.
+func (p *MediaPlaylist) AppendTrailingSCTE35DateRange(dr *DateRange) {
+	p.TrailingSCTE35DateRanges = append(p.TrailingSCTE35DateRanges, dr)
+	p.scte35Syntax = SCTE35_DATERANGE
+	p.buf.Reset()
 }
 
 // SetDiscontinuity sets discontinuity flag for the currently last media segment.
