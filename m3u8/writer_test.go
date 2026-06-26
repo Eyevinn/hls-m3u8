@@ -774,6 +774,188 @@ test00.m4s
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+// Byte range encoding omits "@0" only when the previous written segment carried a byte
+// range on the same resource, since an omitted offset means "continue from the previous
+// range" (rfc8216bis Section 4.4.4.2). Otherwise the range is anchored with an explicit
+// offset, even when it is zero. Non-zero offsets are always written.
+func TestEncodeMediaPlaylistByteRangeOffsets(t *testing.T) {
+	t.Run("same_resource_continuation_omits_zero_offset", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0)
+		is.NoErr(e)
+
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+file.ts
+#EXT-X-BYTERANGE:200
+#EXTINF:4.000,
+file.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("different_resource_anchors_zero_offset", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("fileA.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("fileB.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0)
+		is.NoErr(e)
+
+		// fileB.ts must keep @0: omitting it would make it a continuation of fileA.ts.
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+fileA.ts
+#EXT-X-BYTERANGE:200@0
+#EXTINF:4.000,
+fileB.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("previous_segment_without_byterange_anchors_zero_offset", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("whole.ts", 4.0, "")
+		is.NoErr(e)
+
+		e = p.Append("ranged.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0)
+		is.NoErr(e)
+
+		// There is no previous range to continue from, so @0 must be explicit.
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXTINF:4.000,
+whole.ts
+#EXT-X-BYTERANGE:200@0
+#EXTINF:4.000,
+ranged.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("first_visible_segment_in_live_window_anchors_zero_offset", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(2, 3)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0)
+		is.NoErr(e)
+
+		e = p.Remove()
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(300, 0)
+		is.NoErr(e)
+
+		// The range the second segment continued from is no longer in the window,
+		// so it must be anchored even though the resource is the same.
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:1
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:200@0
+#EXTINF:4.000,
+file.ts
+#EXT-X-BYTERANGE:300
+#EXTINF:4.000,
+file.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("nonzero_offsets_always_qualified", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("a.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 2048)
+		is.NoErr(e)
+
+		e = p.Append("b.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(150, 4096)
+		is.NoErr(e)
+
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@2048
+#EXTINF:4.000,
+a.ts
+#EXT-X-BYTERANGE:150@4096
+#EXTINF:4.000,
+b.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("roundtrip_preserves_omitted_offset", func(t *testing.T) {
+		is := is.New(t)
+		input := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+file.ts
+#EXT-X-BYTERANGE:200
+#EXTINF:4.000,
+file.ts
+#EXT-X-BYTERANGE:300
+#EXTINF:4.000,
+file.ts
+`
+		p, listType, err := DecodeFrom(strings.NewReader(input), true)
+		is.NoErr(err)
+		is.Equal(listType, MEDIA)
+		is.Equal(p.String(), input)
+	})
+}
+
 func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(10, 10)
