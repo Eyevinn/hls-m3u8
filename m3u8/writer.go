@@ -386,7 +386,7 @@ func writePartialSegment(buf *bytes.Buffer, ps *PartialSegment, writePrecision i
 		writeYESorNO(buf, ps.Gap)
 	}
 	if ps.Limit > 0 {
-		writeRange(buf, ",BYTERANGE=", true, ps.Limit, ps.Offset)
+		writeRange(buf, ",BYTERANGE=", true, ps.Limit, ps.Offset, true)
 	}
 	buf.WriteString(",URI=\"")
 	buf.WriteString(ps.URI)
@@ -542,7 +542,7 @@ func writeExtXMap(buf *bytes.Buffer, m *Map) {
 	buf.WriteString(m.URI)
 	buf.WriteRune('"')
 	if m.Limit > 0 {
-		writeRange(buf, ",BYTERANGE=", true, m.Limit, m.Offset)
+		writeRange(buf, ",BYTERANGE=", true, m.Limit, m.Offset, true)
 	}
 	buf.WriteRune('\n')
 }
@@ -576,14 +576,16 @@ func writeContentSteering(buf *bytes.Buffer, cs *ContentSteering) {
 	buf.WriteRune('\n')
 }
 
-func writeRange(buf *bytes.Buffer, tag string, quoted bool, limit, offset int64) {
+func writeRange(buf *bytes.Buffer, tag string, quoted bool, limit, offset int64, includeZeroOffset bool) {
 	buf.WriteString(tag)
 	if quoted {
 		buf.WriteRune('"')
 	}
 	buf.WriteString(strconv.FormatInt(limit, 10))
-	buf.WriteRune('@')
-	buf.WriteString(strconv.FormatInt(offset, 10))
+	if offset != 0 || includeZeroOffset {
+		buf.WriteRune('@')
+		buf.WriteString(strconv.FormatInt(offset, 10))
+	}
 	if quoted {
 		buf.WriteRune('"')
 	}
@@ -1012,6 +1014,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 
 	// shift head to start
 	p.head = start
+	isFirstSegment := true
 	// output segments
 	for i := start; i < start+outputCount; i++ {
 		seg = p.Segments[i]
@@ -1108,7 +1111,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		}
 
 		if seg.Limit > 0 {
-			writeRange(&p.buf, "#EXT-X-BYTERANGE:", false, seg.Limit, seg.Offset)
+			writeRange(&p.buf, "#EXT-X-BYTERANGE:", false, seg.Limit, seg.Offset, isFirstSegment)
 			p.buf.WriteRune('\n')
 		}
 
@@ -1130,6 +1133,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			p.buf.WriteString(p.Args)
 		}
 		p.buf.WriteRune('\n')
+		isFirstSegment = false
 	}
 
 	// handle remaining partial segments

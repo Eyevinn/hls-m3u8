@@ -594,6 +594,106 @@ test00.m4s
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+// Byte range encoding omits "@0" on every segment after the first when offset is zero,
+// but always includes "@<offset>" when offset is non-zero. The first emitted segment
+// must anchor the byte range because omitted offsets continue from the previous range.
+func TestEncodeMediaPlaylistByteRangeOffsets(t *testing.T) {
+	t.Run("zero_offset_first_segment_only", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("seg0.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("seg1.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0)
+		is.NoErr(e)
+
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+seg0.ts
+#EXT-X-BYTERANGE:200
+#EXTINF:4.000,
+seg1.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("zero_offset_first_visible_segment_in_live_window", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(2, 3)
+		is.NoErr(e)
+
+		e = p.Append("seg0.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("seg1.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0)
+		is.NoErr(e)
+
+		e = p.Remove()
+		is.NoErr(e)
+
+		e = p.Append("seg2.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(300, 0)
+		is.NoErr(e)
+
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:1
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:200@0
+#EXTINF:4.000,
+seg1.ts
+#EXT-X-BYTERANGE:300
+#EXTINF:4.000,
+seg2.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("nonzero_offsets_always_qualified", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("a.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 2048)
+		is.NoErr(e)
+
+		e = p.Append("b.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(150, 4096)
+		is.NoErr(e)
+
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@2048
+#EXTINF:4.000,
+a.ts
+#EXT-X-BYTERANGE:150@4096
+#EXTINF:4.000,
+b.ts
+`
+		is.Equal(p.String(), expected)
+	})
+}
+
 func TestEncodeMediaPlaylistWithSkipUntil(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(10, 10)
