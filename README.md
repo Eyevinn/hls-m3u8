@@ -3,7 +3,6 @@
 ![Test](https://github.com/Eyevinn/hls-m3u8/workflows/Go/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/Eyevinn/hls-m3u8/badge.svg?branch=main)](https://coveralls.io/github/Eyevinn/hls-m3u8?branch=main)
 [![GoDoc](https://godoc.org/github.com/Eyevinn/hls-m3u8?status.svg)](http://godoc.org/github.com/Eyevinn/hls-m3u8)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Eyevinn/hls-m3u8)](https://goreportcard.com/report/github.com/Eyevinn/hls-m3u8)
 [![license](https://img.shields.io/github/license/Eyevinn/hls-m3u8.svg)](https://github.com/Eyevinn/hls-m3u8/blob/main/LICENSE)
 
 hls-m3u8 implements parsing and generation of HLS m3u8 playlists.
