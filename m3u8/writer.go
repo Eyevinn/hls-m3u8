@@ -1024,6 +1024,13 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	)
 
 	segmentsSkipped := p.SkippedSegments()
+	// Tracks which partial segments have been written together with their full
+	// segment, so that the remaining ones can be written after the last full
+	// segment. Kept local, since Encode must not change the playlist.
+	var partWritten []bool
+	if p.HasPartialSegments() {
+		partWritten = make([]bool, len(p.PartialSegments))
+	}
 	var lastSegId uint64 = 0 // last segment sequence number in live playlist
 	if p.winsize > 0 && p.count > 0 {
 		// p.last() handles a tail that has wrapped around to the start of the slice
@@ -1111,21 +1118,12 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 			p.buf.WriteRune('\n')
 		}
 		// handle completed partial segments
-		if p.HasPartialSegments() {
-			fullSegUri := seg.URI
-			var remainingPartialSegments []*PartialSegment
-			for _, ps := range p.PartialSegments {
-				if isPartOf(ps.URI, fullSegUri) {
-					// This partial segment is part of the current full segment
-					writePartialSegment(&p.buf, ps, p.WritePrecision())
-				} else {
-					// This partial segment does not belong to current full segment
-					// Keep it to be written later
-					remainingPartialSegments = append(remainingPartialSegments, ps)
-				}
+		for i, ps := range p.PartialSegments {
+			if !partWritten[i] && isPartOf(ps.URI, seg.URI) {
+				// This partial segment is part of the current full segment
+				writePartialSegment(&p.buf, ps, p.WritePrecision())
+				partWritten[i] = true
 			}
-			// Update the PartialSegments list to exclude the completed ones
-			p.PartialSegments = remainingPartialSegments
 		}
 
 		if seg.Limit > 0 {
@@ -1154,17 +1152,14 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	}
 
 	// handle remaining partial segments
-	if p.HasPartialSegments() {
-		for _, ps := range p.PartialSegments {
-			if ps.SeqID >= lastSegId {
-				// This partial segment is part of the next segment
-				writePartialSegment(&p.buf, ps, p.WritePrecision())
-			} else {
-				// This partial segment does not belong to any segment
-				// and should be ignored
-				continue
-			}
+	for i, ps := range p.PartialSegments {
+		if partWritten[i] || ps.SeqID < lastSegId {
+			// Already written above, or belonging to a segment that is no longer
+			// in the playlist, in which case it should be ignored
+			continue
 		}
+		// This partial segment is part of the next, not yet complete, segment
+		writePartialSegment(&p.buf, ps, p.WritePrecision())
 	}
 
 	if p.PreloadHints != nil {
