@@ -669,6 +669,38 @@ func TestEncodeDecodedLowLatencyMediaPlaylistIdempotent(t *testing.T) {
 	}
 }
 
+// Partial segments must be dropped as the end of the playlist moves forward, also when
+// it moves by full segments only. Otherwise they linger for a stream that stops adding
+// partial segments, and IsSegmentReady keeps reporting them as available.
+func TestRemoveExpiredPartialsOnAppendSegment(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(3, 5)
+	is.NoErr(e) // Create media playlist should be successful
+	e = p.Append("fileSequence0.ts", 6.0, "")
+	is.NoErr(e) // Add segment to a media playlist should be successful
+	e = p.AppendPartial("filePart1.1.ts", 1.5, true)
+	is.NoErr(e) // Add partial segment to a media playlist should be successful
+	e = p.AppendPartial("filePart1.2.ts", 1.5, true)
+	is.NoErr(e) // Add partial segment to a media playlist should be successful
+
+	is.Equal(len(p.PartialSegments), 2)             // both partial segments should be kept
+	is.Equal(p.PartialSegments[0].SeqID, uint64(1)) // they belong to the next full segment
+	is.True(p.IsSegmentReady("filePart1.1.ts"))     // partial segment should be ready
+
+	// no more partial segments are added, so only the full segments move the end of
+	// the playlist forward
+	for i := 1; i <= 3; i++ {
+		e = p.Append(fmt.Sprintf("fileSequence%d.ts", i), 6.0, "")
+		is.NoErr(e) // Add segment to a media playlist should be successful
+	}
+	is.Equal(len(p.PartialSegments), 2) // still within the last 3 full segments
+
+	e = p.Append("fileSequence4.ts", 6.0, "")
+	is.NoErr(e)                                  // Add segment to a media playlist should be successful
+	is.Equal(len(p.PartialSegments), 0)          // expired partial segments should be removed
+	is.True(!p.IsSegmentReady("filePart1.1.ts")) // expired partial segment should not be ready
+}
+
 func TestEncodePartialSegments(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(5, 10)
