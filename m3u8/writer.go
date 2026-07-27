@@ -794,6 +794,9 @@ func (p *MediaPlaylist) AppendSegment(seg *MediaSegment) error {
 	if len(seg.SCTE35DateRanges) > 0 {
 		p.scte35Syntax = SCTE35_DATERANGE
 	}
+	// A new full segment moves the end of the playlist forward, which may leave
+	// earlier partial segments too far behind it to be kept.
+	p.removeExpiredPartials()
 	p.buf.Reset()
 	return nil
 }
@@ -836,29 +839,30 @@ func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 	return nil
 }
 
+// minRetainedPartSeqID returns the lowest segment sequence number for which partial
+// segments are kept, see partRetentionSegments. Partial segments of the next, not yet
+// appended, segment have a higher sequence number and are always kept.
+// Must not be called on an empty playlist.
+func (p *MediaPlaylist) minRetainedPartSeqID() uint64 {
+	lastSegID := p.Segments[p.last()].SeqId
+	if lastSegID < partRetentionSegments {
+		return 0 // keep all, and avoid underflow
+	}
+	return lastSegID - partRetentionSegments + 1
+}
+
+// removeExpiredPartials drops the partial segments that are too far behind the end of
+// the playlist to be included in it. Called both when a partial segment and when a full
+// segment is appended, since either may move the end of the playlist forward.
 func (p *MediaPlaylist) removeExpiredPartials() {
-	if len(p.PartialSegments) == 0 {
+	if len(p.PartialSegments) == 0 || p.count == 0 {
 		return
 	}
 
-	// Last full segment
-	segId := p.Segments[p.last()].SeqId
-	var validPartialSegments []*PartialSegment
-	for _, ps := range p.PartialSegments {
-		if segId < 3 {
-			// Keep all partial segments if we have less than 3 full segments
-			validPartialSegments = append(validPartialSegments, ps)
-		} else if ps.SeqID > segId-3 {
-			// Keep partial segments that belong to the last 3 full segments
-			validPartialSegments = append(validPartialSegments, ps)
-		} else {
-			// This partial segment is older than the last 3 segments
-			// and should be removed
-			continue
-		}
-	}
-
-	p.PartialSegments = validPartialSegments
+	minSeqID := p.minRetainedPartSeqID()
+	p.PartialSegments = slices.DeleteFunc(p.PartialSegments, func(ps *PartialSegment) bool {
+		return ps.SeqID < minSeqID
+	})
 }
 
 func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {

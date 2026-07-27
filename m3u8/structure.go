@@ -64,6 +64,13 @@ const (
 	// DATETIME represents format for EXT-X-PROGRAM-DATE-TIME timestamps.
 	// Format is [ISO/IEC 8601:2004] according to the [HLS spec].
 	DATETIME = time.RFC3339Nano
+
+	// partRetentionSegments is the number of full segments, counted back from the end
+	// of the playlist, for which partial segments are kept. The HLS specification says
+	// that EXT-X-PART tags SHOULD be removed once they are more than three target
+	// durations from the end of the playlist, which this approximates by counting the
+	// three last full segments.
+	partRetentionSegments uint64 = 3
 )
 
 // ListType is type of playlist.
