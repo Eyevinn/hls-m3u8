@@ -889,6 +889,37 @@ func (p *MediaPlaylist) ResetCache() {
 	p.buf.Reset()
 }
 
+// outputWindow returns the segments to include in the encoded playlist as the
+// ring-buffer index of the first segment and the number of segments to output.
+// For live playlists (winsize > 0) that is the last winsize segments, for
+// VoD/EVENT playlists (winsize == 0) all segments. Since the segment slice is a
+// ring buffer, the window may wrap, so indices must be taken modulo capacity
+// when walking it.
+func (p *MediaPlaylist) outputWindow() (start, outputCount uint) {
+	if p.count == 0 {
+		return p.head, 0
+	}
+	if p.winsize == 0 { // VoD or EVENT playlist: output all segments
+		return p.head, p.count
+	}
+	outputCount = min(p.winsize, p.count)
+	return (p.head + p.count - outputCount) % p.capacity, outputCount
+}
+
+// mediaSequence returns the value for the EXT-X-MEDIA-SEQUENCE tag, which is the
+// sequence number of the first segment appearing in the encoded playlist. Segments
+// replaced by an EXT-X-SKIP tag still count, so this is the start of the output
+// window rather than the first segment actually written.
+func (p *MediaPlaylist) mediaSequence(start, outputCount uint) uint64 {
+	if outputCount == 0 {
+		return p.SeqNo
+	}
+	if seg := p.Segments[start]; seg != nil {
+		return seg.SeqId
+	}
+	return p.SeqNo // protection from badly filled chunklists
+}
+
 // Encode generates output and returns a pointer to an internal buffer.
 // If winsize > 0, encoded the last `winsize` segments, otherwise encode all segments.
 // If already encoded, and not changed, the cached buffer will be returned.
@@ -955,8 +986,11 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		p.buf.WriteString(strconv.FormatFloat(p.PartTargetDuration, 'f', p.WritePrecision(), 64))
 		p.buf.WriteRune('\n')
 	}
+	// start index and number of segments to output. Needed already here, since
+	// EXT-X-MEDIA-SEQUENCE refers to the first segment of the output window.
+	start, outputCount := p.outputWindow()
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
-	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
+	p.buf.WriteString(strconv.FormatUint(p.mediaSequence(start, outputCount), 10))
 	p.buf.WriteRune('\n')
 	p.buf.WriteString("#EXT-X-TARGETDURATION:")
 	p.buf.WriteString(strconv.FormatInt(int64(p.TargetDuration), 10))
@@ -989,30 +1023,19 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		durationCache = make(map[float64]string)
 	)
 
-	head := p.head
-	tail := p.tail
-	count := p.count
-	isVoDOrEvent := p.winsize == 0
 	segmentsSkipped := p.SkippedSegments()
-	var outputCount uint     // number of segments to output
-	var start uint           // start index of segments to output
 	var lastSegId uint64 = 0 // last segment sequence number in live playlist
-	if isVoDOrEvent {
-		// for VoD playlists, output all segments
-		outputCount = count
-		start = head
-	} else {
-		// for Live playlists, output the last winsize segments
-		outputCount = min(p.winsize, count)
-		start = head + count - outputCount
-		if tail > 0 {
-			lastSegId = p.Segments[tail-1].SeqId
+	if p.winsize > 0 && p.count > 0 {
+		// p.last() handles a tail that has wrapped around to the start of the slice
+		if last := p.Segments[p.last()]; last != nil {
+			lastSegId = last.SeqId
 		}
 	}
 
-	// output segments
-	for i := start; i < start+outputCount; i++ {
-		seg = p.Segments[i]
+	// output segments, walking the ring buffer from start so that a window
+	// wrapping past the end of the slice is handled
+	for i := uint(0); i < outputCount; i++ {
+		seg = p.Segments[(start+i)%p.capacity]
 		if seg == nil { // protection from badly filled chunklists
 			continue
 		}
