@@ -1010,8 +1010,6 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		}
 	}
 
-	// shift head to start
-	p.head = start
 	// output segments
 	for i := start; i < start+outputCount; i++ {
 		seg = p.Segments[i]
