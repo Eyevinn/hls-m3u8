@@ -632,6 +632,41 @@ test04.m4s
 `
 	out := p.String()
 	is.Equal(out, expected) // Encode media playlist does not match expected
+
+	// Encode must not consume the partial segments, so encoding again gives the same result
+	nrParts := len(p.PartialSegments)
+	p.ResetCache()
+	is.Equal(p.String(), expected)            // repeated Encode must give the same output
+	is.Equal(len(p.PartialSegments), nrParts) // Encode must not consume partial segments
+	p.ResetCache()
+	is.Equal(p.String(), expected)            // a third Encode must also give the same output
+	is.Equal(len(p.PartialSegments), nrParts) // Encode must not consume partial segments
+}
+
+// A decoded low-latency playlist must survive being encoded more than once, with all
+// its EXT-X-PART tags intact.
+func TestEncodeDecodedLowLatencyMediaPlaylistIdempotent(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-low-latency.m3u8")
+	is.NoErr(err) // must open file
+	defer f.Close()
+	pl, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err)             // must decode playlist
+	is.Equal(listType, MEDIA) // must be a media playlist
+	p := pl.(*MediaPlaylist)
+
+	nrParts := len(p.PartialSegments)
+	is.Equal(nrParts, 10) // sample playlist has 10 EXT-X-PART tags
+
+	p.ResetCache()
+	first := p.Encode().String()
+	is.Equal(strings.Count(first, "#EXT-X-PART:"), nrParts) // all partial segments must be written
+
+	for i := 2; i <= 3; i++ {
+		p.ResetCache()
+		is.Equal(p.Encode().String(), first)      // repeated Encode must give the same output
+		is.Equal(len(p.PartialSegments), nrParts) // Encode must not consume partial segments
+	}
 }
 
 func TestEncodePartialSegments(t *testing.T) {

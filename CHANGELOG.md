@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   e.g. after `capacity` calls to `Slide` (PR #91)
 - `EXT-X-MEDIA-SEQUENCE` now reports the sequence number of the first segment in the
   encoded playlist, instead of that of the head segment (PR #91)
+- `Encode` no longer consumes the partial segments of a low-latency media playlist,
+  so that repeated calls keep writing all `EXT-X-PART` tags (PR #91)
 
 ### Changed
 - Encoded output of a live media playlist with more segments than `winsize` changes,
