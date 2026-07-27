@@ -424,6 +424,24 @@ test01.ts
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+func TestEncodeMediaPlaylistIdempotent(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(3, 10)
+	is.NoErr(e)
+	for i := 0; i < 5; i++ {
+		e = p.Append(fmt.Sprintf("seg%d.ts", i), 6.0, "")
+		is.NoErr(e)
+	}
+
+	p.ResetCache()
+	first := p.Encode().String()
+	is.True(strings.Contains(first, "seg2.ts")) // winsize=3, last 3 of 5 segments
+
+	p.ResetCache()
+	second := p.Encode().String()
+	is.Equal(first, second) // Encode must be idempotent
+}
+
 func TestEncodeMediaPlaylistWithGaps(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(3, 5)
