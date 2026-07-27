@@ -424,6 +424,8 @@ test01.ts
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+// Encode must not change the playlist, so that repeated calls give the same
+// result and appending after an Encode still yields the correct window.
 func TestEncodeMediaPlaylistIdempotent(t *testing.T) {
 	is := is.New(t)
 	p, e := NewMediaPlaylist(3, 10)
@@ -432,14 +434,89 @@ func TestEncodeMediaPlaylistIdempotent(t *testing.T) {
 		e = p.Append(fmt.Sprintf("seg%d.ts", i), 6.0, "")
 		is.NoErr(e)
 	}
+	// winsize is 3, so only the last 3 of the 5 segments are in the window
+	expected := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-MEDIA-SEQUENCE:2
+#EXT-X-TARGETDURATION:6
+#EXTINF:6.000,
+seg2.ts
+#EXTINF:6.000,
+seg3.ts
+#EXTINF:6.000,
+seg4.ts
+`
+	head, count := p.head, p.count
+	for i := 1; i <= 3; i++ {
+		p.ResetCache()
+		is.Equal(p.Encode().String(), expected) // every Encode must give the full window
+		is.Equal(p.head, head)                  // Encode must not move the head pointer
+		is.Equal(p.count, count)                // Encode must not change the segment count
+		is.Equal(len(p.GetAllSegments()), 5)    // all appended segments must be retained
+	}
 
+	// appending after an Encode must slide the window by one, not corrupt it
+	e = p.Append("seg5.ts", 6.0, "")
+	is.NoErr(e)
 	p.ResetCache()
-	first := p.Encode().String()
-	is.True(strings.Contains(first, "seg2.ts")) // winsize=3, last 3 of 5 segments
+	out := p.Encode().String()
+	is.True(strings.Contains(out, "seg3.ts"))  // window must start at seg3
+	is.True(strings.Contains(out, "seg5.ts"))  // window must end at the new segment
+	is.True(!strings.Contains(out, "seg2.ts")) // seg2 must have left the window
+}
 
+// The segment slice is a ring buffer, so the output window may wrap past the end
+// of the slice once more than capacity segments have been added.
+func TestEncodeMediaPlaylistRingWraparound(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(3, 5)
+	is.NoErr(e)
+	// slide well past capacity so that head and tail both wrap around
+	for i := 0; i < 12; i++ {
+		p.Slide(fmt.Sprintf("s%d.ts", i), 6.0, "")
+		p.ResetCache()
+		is.True(len(p.Encode().String()) > 0) // Encode must not panic on a wrapped window
+	}
+	expected := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-MEDIA-SEQUENCE:9
+#EXT-X-TARGETDURATION:6
+#EXTINF:6.000,
+s9.ts
+#EXTINF:6.000,
+s10.ts
+#EXTINF:6.000,
+s11.ts
+`
 	p.ResetCache()
-	second := p.Encode().String()
-	is.Equal(first, second) // Encode must be idempotent
+	is.Equal(p.Encode().String(), expected) // wrapped window must hold the last 3 segments
+}
+
+// EXT-X-MEDIA-SEQUENCE must be the sequence number of the first segment that the
+// playlist describes, which is the first segment of the output window.
+func TestEncodeMediaPlaylistMediaSequence(t *testing.T) {
+	is := is.New(t)
+	p, e := NewMediaPlaylist(2, 10)
+	is.NoErr(e)
+	is.True(strings.Contains(p.String(), "#EXT-X-MEDIA-SEQUENCE:0")) // empty playlist uses SeqNo
+
+	for i := 0; i < 4; i++ {
+		e = p.Append(fmt.Sprintf("seg%d.ts", i), 6.0, "")
+		is.NoErr(e)
+		p.ResetCache()
+		// with winsize 2 the window start trails the newest segment by one
+		wantSeqNo := uint64(0)
+		if i > 0 {
+			wantSeqNo = uint64(i) - 1
+		}
+		expTag := fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d", wantSeqNo)
+		is.True(strings.Contains(p.Encode().String(), expTag+"\n")) // must match window start
+	}
+
+	// Remove advances the head, and the window start with it
+	is.NoErr(p.Remove())
+	p.ResetCache()
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-MEDIA-SEQUENCE:2\n"))
 }
 
 func TestEncodeMediaPlaylistWithGaps(t *testing.T) {
@@ -1407,10 +1484,12 @@ func ExampleNewMediaPlaylist_string() {
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
+	// The window holds test02.ts only, so EXT-X-MEDIA-SEQUENCE is its
+	// sequence number 1, and not that of the dropped test01.ts.
 	// Output:
 	// #EXTM3U
 	// #EXT-X-VERSION:3
-	// #EXT-X-MEDIA-SEQUENCE:0
+	// #EXT-X-MEDIA-SEQUENCE:1
 	// #EXT-X-TARGETDURATION:6
 	// #EXTINF:6.000,
 	// test02.ts
