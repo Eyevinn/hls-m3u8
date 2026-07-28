@@ -20,7 +20,7 @@ var ErrCannotDetectPlaylistType = errors.New("cannot detect playlist type")
 
 // Deprecated: ErrDanglingSCTE35DateRange is never returned anymore.
 // SCTE-35 DATERANGE tags after the last segment are accepted and stored
-// in MediaPlaylist.TrailingSCTE35DateRanges.
+// in MediaPlaylist.TrailingDateRanges.
 var ErrDanglingSCTE35DateRange = errors.New("dangling SCTE-35 DateRange tag after last segment not supported")
 
 // TimeParse allows globally apply and/or override Time Parser function.
@@ -250,17 +250,17 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 	if strict && !state.m3u {
 		return ErrExtM3UAbsent
 	}
-	p.storeTrailingSCTE35DateRanges(state)
+	p.storeTrailingDateRanges(state)
 	return nil
 }
 
-// storeTrailingSCTE35DateRanges moves SCTE-35 DATERANGE tags left in the decoding
-// state after the last segment to the playlist's TrailingSCTE35DateRanges.
-func (p *MediaPlaylist) storeTrailingSCTE35DateRanges(state *decodingState) {
+// storeTrailingDateRanges moves SCTE-35 DATERANGE tags left in the decoding
+// state after the last segment to the playlist's TrailingDateRanges.
+func (p *MediaPlaylist) storeTrailingDateRanges(state *decodingState) {
 	if len(state.scte35DateRanges) == 0 {
 		return
 	}
-	p.TrailingSCTE35DateRanges = append(p.TrailingSCTE35DateRanges, state.scte35DateRanges...)
+	p.TrailingDateRanges = append(p.TrailingDateRanges, state.scte35DateRanges...)
 	state.scte35DateRanges = nil
 	p.scte35Syntax = SCTE35_DATERANGE
 }
@@ -363,7 +363,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 			// VoD and Event's should show the entire playlist
 			_ = media.SetWinSize(0)
 		}
-		media.storeTrailingSCTE35DateRanges(state)
+		media.storeTrailingDateRanges(state)
 		return media, MEDIA, nil
 	}
 	return nil, state.listType, ErrCannotDetectPlaylistType

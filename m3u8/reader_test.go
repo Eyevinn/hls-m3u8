@@ -1155,8 +1155,8 @@ func TestTrailingScte35DateRange(t *testing.T) {
 			p := pl.(*MediaPlaylist)
 			is.Equal(p.Count(), uint(1))                     // single segment preserved
 			is.Equal(len(p.Segments[0].SCTE35DateRanges), 1) // first DATERANGE attached to seg[0]
-			is.Equal(len(p.TrailingSCTE35DateRanges), 1)     // trailing DATERANGE bucketed
-			is.Equal(p.TrailingSCTE35DateRanges[0].ID, "78")
+			is.Equal(len(p.TrailingDateRanges), 1)           // trailing DATERANGE bucketed
+			is.Equal(p.TrailingDateRanges[0].ID, "78")
 			is.Equal(p.SCTE35Syntax(), SCTE35_DATERANGE)
 		})
 		t.Run(fmt.Sprintf("strict=%v/MediaPlaylist.DecodeFrom", strict), func(t *testing.T) {
@@ -1168,8 +1168,8 @@ func TestTrailingScte35DateRange(t *testing.T) {
 			is.NoErr(err)
 			err = pl.DecodeFrom(bufio.NewReader(f), strict)
 			is.NoErr(err)
-			is.Equal(len(pl.TrailingSCTE35DateRanges), 1)
-			is.Equal(pl.TrailingSCTE35DateRanges[0].ID, "78")
+			is.Equal(len(pl.TrailingDateRanges), 1)
+			is.Equal(pl.TrailingDateRanges[0].ID, "78")
 		})
 	}
 }
@@ -1193,9 +1193,9 @@ func TestTrailingScte35DateRangeRoundTrip(t *testing.T) {
 	p2, _, err := DecodeFrom(strings.NewReader(encoded), false)
 	is.NoErr(err)
 	m2 := p2.(*MediaPlaylist)
-	is.Equal(len(m2.TrailingSCTE35DateRanges), 1)
-	is.Equal(m2.TrailingSCTE35DateRanges[0].ID, "78")
-	is.Equal(m2.TrailingSCTE35DateRanges[0].SCTE35Out, "0xFC00")
+	is.Equal(len(m2.TrailingDateRanges), 1)
+	is.Equal(m2.TrailingDateRanges[0].ID, "78")
+	is.Equal(m2.TrailingDateRanges[0].SCTE35Out, "0xFC00")
 }
 
 func TestTrailingScte35DateRangeAfterEndlist(t *testing.T) {
@@ -1214,8 +1214,8 @@ video1.mp4
 	is.Equal(listType, MEDIA)
 	p := pl.(*MediaPlaylist)
 	is.True(p.Closed)
-	is.Equal(len(p.TrailingSCTE35DateRanges), 1)
-	is.Equal(p.TrailingSCTE35DateRanges[0].ID, "79")
+	is.Equal(len(p.TrailingDateRanges), 1)
+	is.Equal(p.TrailingDateRanges[0].ID, "79")
 	encoded := p.Encode().String()
 	drIdx := strings.Index(encoded, `#EXT-X-DATERANGE:ID="79"`)
 	segIdx := strings.Index(encoded, "video1.mp4")

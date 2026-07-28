@@ -1170,7 +1170,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		writePreloadHint(&p.buf, p.PreloadHints)
 	}
 
-	for _, dr := range p.TrailingSCTE35DateRanges {
+	for _, dr := range p.TrailingDateRanges {
 		writeDateRange(&p.buf, dr, p.WritePrecision())
 	}
 
@@ -1378,11 +1378,13 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 	return nil
 }
 
-// AppendTrailingSCTE35DateRange appends an SCTE-35 EXT-X-DATERANGE tag to be
+// AppendTrailingDateRange appends an EXT-X-DATERANGE tag (e.g. SCTE-35) to be
 // written after the last segment. This operation resets the playlist cache.
-func (p *MediaPlaylist) AppendTrailingSCTE35DateRange(dr *DateRange) {
-	p.TrailingSCTE35DateRanges = append(p.TrailingSCTE35DateRanges, dr)
-	p.scte35Syntax = SCTE35_DATERANGE
+func (p *MediaPlaylist) AppendTrailingDateRange(dr *DateRange) {
+	p.TrailingDateRanges = append(p.TrailingDateRanges, dr)
+	if dr.SCTE35Cmd != "" || dr.SCTE35Out != "" || dr.SCTE35In != "" {
+		p.scte35Syntax = SCTE35_DATERANGE
+	}
 	p.buf.Reset()
 }
 

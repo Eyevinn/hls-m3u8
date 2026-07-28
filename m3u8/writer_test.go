@@ -147,14 +147,14 @@ func TestSetSCTE35(t *testing.T) {
 	}
 }
 
-func TestAppendTrailingScte35DateRange(t *testing.T) {
+func TestAppendTrailingDateRange(t *testing.T) {
 	is := is.New(t)
 	p, err := NewMediaPlaylist(0, 5)
 	is.NoErr(err)
 	is.NoErr(p.Append("video1.mp4", 5.76, ""))
 	_ = p.Encode() // fill the cache
 	plannedDur := 30.0
-	p.AppendTrailingSCTE35DateRange(&DateRange{
+	p.AppendTrailingDateRange(&DateRange{
 		ID:              "80",
 		StartDate:       time.Date(2024, 11, 25, 14, 57, 19, 0, time.UTC),
 		PlannedDuration: &plannedDur,
