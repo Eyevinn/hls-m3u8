@@ -375,6 +375,11 @@ type decodingState struct {
 	programDateTime    time.Time
 	limit              int64
 	offset             int64
+	rangeHasOffset     bool   // the pending EXT-X-BYTERANGE carried an explicit @offset
+	prevRangeURI       string // URI of the previous segment with a byte range, "" if it had none
+	prevRangeEnd       int64  // first byte after the previous segment's byte range
+	prevPartURI        string // URI of the previous partial segment with a byte range
+	prevPartEnd        int64  // first byte after the previous partial segment's byte range
 	duration           float64
 	title              string
 	variant            *Variant

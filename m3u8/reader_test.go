@@ -132,13 +132,170 @@ func TestDecodeMediaPlaylistByteRange(t *testing.T) {
 	expected := []*MediaSegment{
 		{URI: "video.ts", Duration: 10, Limit: 75232, SeqId: 0},
 		{URI: "video.ts", Duration: 10, Limit: 82112, Offset: 752321, SeqId: 1},
-		{URI: "video.ts", Duration: 10, Limit: 69864, SeqId: 2},
+		// The third segment omits its offset, so it continues from the byte after the
+		// second range: 752321 + 82112.
+		{URI: "video.ts", Duration: 10, Limit: 69864, Offset: 834433, SeqId: 2},
 	}
 	for i, seg := range p.Segments {
 		if !reflect.DeepEqual(*seg, *expected[i]) {
 			t.Errorf("exp: %+v\ngot: %+v", expected[i], seg)
 		}
 	}
+}
+
+// An EXT-X-BYTERANGE without an offset continues from the previous sub-range of the same
+// resource, so the decoder resolves it to an absolute offset. Re-encoding omits the offset
+// again for exactly those ranges that continue the previous one.
+func TestDecodeByteRangeOffsetResolution(t *testing.T) {
+	t.Run("omitted_offsets_resolved_and_roundtripped", func(t *testing.T) {
+		is := is.New(t)
+		// Non-contiguous second range, then two omitted offsets chaining from it.
+		input := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:10
+#EXT-X-BYTERANGE:75232@0
+#EXTINF:10.000,
+video.ts
+#EXT-X-BYTERANGE:82112@752321
+#EXTINF:10.000,
+video.ts
+#EXT-X-BYTERANGE:69864
+#EXTINF:10.000,
+video.ts
+#EXT-X-BYTERANGE:1000
+#EXTINF:10.000,
+video.ts
+`
+		p, listType, err := DecodeFrom(strings.NewReader(input), true)
+		is.NoErr(err)
+		is.Equal(listType, MEDIA)
+		mp := p.(*MediaPlaylist)
+		is.Equal(mp.Segments[0].Offset, int64(0))
+		is.Equal(mp.Segments[1].Offset, int64(752321))
+		is.Equal(mp.Segments[2].Offset, int64(834433)) // 752321 + 82112
+		is.Equal(mp.Segments[3].Offset, int64(904297)) // 834433 + 69864
+		is.Equal(mp.String(), input)                   // omitted offsets are omitted again
+	})
+
+	t.Run("explicit_zero_offset_is_not_a_continuation", func(t *testing.T) {
+		is := is.New(t)
+		// The second range restarts at byte 0 of the same resource, which must survive a
+		// round trip as an explicit @0 rather than becoming a continuation.
+		input := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:10
+#EXT-X-BYTERANGE:100@0
+#EXTINF:10.000,
+video.ts
+#EXT-X-BYTERANGE:200@0
+#EXTINF:10.000,
+video.ts
+`
+		p, _, err := DecodeFrom(strings.NewReader(input), true)
+		is.NoErr(err)
+		mp := p.(*MediaPlaylist)
+		is.Equal(mp.Segments[1].Offset, int64(0))
+		is.Equal(mp.String(), input)
+	})
+
+	t.Run("strict_rejects_omitted_offset_without_previous_range", func(t *testing.T) {
+		is := is.New(t)
+		input := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:10
+#EXTINF:10.000,
+whole.ts
+#EXT-X-BYTERANGE:200
+#EXTINF:10.000,
+ranged.ts
+`
+		_, _, err := DecodeFrom(strings.NewReader(input), true)
+		is.True(err != nil) // omitted offset with nothing to continue from must fail in strict mode
+		is.True(strings.Contains(err.Error(), "omits the offset"))
+	})
+
+	t.Run("strict_rejects_omitted_offset_after_other_resource", func(t *testing.T) {
+		is := is.New(t)
+		input := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:10
+#EXT-X-BYTERANGE:100@0
+#EXTINF:10.000,
+fileA.ts
+#EXT-X-BYTERANGE:200
+#EXTINF:10.000,
+fileB.ts
+`
+		_, _, err := DecodeFrom(strings.NewReader(input), true)
+		is.True(err != nil) // a continuation of a different resource must fail in strict mode
+	})
+
+	t.Run("lenient_keeps_zero_offset_without_previous_range", func(t *testing.T) {
+		is := is.New(t)
+		input := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:10
+#EXTINF:10.000,
+whole.ts
+#EXT-X-BYTERANGE:200
+#EXTINF:10.000,
+ranged.ts
+`
+		p, _, err := DecodeFrom(strings.NewReader(input), false)
+		is.NoErr(err)
+		mp := p.(*MediaPlaylist)
+		is.Equal(mp.Segments[1].Offset, int64(0))
+	})
+}
+
+// EXT-X-PART BYTERANGE has the same optional offset as EXT-X-BYTERANGE, scoped to the
+// partial segments of the same parent segment (rfc8216bis Section 4.4.4.9).
+func TestDecodePartialSegmentByteRangeOffsetResolution(t *testing.T) {
+	t.Run("omitted_offsets_resolved_within_parent_segment", func(t *testing.T) {
+		is := is.New(t)
+		input := `#EXTM3U
+#EXT-X-VERSION:9
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PART-INF:PART-TARGET=2.000
+#EXTINF:4.000,
+seg0.m4s
+#EXT-X-PART:DURATION=2.000,URI="seg1.m4s",BYTERANGE="1000@0"
+#EXT-X-PART:DURATION=2.000,URI="seg1.m4s",BYTERANGE="2000"
+#EXTINF:4.000,
+seg1.m4s
+`
+		p, _, err := DecodeFrom(strings.NewReader(input), true)
+		is.NoErr(err) // an omitted part offset is valid and must not fail to parse
+		mp := p.(*MediaPlaylist)
+		is.Equal(len(mp.PartialSegments), 2)
+		is.Equal(mp.PartialSegments[0].Offset, int64(0))
+		is.Equal(mp.PartialSegments[1].Offset, int64(1000))
+	})
+
+	t.Run("strict_rejects_omitted_offset_in_new_parent_segment", func(t *testing.T) {
+		is := is.New(t)
+		// all.m4s is one resource, but the continuation does not cross the parent segment.
+		input := `#EXTM3U
+#EXT-X-VERSION:9
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PART-INF:PART-TARGET=4.000
+#EXTINF:4.000,
+seg0.m4s
+#EXT-X-PART:DURATION=4.000,URI="all.m4s",BYTERANGE="1000@0"
+#EXTINF:4.000,
+all.m4s
+#EXT-X-PART:DURATION=4.000,URI="all.m4s",BYTERANGE="2000"
+#EXTINF:4.000,
+all.m4s
+`
+		_, _, err := DecodeFrom(strings.NewReader(input), true)
+		is.True(err != nil) // continuation must not cross a parent segment boundary
+		is.True(strings.Contains(err.Error(), "omits the offset"))
+	})
 }
 
 // Decode a master playlist with i-frame-stream-inf
@@ -1396,7 +1553,7 @@ func TestParsePartialSegment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parsePartialSegment(tt.parameters)
+			got, _, err := parsePartialSegment(tt.parameters)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parsePartialSegment() error = %v, wantErr %v", err, tt.wantErr)
 				return
