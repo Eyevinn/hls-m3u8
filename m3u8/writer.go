@@ -576,13 +576,16 @@ func writeContentSteering(buf *bytes.Buffer, cs *ContentSteering) {
 	buf.WriteRune('\n')
 }
 
-func writeRange(buf *bytes.Buffer, tag string, quoted bool, limit, offset int64, includeZeroOffset bool) {
+// writeRange writes a byte range as "<n>[@<o>]". The offset is written unless writeOffset
+// is false, which the caller may only choose when omitting it means exactly the same range,
+// i.e. when it continues the previous sub-range of the same resource.
+func writeRange(buf *bytes.Buffer, tag string, quoted bool, limit, offset int64, writeOffset bool) {
 	buf.WriteString(tag)
 	if quoted {
 		buf.WriteRune('"')
 	}
 	buf.WriteString(strconv.FormatInt(limit, 10))
-	if offset != 0 || includeZeroOffset {
+	if writeOffset {
 		buf.WriteRune('@')
 		buf.WriteString(strconv.FormatInt(offset, 10))
 	}
@@ -1045,8 +1048,10 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		}
 	}
 
-	// URI of the previous written segment if it had a byte range, "" otherwise
+	// URI of the previous written segment if it had a byte range, "" otherwise, and the
+	// first byte after that range, to detect sub-ranges that can omit their offset
 	prevRangeURI := ""
+	prevRangeEnd := int64(0)
 	// output segments, walking the ring buffer from start so that a window
 	// wrapping past the end of the slice is handled
 	for i := uint(0); i < outputCount; i++ {
@@ -1135,13 +1140,15 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		}
 
 		if seg.Limit > 0 {
-			// An omitted offset means continuation of the previous segment's range, which is
-			// only defined when that segment is a sub-range of the same resource
-			// (rfc8216bis Section 4.4.4.2). Otherwise anchor with an explicit offset, even zero.
-			mustAnchor := prevRangeURI != seg.URI
-			writeRange(&p.buf, "#EXT-X-BYTERANGE:", false, seg.Limit, seg.Offset, mustAnchor)
+			// The offset may only be omitted when this range starts at the byte following the
+			// previous range of the same resource, since that is what a client assumes for an
+			// absent offset (rfc8216bis Section 4.4.4.2). Any other range, including one that
+			// restarts at zero, needs an explicit offset.
+			isContinuation := prevRangeURI == seg.URI && seg.Offset == prevRangeEnd
+			writeRange(&p.buf, "#EXT-X-BYTERANGE:", false, seg.Limit, seg.Offset, !isContinuation)
 			p.buf.WriteRune('\n')
 			prevRangeURI = seg.URI
+			prevRangeEnd = seg.Offset + seg.Limit
 		} else {
 			prevRangeURI = ""
 		}
