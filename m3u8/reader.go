@@ -719,27 +719,32 @@ func parseDefine(line string) (Define, error) {
 	return d, nil
 }
 
-func parsePartialSegment(parameters string) (*PartialSegment, error) {
-	ps := PartialSegment{}
+// parsePartialSegment parses the attributes of an EXT-X-PART tag.
+//
+// hasOffset reports whether a BYTERANGE attribute carried an explicit offset. It is
+// meaningless when the partial segment has no byte range at all (Limit == 0).
+func parsePartialSegment(parameters string) (ps *PartialSegment, hasOffset bool, err error) {
+	part := PartialSegment{}
 	for _, attr := range decodeAttributes(parameters) {
 		switch attr.Key {
 		case "URI":
-			ps.URI = deQuote(attr.Val)
+			part.URI = deQuote(attr.Val)
 		case "DURATION":
 			duration, err := strconv.ParseFloat(attr.Val, 64)
 			if err != nil {
-				return nil, fmt.Errorf("duration parsing error: %w", err)
+				return nil, false, fmt.Errorf("duration parsing error: %w", err)
 			}
-			ps.Duration = duration
+			part.Duration = duration
 		case "INDEPENDENT":
-			ps.Independent = attr.Val == "YES"
+			part.Independent = attr.Val == "YES"
 		case "BYTERANGE":
-			if _, err := fmt.Sscanf(deQuote(attr.Val), "%d@%d", &ps.Limit, &ps.Offset); err != nil {
-				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+			var err error
+			if part.Limit, part.Offset, hasOffset, err = parseByteRange(deQuote(attr.Val)); err != nil {
+				return nil, false, err
 			}
 		}
 	}
-	return &ps, nil
+	return &part, hasOffset, nil
 }
 
 func parsePreloadHint(parameters string) (*PreloadHint, error) {
@@ -836,6 +841,24 @@ func parseSessionData(line string) (*SessionData, error) {
 	return &sd, nil
 }
 
+// parseByteRange parses an EXT-X-BYTERANGE-style "<n>[@<o>]" value.
+//
+// hasOffset reports whether the optional offset was present. When it is absent, the
+// sub-range starts at the byte following the previous sub-range of the same resource
+// (rfc8216bis Sections 4.4.4.2 and 4.4.4.9), so the caller must resolve it.
+func parseByteRange(value string) (limit, offset int64, hasOffset bool, err error) {
+	limitStr, offsetStr, hasOffset := strings.Cut(value, "@")
+	if limit, err = strconv.ParseInt(limitStr, 10, 64); err != nil {
+		return 0, 0, false, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+	}
+	if hasOffset {
+		if offset, err = strconv.ParseInt(offsetStr, 10, 64); err != nil {
+			return 0, 0, false, fmt.Errorf("byterange sub-range offset value parsing error: %w", err)
+		}
+	}
+	return limit, offset, hasOffset, nil
+}
+
 func parseExtXMapParameters(parameters string) (*Map, error) {
 	m := Map{}
 	for _, attr := range decodeAttributes(parameters) {
@@ -843,9 +866,16 @@ func parseExtXMapParameters(parameters string) (*Map, error) {
 		case "URI":
 			m.URI = deQuote(attr.Val)
 		case "BYTERANGE":
-			if _, err := fmt.Sscanf(deQuote(attr.Val), "%d@%d", &m.Limit, &m.Offset); err != nil {
-				return nil, fmt.Errorf("byterange sub-range length value parsing error: %w", err)
+			limit, offset, hasOffset, err := parseByteRange(deQuote(attr.Val))
+			if err != nil {
+				return nil, err
 			}
+			if !hasOffset {
+				// Unlike EXT-X-BYTERANGE, the offset is REQUIRED here (rfc8216bis
+				// Section 4.4.4.5), so there is nothing to continue from.
+				return nil, fmt.Errorf("EXT-X-MAP BYTERANGE %q is missing the required offset", attr.Val)
+			}
+			m.Limit, m.Offset = limit, offset
 		}
 	}
 	return &m, nil
@@ -999,10 +1029,31 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			state.tagInf = false
 		}
 		if state.tagRange {
-			if err = p.SetRange(state.limit, state.offset); strict && err != nil {
+			offset := state.offset
+			if !state.rangeHasOffset {
+				// An absent offset means the sub-range starts at the byte following the
+				// previous sub-range, which requires the previous segment to be a sub-range
+				// of the same resource (rfc8216bis Section 4.4.4.2). Resolve it to an
+				// absolute offset so that Offset is always usable for a byte-range request.
+				if state.prevRangeURI != line {
+					if strict {
+						return fmt.Errorf("EXT-X-BYTERANGE for %q omits the offset, but the previous"+
+							" segment is not a sub-range of the same resource", line)
+					}
+					offset = 0 // undefined per spec, keep zero for a lenient parse
+				} else {
+					offset = state.prevRangeEnd
+				}
+			}
+			if err = p.SetRange(state.limit, offset); strict && err != nil {
 				return err
 			}
+			state.prevRangeURI = line
+			state.prevRangeEnd = offset + state.limit
 			state.tagRange = false
+		} else {
+			// A segment without a byte range leaves no range to continue from.
+			state.prevRangeURI = ""
 		}
 		if state.tagSCTE35 {
 			state.tagSCTE35 = false
@@ -1059,6 +1110,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			// Mark all partial segments as completed
 			state.tagPartialSegment = false
 		}
+		// A byte range continues only within the same parent segment, so the next parent
+		// starts without a range to continue from.
+		state.prevPartURI = ""
 	// start tag first
 	case line == "#EXTM3U":
 		state.m3u = true
@@ -1094,9 +1148,27 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case strings.HasPrefix(line, "#EXT-X-PART:"):
 		state.listType = MEDIA
 		state.tagPartialSegment = true
-		partialSegment, err := parsePartialSegment(line[12:])
+		partialSegment, rangeHasOffset, err := parsePartialSegment(line[12:])
 		if err != nil {
 			return err
+		}
+		if partialSegment.Limit > 0 {
+			// As for EXT-X-BYTERANGE, an absent offset continues from the previous partial
+			// segment, here scoped to the same parent segment (rfc8216bis Section 4.4.4.9).
+			if !rangeHasOffset {
+				if state.prevPartURI != partialSegment.URI {
+					if strict {
+						return fmt.Errorf("EXT-X-PART BYTERANGE for %q omits the offset, but the previous"+
+							" partial segment is not a sub-range of the same resource", partialSegment.URI)
+					}
+				} else {
+					partialSegment.Offset = state.prevPartEnd
+				}
+			}
+			state.prevPartURI = partialSegment.URI
+			state.prevPartEnd = partialSegment.Offset + partialSegment.Limit
+		} else {
+			state.prevPartURI = ""
 		}
 		// if the program date time tag is present, set it on this partial segment
 		if state.tagProgramDateTime && p.HasPartialSegments() {
@@ -1177,15 +1249,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case !state.tagRange && strings.HasPrefix(line, "#EXT-X-BYTERANGE:"):
 		state.tagRange = true
 		state.listType = MEDIA
-		state.offset = 0
-		params := strings.SplitN(line[17:], "@", 2)
-		if state.limit, err = strconv.ParseInt(params[0], 10, 64); strict && err != nil {
-			return fmt.Errorf("byterange sub-range length value parsing error: %w", err)
-		}
-		if len(params) > 1 {
-			if state.offset, err = strconv.ParseInt(params[1], 10, 64); strict && err != nil {
-				return fmt.Errorf("byterange sub-range offset value parsing error: %w ", err)
-			}
+		state.limit, state.offset, state.rangeHasOffset, err = parseByteRange(line[17:])
+		if strict && err != nil {
+			return err
 		}
 	case !state.tagSCTE35 && strings.HasPrefix(line, "#EXT-SCTE35:"):
 		state.tagSCTE35 = true

@@ -779,7 +779,7 @@ test00.m4s
 // range" (rfc8216bis Section 4.4.4.2). Otherwise the range is anchored with an explicit
 // offset, even when it is zero. Non-zero offsets are always written.
 func TestEncodeMediaPlaylistByteRangeOffsets(t *testing.T) {
-	t.Run("same_resource_continuation_omits_zero_offset", func(t *testing.T) {
+	t.Run("same_resource_continuation_omits_offset", func(t *testing.T) {
 		is := is.New(t)
 		p, e := NewMediaPlaylist(0, 5)
 		is.NoErr(e)
@@ -791,7 +791,7 @@ func TestEncodeMediaPlaylistByteRangeOffsets(t *testing.T) {
 
 		e = p.Append("file.ts", 4.0, "")
 		is.NoErr(e)
-		e = p.SetRange(200, 0)
+		e = p.SetRange(200, 100) // starts right after the previous range
 		is.NoErr(e)
 
 		expected := `#EXTM3U
@@ -802,6 +802,65 @@ func TestEncodeMediaPlaylistByteRangeOffsets(t *testing.T) {
 #EXTINF:4.000,
 file.ts
 #EXT-X-BYTERANGE:200
+#EXTINF:4.000,
+file.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("same_resource_restart_at_zero_keeps_offset", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 0) // back to the start, not a continuation
+		is.NoErr(e)
+
+		// Omitting the offset here would move the range to byte 100.
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+file.ts
+#EXT-X-BYTERANGE:200@0
+#EXTINF:4.000,
+file.ts
+`
+		is.Equal(p.String(), expected)
+	})
+
+	t.Run("non_contiguous_same_resource_keeps_offset", func(t *testing.T) {
+		is := is.New(t)
+		p, e := NewMediaPlaylist(0, 5)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(100, 0)
+		is.NoErr(e)
+
+		e = p.Append("file.ts", 4.0, "")
+		is.NoErr(e)
+		e = p.SetRange(200, 5000) // gap between the two ranges
+		is.NoErr(e)
+
+		expected := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:4
+#EXT-X-BYTERANGE:100@0
+#EXTINF:4.000,
+file.ts
+#EXT-X-BYTERANGE:200@5000
 #EXTINF:4.000,
 file.ts
 `
@@ -865,7 +924,7 @@ ranged.ts
 		is.Equal(p.String(), expected)
 	})
 
-	t.Run("first_visible_segment_in_live_window_anchors_zero_offset", func(t *testing.T) {
+	t.Run("first_visible_segment_in_live_window_keeps_offset", func(t *testing.T) {
 		is := is.New(t)
 		p, e := NewMediaPlaylist(2, 3)
 		is.NoErr(e)
@@ -877,7 +936,7 @@ ranged.ts
 
 		e = p.Append("file.ts", 4.0, "")
 		is.NoErr(e)
-		e = p.SetRange(200, 0)
+		e = p.SetRange(200, 100)
 		is.NoErr(e)
 
 		e = p.Remove()
@@ -885,16 +944,17 @@ ranged.ts
 
 		e = p.Append("file.ts", 4.0, "")
 		is.NoErr(e)
-		e = p.SetRange(300, 0)
+		e = p.SetRange(300, 300)
 		is.NoErr(e)
 
-		// The range the second segment continued from is no longer in the window,
-		// so it must be anchored even though the resource is the same.
+		// The range the second segment continued from is no longer in the window, so it
+		// needs an explicit offset even though the resource is the same. The third segment
+		// still continues from the second and can omit it.
 		expected := `#EXTM3U
 #EXT-X-VERSION:4
 #EXT-X-MEDIA-SEQUENCE:1
 #EXT-X-TARGETDURATION:4
-#EXT-X-BYTERANGE:200@0
+#EXT-X-BYTERANGE:200@100
 #EXTINF:4.000,
 file.ts
 #EXT-X-BYTERANGE:300
