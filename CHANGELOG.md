@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so that repeated calls keep writing all `EXT-X-PART` tags (PR #91)
 - Expired partial segments are now also removed when a full segment is appended, so
   they no longer linger, and are no longer reported by `IsSegmentReady` (PR #91)
+- `EXT-X-BYTERANGE` no longer writes `@0` for a sub-range that continues the previous
+  segment's range, since an omitted offset and `@0` are not equivalent (PR #86)
 
 ### Changed
 - Encoded output of a live media playlist with more segments than `winsize` changes,
