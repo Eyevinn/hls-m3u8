@@ -130,10 +130,12 @@ func (p *MasterPlaylist) AppendDefine(d Define) error {
 		return errors.New("IMPORT not allowed in master playlist")
 	}
 	p.Defines = append(p.Defines, d)
+	p.ResetCache()
 	return nil
 }
 
-// ResetCache resets the playlist's cache (its buffer).
+// ResetCache resets the playlist's cache (its buffer). Call ResetCache after
+// modifying exported playlist fields directly.
 func (p *MasterPlaylist) ResetCache() {
 	p.buf.Reset()
 }
@@ -661,6 +663,7 @@ func (p *MasterPlaylist) SetCustomTag(tag CustomTag) {
 	}
 
 	p.Custom[tag.TagName()] = tag
+	p.ResetCache()
 }
 
 // IndependentSegments returns true if all media samples in a segment can be
@@ -672,6 +675,7 @@ func (p *MasterPlaylist) IndependentSegments() bool {
 // SetIndependentSegments sets the master playlist #EXT-X--INDEPENDENT-SEGMENTS tag.
 func (p *MasterPlaylist) SetIndependentSegments(b bool) {
 	p.independentSegments = b
+	p.ResetCache()
 }
 
 // String provides the playlist fulfilling the Stringer interface.
@@ -743,6 +747,7 @@ func (p *MediaPlaylist) last() uint {
 
 func (p *MediaPlaylist) SetIndependentSegments(b bool) {
 	p.independentSegments = b
+	p.ResetCache()
 }
 
 func (p *MediaPlaylist) IndependentSegments() bool {
@@ -840,6 +845,7 @@ func (p *MediaPlaylist) AppendPartialSegment(ps *PartialSegment) error {
 	}
 	p.SegmentIndexing.NextPartIndex++
 	p.removeExpiredPartials()
+	p.ResetCache()
 
 	return nil
 }
@@ -875,10 +881,12 @@ func (p *MediaPlaylist) SetPreloadHint(hintType, uri string) {
 	preloadHint.Type = hintType
 	preloadHint.URI = uri
 	p.PreloadHints = preloadHint
+	p.ResetCache()
 }
 
 func (p *MediaPlaylist) AppendDefine(d Define) {
 	p.Defines = append(p.Defines, d)
+	p.ResetCache()
 }
 
 // Slide combines two operations: first it removes one chunk from
@@ -893,7 +901,8 @@ func (p *MediaPlaylist) Slide(uri string, duration float64, title string) {
 }
 
 // ResetCache resets playlist cache (internal buffer).
-// Next call to Encode() fills buffer/cache again.
+// Next call to Encode() fills buffer/cache again. Call ResetCache after modifying
+// exported playlist fields directly.
 func (p *MediaPlaylist) ResetCache() {
 	p.buf.Reset()
 }
@@ -1257,10 +1266,8 @@ func (p *MediaPlaylist) TotalDuration() float64 {
 
 // Close sliding playlist and by setting the EXT-X-ENDLIST tag and setting the Closed flag.
 func (p *MediaPlaylist) Close() {
-	if p.buf.Len() > 0 {
-		p.buf.WriteString("#EXT-X-ENDLIST\n")
-	}
 	p.Closed = true
+	p.ResetCache()
 }
 
 // CalculateTargetDuration calculates the target duration for the playlist.
@@ -1321,6 +1328,7 @@ func (p *MediaPlaylist) SetTargetDuration(duration uint) {
 	}
 	p.TargetDuration = duration
 	p.targetDurLocked = true
+	p.ResetCache()
 }
 
 // SetDefaultKey sets encryption key to appear before segments in the media playlist.
@@ -1329,6 +1337,7 @@ func (p *MediaPlaylist) SetDefaultKey(method, uri, iv, keyformat, keyformatversi
 		updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	}
 	p.Keys = append(p.Keys, Key{method, uri, iv, keyformat, keyformatversions})
+	p.ResetCache()
 	return nil
 }
 
@@ -1337,12 +1346,14 @@ func (p *MediaPlaylist) SetDefaultKey(method, uri, iv, keyformat, keyformatversi
 func (p *MediaPlaylist) SetDefaultMap(uri string, limit, offset int64) {
 	updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	p.Map = &Map{uri, limit, offset}
+	p.ResetCache()
 }
 
 // SetIframeOnly marks medialist of only I-frames (Intra frames).
 func (p *MediaPlaylist) SetIframeOnly() {
 	updateVersion(&p.ver, 4) // [Protocol Version Compatibility]
 	p.Iframe = true
+	p.ResetCache()
 }
 
 // SetKey sets encryption key for the current (and following) segment of media playlist
@@ -1356,6 +1367,7 @@ func (p *MediaPlaylist) SetKey(method, uri, iv, keyformat, keyformatversions str
 	}
 
 	p.Segments[p.last()].Keys = append(p.Segments[p.last()].Keys, Key{method, uri, iv, keyformat, keyformatversions})
+	p.ResetCache()
 	return nil
 }
 
@@ -1366,6 +1378,7 @@ func (p *MediaPlaylist) SetMap(uri string, limit, offset int64) error {
 	}
 	updateVersion(&p.ver, 5) // [Protocol Version Compatibility]
 	p.Segments[p.last()].Map = &Map{uri, limit, offset}
+	p.ResetCache()
 	return nil
 }
 
@@ -1377,6 +1390,7 @@ func (p *MediaPlaylist) SetRange(limit, offset int64) error {
 	updateVersion(&p.ver, 4) // [Protocol Version Compatibility]
 	p.Segments[p.last()].Limit = limit
 	p.Segments[p.last()].Offset = offset
+	p.ResetCache()
 	return nil
 }
 
@@ -1393,6 +1407,7 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].SCTE = scte35
+	p.ResetCache()
 	return nil
 }
 
@@ -1414,6 +1429,7 @@ func (p *MediaPlaylist) SetDiscontinuity() error {
 		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].Discontinuity = true
+	p.ResetCache()
 	return nil
 }
 
@@ -1426,6 +1442,7 @@ func (p *MediaPlaylist) SetGap() error {
 		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].Gap = true
+	p.ResetCache()
 	return nil
 }
 
@@ -1439,6 +1456,7 @@ func (p *MediaPlaylist) SetProgramDateTime(value time.Time) error {
 		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].ProgramDateTime = value
+	p.ResetCache()
 	return nil
 }
 
@@ -1449,6 +1467,7 @@ func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 	}
 
 	p.Custom[tag.TagName()] = tag
+	p.ResetCache()
 }
 
 // SetSkipped sets the number of segments that have been skipped in the playlist.
@@ -1456,6 +1475,7 @@ func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 // and the skipping of segments has already been handled.
 func (p *MediaPlaylist) SetSkipped(skipped uint64) {
 	p.skippedSegments = skipped
+	p.ResetCache()
 }
 
 // SetCustomSegmentTag sets the provided tag on the current media segment for its TagName.
@@ -1471,6 +1491,7 @@ func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	}
 
 	last.Custom[tag.TagName()] = tag
+	p.ResetCache()
 
 	return nil
 }
@@ -1486,6 +1507,7 @@ func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 		return fmt.Errorf("capacity=%d < winsize=%d: %w", p.capacity, winsize, ErrWinSizeTooSmall)
 	}
 	p.winsize = winsize
+	p.ResetCache()
 	return nil
 }
 
@@ -1503,6 +1525,7 @@ func (p *MediaPlaylist) SetServerControl(control *ServerControl) error {
 	}
 
 	p.ServerControl = control
+	p.ResetCache()
 	return nil
 }
 

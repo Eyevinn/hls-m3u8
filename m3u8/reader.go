@@ -122,6 +122,7 @@ func (p *MasterPlaylist) Version() uint8 {
 // SetVersion sets the HLS protocol version as signaled by EXT-X-VERSION
 func (p *MasterPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
+	p.ResetCache()
 }
 
 // Decode parses a media playlist passed from the buffer. If strict
@@ -162,6 +163,7 @@ func (p *MediaPlaylist) Version() uint8 {
 // have increased automatically by other Set methods.
 func (p *MediaPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
+	p.ResetCache()
 }
 
 // LastSegIndex returns the index of the last segment in the media playlist.

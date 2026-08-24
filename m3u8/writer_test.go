@@ -442,6 +442,52 @@ test01.ts
 	is.Equal(out, expected) // Encode media playlist does not match expected
 }
 
+func TestMediaPlaylistMutationsInvalidateCache(t *testing.T) {
+	is := is.New(t)
+	p, err := NewMediaPlaylist(3, 5)
+	is.NoErr(err)
+	is.NoErr(p.Append("segment0.ts", 4, ""))
+
+	_ = p.Encode() // fill the cache; each assertion below refills it before the next mutation
+	is.NoErr(p.AppendPartial("segment1.0.ts", 1, true))
+	is.True(strings.Contains(p.Encode().String(), `URI="segment1.0.ts"`))
+
+	p.SetPreloadHint("PART", "segment1.1.ts")
+	is.True(strings.Contains(p.Encode().String(), `#EXT-X-PRELOAD-HINT:TYPE=PART,URI="segment1.1.ts"`))
+
+	is.NoErr(p.SetServerControl(&ServerControl{PartHoldBack: 3, CanBlockReload: true}))
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-SERVER-CONTROL:"))
+
+	is.NoErr(p.SetGap())
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-GAP\n"))
+
+	p.SetVersion(9)
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-VERSION:9\n"))
+
+	p.Close()
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-ENDLIST\n"))
+	p.Close()
+	is.Equal(strings.Count(p.Encode().String(), "#EXT-X-ENDLIST\n"), 1)
+}
+
+func TestMasterPlaylistMutationsInvalidateCache(t *testing.T) {
+	is := is.New(t)
+	p := NewMasterPlaylist()
+
+	_ = p.Encode() // fill the cache; each assertion below refills it before the next mutation
+	p.SetIndependentSegments(true)
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-INDEPENDENT-SEGMENTS\n"))
+
+	is.NoErr(p.AppendDefine(Define{Name: "token", Type: VALUE, Value: "value"}))
+	is.True(strings.Contains(p.Encode().String(), `#EXT-X-DEFINE:NAME="token",VALUE="value"`))
+
+	p.SetCustomTag(&MockCustomTag{name: "#EXT-X-CUSTOM:", encodedString: "#EXT-X-CUSTOM:value"})
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-CUSTOM:value\n"))
+
+	p.SetVersion(8)
+	is.True(strings.Contains(p.Encode().String(), "#EXT-X-VERSION:8\n"))
+}
+
 // Encode must not change the playlist, so that repeated calls give the same
 // result and appending after an Encode still yields the correct window.
 func TestEncodeMediaPlaylistIdempotent(t *testing.T) {
