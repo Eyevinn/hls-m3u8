@@ -803,9 +803,10 @@ func TestEncodePartialSegments(t *testing.T) {
 	e = p.SetServerControl(&serverControl)
 	is.NoErr(e) // Set server control should be successful
 
-	// Output only partial segments from last 3 full segments
+	// Output only partial segments from last 3 full segments.
+	// The version is 4, since the playlist contains an EXT-X-BYTERANGE tag.
 	expected := `#EXTM3U
-#EXT-X-VERSION:3
+#EXT-X-VERSION:4
 #EXT-X-SERVER-CONTROL:PART-HOLD-BACK=3.006,CAN-BLOCK-RELOAD=YES
 #EXT-X-PART-INF:PART-TARGET=1.002
 #EXT-X-MEDIA-SEQUENCE:0

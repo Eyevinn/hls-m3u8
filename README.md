@@ -26,7 +26,9 @@ values are not validated.
 
 The HLS protocol has different versions, and there are rules for what minimal
 version to signal depending on features being used. That mechanism is implemented
-in the `CalcMinVersion()` method of the `Playlist` interface.
+in the `CalcMinVersion()` method of the `Playlist` interface. When a playlist is
+encoded, the signaled `EXT-X-VERSION` is automatically raised to that minimal
+version, so `SetVersion()` provides a floor rather than an exact value.
 
 ## Structure and design of the code
 
