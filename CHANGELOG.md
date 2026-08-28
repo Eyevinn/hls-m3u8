@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MediaPlaylist.AppendTrailingDateRange` to add such a tag when generating a playlist
 
 ### Fixed
+- `Encode` now raises `EXT-X-VERSION` to the minimum version required by the playlist content,
+  so e.g. a media playlist with an `EXT-X-MAP` tag but no `EXT-X-I-FRAMES-ONLY` tag signals
+  version 6 instead of 5 (issue #95)
 - `Encode` no longer shifts the media playlist head pointer, so it is not destructive (PR #90)
 - Panic when encoding a media playlist whose segment ring buffer has wrapped around,
   e.g. after `capacity` calls to `Slide` (PR #91)
@@ -31,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decoding to offset zero (PR #93)
 
 ### Changed
+- `EXT-X-VERSION` in encoded output may be higher than before, since it is now raised to the
+  minimum version required by the playlist content. `SetVersion` therefore sets a floor, and a
+  version lower than the required minimum is no longer output (issue #95)
 - Encoded output of a live media playlist with more segments than `winsize` changes,
   since `EXT-X-MEDIA-SEQUENCE` now matches the first segment written (PR #91)
 - Decoding no longer fails on SCTE-35 `EXT-X-DATERANGE` tags after the last segment

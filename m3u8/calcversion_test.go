@@ -147,3 +147,94 @@ func TestAllPlaylistVersions(t *testing.T) {
 		})
 	}
 }
+
+// TestEncodeRaisesVersionToMinVersion checks that the version signaled by EXT-X-VERSION
+// is raised to the minimum version required by the playlist content (issue #95).
+func TestEncodeRaisesVersionToMinVersion(t *testing.T) {
+	mapNoIframes := func(t *testing.T) Playlist {
+		t.Helper()
+		p, err := NewMediaPlaylist(0, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.SetDefaultMap("init.mp4", 0, 0)
+		if err := p.Append("seg1.m4s", 4.0, ""); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	cases := []struct {
+		desc            string
+		makePlaylist    func(t *testing.T) Playlist
+		expectedVersion uint8
+	}{
+		{
+			desc:            "EXT-X-MAP without EXT-X-I-FRAMES-ONLY requires version 6",
+			makePlaylist:    mapNoIframes,
+			expectedVersion: 6,
+		},
+		{
+			desc: "EXT-X-MAP with EXT-X-I-FRAMES-ONLY requires version 5",
+			makePlaylist: func(t *testing.T) Playlist {
+				t.Helper()
+				p := mapNoIframes(t).(*MediaPlaylist)
+				p.SetIframeOnly()
+				return p
+			},
+			expectedVersion: 5,
+		},
+		{
+			desc: "higher version set with SetVersion is kept",
+			makePlaylist: func(t *testing.T) Playlist {
+				t.Helper()
+				p := mapNoIframes(t)
+				p.SetVersion(9)
+				return p
+			},
+			expectedVersion: 9,
+		},
+		{
+			desc: "EXT-X-DEFINE with QUERYPARAM requires version 11",
+			makePlaylist: func(t *testing.T) Playlist {
+				t.Helper()
+				p, err := NewMediaPlaylist(0, 2)
+				if err != nil {
+					t.Fatal(err)
+				}
+				p.AppendDefine(Define{Name: "token", Type: QUERYPARAM})
+				if err := p.Append("seg1.ts", 4.0, ""); err != nil {
+					t.Fatal(err)
+				}
+				return p
+			},
+			expectedVersion: 11,
+		},
+		{
+			desc: "SERVICE value for INSTREAM-ID requires version 7 in master playlist",
+			makePlaylist: func(t *testing.T) Playlist {
+				t.Helper()
+				p := NewMasterPlaylist()
+				p.Append("variant.m3u8", nil, VariantParams{
+					Bandwidth: 1000,
+					Alternatives: []*Alternative{
+						{GroupId: "cc", Type: "CLOSED-CAPTIONS", Name: "English", InstreamId: "SERVICE1"},
+					},
+				})
+				return p
+			},
+			expectedVersion: 7,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			is := is.New(t)
+			p := c.makePlaylist(t)
+			out := p.Encode().String()
+			is.Equal(p.Version(), c.expectedVersion) // version after encoding
+			wantTag := fmt.Sprintf("#EXT-X-VERSION:%d\n", c.expectedVersion)
+			is.True(strings.Contains(out, wantTag)) // EXT-X-VERSION tag in output
+		})
+	}
+}

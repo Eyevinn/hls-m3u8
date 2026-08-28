@@ -90,6 +90,22 @@ func updateVersion(ver *uint8, newVer uint8) {
 	}
 }
 
+// raiseVersionToMin raises the signaled version to the minimum required by the
+// playlist content, if it is not already high enough. It never lowers the version,
+// so a higher version set with SetVersion is kept.
+func (p *MasterPlaylist) raiseVersionToMin() {
+	minVersion, _ := p.CalcMinVersion()
+	updateVersion(&p.ver, minVersion)
+}
+
+// raiseVersionToMin raises the signaled version to the minimum required by the
+// playlist content, if it is not already high enough. It never lowers the version,
+// so a higher version set with SetVersion is kept.
+func (p *MediaPlaylist) raiseVersionToMin() {
+	minVersion, _ := p.CalcMinVersion()
+	updateVersion(&p.ver, minVersion)
+}
+
 func strVer(ver uint8) string {
 	return strconv.FormatUint(uint64(ver), 10)
 }
@@ -139,10 +155,13 @@ func (p *MasterPlaylist) ResetCache() {
 }
 
 // Encode generates the output in M3U8 format and provides a pointer to its buffer.
+// The signaled version is raised to the minimum required by the playlist content,
+// as given by [MasterPlaylist.CalcMinVersion], if it is not already high enough.
 func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	if p.buf.Len() > 0 {
 		return &p.buf
 	}
+	p.raiseVersionToMin()
 
 	p.buf.WriteString("#EXTM3U\n#EXT-X-VERSION:")
 	p.buf.WriteString(strVer(p.ver))
@@ -938,6 +957,7 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 	if p.buf.Len() > 0 {
 		return &p.buf
 	}
+	p.raiseVersionToMin()
 
 	var lastMap *Map
 
@@ -1212,9 +1232,11 @@ func (p *MediaPlaylist) EncodeWithSkip(skipped uint64) (*bytes.Buffer, error) {
 	return p.encode(skipped), nil
 }
 
+// Encode generates the output in M3U8 format and provides a pointer to its buffer.
+// The signaled version is raised to the minimum required by the playlist content,
+// as given by [MediaPlaylist.CalcMinVersion], if it is not already high enough.
 func (p *MediaPlaylist) Encode() *bytes.Buffer {
 	return p.encode(p.SkippedSegments())
-
 }
 
 // writeExtInfWithCache writes the EXTINF tag and value to the buffer.

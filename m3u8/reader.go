@@ -119,7 +119,9 @@ func (p *MasterPlaylist) Version() uint8 {
 	return p.ver
 }
 
-// SetVersion sets the HLS protocol version as signaled by EXT-X-VERSION
+// SetVersion sets the HLS protocol version as signaled by EXT-X-VERSION.
+// Note that Encode raises the version to the minimum required by the playlist
+// content, so a version lower than that will not be output.
 func (p *MasterPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
 }
@@ -159,7 +161,9 @@ func (p *MediaPlaylist) Version() uint8 {
 }
 
 // SetVersion sets the playlist version number, note the version
-// have increased automatically by other Set methods.
+// may have been increased automatically by other Set methods.
+// Note that Encode raises the version to the minimum required by the playlist
+// content, so a version lower than that will not be output.
 func (p *MediaPlaylist) SetVersion(ver uint8) {
 	p.ver = ver
 }
