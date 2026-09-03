@@ -5,10 +5,10 @@ Playlist parsing tests.
 */
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -18,18 +18,82 @@ import (
 	"github.com/matryer/is"
 )
 
+func TestDecodeReadError(t *testing.T) {
+
+	t.Run("io_eof", func(t *testing.T) {
+		is := is.New(t)
+		f, err := os.Open("sample-playlists/master.m3u8")
+		is.NoErr(err) // must open file
+
+		pr, pw := io.Pipe()
+		go func() {
+			_, err = io.Copy(pw, f)
+			is.NoErr(err)
+			pw.Close()
+		}()
+
+		list, typ, err := DecodeFrom(pr, false)
+		is.NoErr(err)
+		is.Equal(typ, MASTER)
+		is.True(list != nil)
+	})
+
+	t.Run("other_io_error", func(t *testing.T) {
+		brokenInput := `#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:10
+#EXT-X-BYTERANGE:75232@0
+#EXTINF:10.000,
+video0.ts
+#EXT-X-BYTERANGE:82112@
+`
+		is := is.New(t)
+		pr, pw := io.Pipe()
+		go func() {
+			_, err := pw.Write([]byte(brokenInput))
+			is.NoErr(err)
+			pw.CloseWithError(io.ErrUnexpectedEOF)
+		}()
+
+		list, typ, err := DecodeFrom(pr, false)
+		is.True(err != nil && errors.Is(err, io.ErrUnexpectedEOF))
+		is.Equal(typ, UNKNOWN)
+		is.True(list == nil)
+	})
+}
+
 func TestDecodeMasterPlaylist(t *testing.T) {
-	is := is.New(t)
-	f, err := os.Open("sample-playlists/master.m3u8")
-	is.NoErr(err) // must open file
-	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
-	is.NoErr(err) // must decode playlist
-	// check parsed values
-	is.Equal(p.ver, uint8(3))    // version must be 3
-	is.Equal(len(p.Variants), 5) // must be 5 variants
-	// TODO check other values
-	// fmt.Println(p.Encode().String())
+	t.Run("normal", func(t *testing.T) {
+		is := is.New(t)
+		f, err := os.Open("sample-playlists/master.m3u8")
+		is.NoErr(err) // must open file
+		p := NewMasterPlaylist()
+		err = p.DecodeFrom(f, false)
+		is.NoErr(err) // must decode playlist
+		// check parsed values
+		is.Equal(p.ver, uint8(3))    // version must be 3
+		is.Equal(len(p.Variants), 5) // must be 5 variants
+		// TODO check other values
+		// fmt.Println(p.Encode().String())
+	})
+
+	t.Run("other_io_error", func(t *testing.T) {
+		is := is.New(t)
+		f, err := os.Open("sample-playlists/master.m3u8")
+		is.NoErr(err) // must open file
+
+		pr, pw := io.Pipe()
+		go func() {
+			_, err = io.Copy(pw, f)
+			is.NoErr(err)
+			pw.CloseWithError(io.ErrUnexpectedEOF)
+		}()
+
+		p := NewMasterPlaylist()
+		err = p.DecodeFrom(pr, false)
+		is.True(err != nil && errors.Is(err, io.ErrUnexpectedEOF))
+	})
 }
 
 func TestDecodeMasterPlaylistWithMultipleCodecs(t *testing.T) {
@@ -37,7 +101,7 @@ func TestDecodeMasterPlaylistWithMultipleCodecs(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-multiple-codecs.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	// check parsed values
 	is.Equal(p.ver, uint8(3))    // version must be 3
@@ -54,7 +118,7 @@ func TestDecodeMasterPlaylistWithAlternatives(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-alternatives.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	// check parsed values
 	is.Equal(p.ver, uint8(3))    // version must be 3
@@ -78,7 +142,7 @@ func TestDecodeMasterPlaylistWithAlternativesB(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-alternatives-b.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	// check parsed values
 	is.Equal(p.ver, uint8(3))    // version must be 3
@@ -102,7 +166,7 @@ func TestDecodeMasterPlaylistWithClosedCaptionEqNone(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-closed-captions-eq-none.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 
 	// check parsed values
@@ -118,7 +182,7 @@ func TestDecodeMasterPlaylistWithStreamInfName(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-stream-inf-name.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	for _, variant := range p.Variants {
 		is.True(variant.Name != "") // name tag must not be empty
@@ -128,7 +192,7 @@ func TestDecodeMasterPlaylistWithStreamInfName(t *testing.T) {
 func TestDecodeMediaPlaylistByteRange(t *testing.T) {
 	f, _ := os.Open("sample-playlists/media-playlist-with-byterange.m3u8")
 	p, _ := NewMediaPlaylist(3, 3)
-	_ = p.DecodeFrom(bufio.NewReader(f), true)
+	_ = p.DecodeFrom(f, true)
 	expected := []*MediaSegment{
 		{URI: "video.ts", Duration: 10, Limit: 75232, SeqId: 0},
 		{URI: "video.ts", Duration: 10, Limit: 82112, Offset: 752321, SeqId: 1},
@@ -304,7 +368,7 @@ func TestDecodeMasterPlaylistWithIFrameStreamInf(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-i-frame-stream-inf.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	expected := map[int]*Variant{
 		86000: {URI: "low/iframe.m3u8", VariantParams: VariantParams{Bandwidth: 86000, Codecs: "c1",
@@ -331,7 +395,7 @@ func TestDecodeMasterPlaylistWithStreamInfAverageBandwidth(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-stream-inf-1.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	for _, variant := range p.Variants {
 		is.True(variant.AverageBandwidth > 0) // average bandwidth must be greater than 0
@@ -343,7 +407,7 @@ func TestDecodeMasterPlaylistWithStreamInfFrameRate(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-stream-inf-1.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	for _, variant := range p.Variants {
 		is.True(variant.VariantParams.FrameRate > 0) // frame rate must be greater than 0
@@ -355,7 +419,7 @@ func TestDecodeMasterPlaylistWithIndependentSegments(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-independent-segments.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err)                    // must decode playlist
 	is.True(p.IndependentSegments()) // independent segments must be true
 }
@@ -365,7 +429,7 @@ func TestDecodeMasterWithHLSV7(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-hlsv7.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	var unexpected []*Variant
 	expected := map[string]VariantParams{
@@ -467,7 +531,7 @@ video.m3u8
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
 			p := NewMasterPlaylist()
-			err := p.DecodeFrom(bufio.NewReader(bytes.NewBufferString(c.playlist)), true)
+			err := p.DecodeFrom(bytes.NewBufferString(c.playlist), true)
 			is.True(err != nil) // must return an error
 		})
 	}
@@ -478,32 +542,58 @@ video.m3u8
  ****************************/
 
 func TestDecodeMediaPlaylist(t *testing.T) {
-	is := is.New(t)
-	f, err := os.Open("sample-playlists/wowza-vod-chunklist.m3u8")
-	is.NoErr(err) // must open file
-	p, err := NewMediaPlaylist(5, 798)
-	is.NoErr(err) // must create playlist
-	err = p.DecodeFrom(bufio.NewReader(f), true)
-	is.NoErr(err) // must decode playlist
+	t.Run("normal", func(t *testing.T) {
+		is := is.New(t)
+		f, err := os.Open("sample-playlists/wowza-vod-chunklist.m3u8")
+		is.NoErr(err) // must open file
 
-	// check parsed values
-	is.Equal(p.ver, uint8(3))            // version must be 3
-	is.Equal(p.TargetDuration, uint(12)) // target duration must be 12
-	is.True(p.Closed)                    // closed (VOD) playlist but Close field = false")
-	titles := []string{"Title 1", "Title 2", ""}
-	for i, s := range p.Segments {
-		if i > len(titles)-1 {
-			break
+		pr, pw := io.Pipe()
+		go func() {
+			_, err = io.Copy(pw, f)
+			is.NoErr(err)
+			pw.Close()
+		}()
+
+		p, err := NewMediaPlaylist(5, 798)
+		is.NoErr(err)
+		err = p.DecodeFrom(pr, true)
+		is.NoErr(err) // must decode playlist
+
+		// check parsed values
+		is.Equal(p.ver, uint8(3))            // version must be 3
+		is.Equal(p.TargetDuration, uint(12)) // target duration must be 12
+		is.True(p.Closed)                    // closed (VOD) playlist but Close field = false")
+		titles := []string{"Title 1", "Title 2", ""}
+		for i, s := range p.Segments {
+			if i > len(titles)-1 {
+				break
+			}
+			is.Equal(s.Title, titles[i]) // title must be "Title 1", "Title 2", ""
 		}
-		is.Equal(s.Title, titles[i]) // title must be "Title 1", "Title 2", ""
-	}
-	is.Equal(p.Count(), uint(522)) // segment count must be 522
-	var seqId, idx uint
-	for seqId, idx = 1, 0; idx < p.Count(); seqId, idx = seqId+1, idx+1 {
-		is.Equal(p.Segments[idx].SeqId, uint64(seqId)) // SeqId must match
-	}
-	// TODO check other values…
-	//fmt.Println(p.Encode().String()), stream.Name}
+		is.Equal(p.Count(), uint(522)) // segment count must be 522
+		var seqId, idx uint
+		for seqId, idx = 1, 0; idx < p.Count(); seqId, idx = seqId+1, idx+1 {
+			is.Equal(p.Segments[idx].SeqId, uint64(seqId)) // SeqId must match
+		}
+	})
+
+	t.Run("other_io_error", func(t *testing.T) {
+		is := is.New(t)
+		f, err := os.Open("sample-playlists/wowza-vod-chunklist.m3u8")
+		is.NoErr(err) // must open file
+
+		pr, pw := io.Pipe()
+		go func() {
+			_, err = io.Copy(pw, f)
+			is.NoErr(err)
+			pw.CloseWithError(io.ErrUnexpectedEOF)
+		}()
+
+		p, err := NewMediaPlaylist(5, 798)
+		is.NoErr(err)
+		err = p.DecodeFrom(pr, true)
+		is.True(err != nil && errors.Is(err, io.ErrUnexpectedEOF)) // must decode playlist
+	})
 }
 
 func TestDecodeMediaPlaylistExtInfNonStrict2(t *testing.T) {
@@ -558,7 +648,7 @@ func TestDecodeMasterPlaylistWithAutodetection(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/master.m3u8")
 	is.NoErr(err) // must open file
-	m, listType, err := DecodeFrom(bufio.NewReader(f), false)
+	m, listType, err := DecodeFrom(f, false)
 	is.NoErr(err)              // must decode playlist
 	is.Equal(listType, MASTER) // must be master playlist
 	mp := m.(*MasterPlaylist)
@@ -574,7 +664,7 @@ func TestDecodeMediaPlaylistWithAutodetection(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/wowza-vod-chunklist.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -593,7 +683,7 @@ func TestDecodeMediaPlaylistAutoDetectExtend(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-large.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -658,7 +748,7 @@ func TestMediaPlaylistWithOATCLSSCTE35Tag(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-oatcls-scte35.m3u8")
 	is.NoErr(err) // must open file
-	p, _, err := DecodeFrom(bufio.NewReader(f), true)
+	p, _, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 
@@ -683,7 +773,7 @@ func TestMediaPlaylistWithDateRangeSCTE35Tag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, _, err := DecodeFrom(bufio.NewReader(f), true)
+	p, _, err := DecodeFrom(f, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -734,7 +824,7 @@ func TestDecodeMediaPlaylistWithDiscontinuitySeq(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-discontinuity-seq.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -798,7 +888,7 @@ func TestDecodeMasterPlaylistWithCustomTags(t *testing.T) {
 		f, err := os.Open(testCase.src)
 		is.NoErr(err) // must open file
 
-		p, listType, err := DecodeWith(bufio.NewReader(f), true, testCase.customDecoders)
+		p, listType, err := DecodeWith(f, true, testCase.customDecoders)
 
 		if testCase.expectedError != "" {
 			is.True(err != nil) // must return an error
@@ -897,7 +987,7 @@ func TestDecodeMediaPlaylistWithCustomTags(t *testing.T) {
 	for _, testCase := range cases {
 		f, err := os.Open(testCase.src)
 		is.NoErr(err) // must open file
-		p, listType, err := DecodeWith(bufio.NewReader(f), true, testCase.customDecoders)
+		p, listType, err := DecodeWith(f, true, testCase.customDecoders)
 
 		if testCase.expectedError != "" {
 			is.True(err != nil) // must return an error
@@ -997,7 +1087,7 @@ func TestMediaPlaylistWithSCTE35Tag(t *testing.T) {
 	}
 	for _, c := range cases {
 		f, _ := os.Open(c.playlistLocation)
-		playlist, _, _ := DecodeFrom(bufio.NewReader(f), true)
+		playlist, _, _ := DecodeFrom(f, true)
 		mediaPlaylist := playlist.(*MediaPlaylist)
 		for index, item := range mediaPlaylist.Segments {
 			if item == nil {
@@ -1024,7 +1114,7 @@ func TestDecodeLowLatencyMediaPlaylistWithNonZeroInitialSequenceNumber(t *testin
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-low-latency-initial-sequence-num-5.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1066,7 +1156,7 @@ func TestDecodeLowLatencyMediaPlaylist(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-low-latency.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1145,7 +1235,7 @@ func TestDecodeMediaPlaylistWithSkip(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-skip.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1173,7 +1263,7 @@ func TestDecodeMediaPlaylistWithProgramDateTime(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-program-date-time.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1209,7 +1299,7 @@ func TestDecodeMediaPlaylistStartTime(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-start-time.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1221,7 +1311,7 @@ func TestDecodeMediaPlaylistWithCueOutCueIn(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-cue-out-in-without-oatcls.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1239,7 +1329,7 @@ func TestDecodeMediaPlaylistWithCueInAndDateRange(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/media-playlist-with-scte35-and-cue.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err) // must decode playlist
 	pp := p.(*MediaPlaylist)
 	CheckType(t, pp)
@@ -1257,7 +1347,7 @@ func TestDecodeMasterChannels(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-channels.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err)              // must decode playlist
 	is.Equal(listType, MASTER) // must be master playlist
 	pp := p.(*MasterPlaylist)
@@ -1281,7 +1371,7 @@ func TestDecodeRenditionsAndIframes(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-groups-and-iframe.m3u8")
 	is.NoErr(err) // must open file
-	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	p, listType, err := DecodeFrom(f, true)
 	is.NoErr(err)              // must decode playlist
 	is.Equal(listType, MASTER) // must be master playlist
 	pp := p.(*MasterPlaylist)
@@ -1306,7 +1396,7 @@ func TestTrailingScte35DateRange(t *testing.T) {
 			f, err := os.Open(fixture)
 			is.NoErr(err)
 			defer f.Close()
-			pl, listType, err := DecodeFrom(bufio.NewReader(f), strict)
+			pl, listType, err := DecodeFrom(f, strict)
 			is.NoErr(err)
 			is.Equal(listType, MEDIA)
 			p := pl.(*MediaPlaylist)
@@ -1323,7 +1413,7 @@ func TestTrailingScte35DateRange(t *testing.T) {
 			defer f.Close()
 			pl, err := NewMediaPlaylist(0, 5)
 			is.NoErr(err)
-			err = pl.DecodeFrom(bufio.NewReader(f), strict)
+			err = pl.DecodeFrom(f, strict)
 			is.NoErr(err)
 			is.Equal(len(pl.TrailingDateRanges), 1)
 			is.Equal(pl.TrailingDateRanges[0].ID, "78")
@@ -1336,7 +1426,7 @@ func TestTrailingScte35DateRangeRoundTrip(t *testing.T) {
 	f, err := os.Open("sample-playlists/media-playlist-trailing-scte35-daterange.m3u8")
 	is.NoErr(err)
 	defer f.Close()
-	pl, _, err := DecodeFrom(bufio.NewReader(f), false)
+	pl, _, err := DecodeFrom(f, false)
 	is.NoErr(err)
 	p := pl.(*MediaPlaylist)
 	encoded := p.Encode().String()
@@ -1386,7 +1476,7 @@ func TestDecodeMasterPlaylistWithDefines(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-defines.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	// check parsed values
 	is.Equal(len(p.Defines), 2) // must be 2 defines
@@ -1404,7 +1494,7 @@ func TestDecodeMasterPlaylistWithInvalidDefines(t *testing.T) {
 	f, err := os.Open("sample-playlists/master-with-defines-invalid.m3u8")
 	is.NoErr(err) // must open file
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	// check parsed values
 	is.Equal(len(p.Defines), 0) // must be 0 defines
@@ -1416,7 +1506,7 @@ func TestDecodeMediaPlaylistWithDefines(t *testing.T) {
 	is.NoErr(err) // must open file
 	p, err := NewMediaPlaylist(1, 1)
 	is.NoErr(err) // must create playlist
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	is.NoErr(err) // must decode playlist
 	// check parsed values
 	is.Equal(len(p.Defines), 3) // must be 3 defines
@@ -1447,7 +1537,7 @@ func TestDecodeMediaPlaylistWithGaps(t *testing.T) {
 			is.NoErr(err) // must open file
 			p, err := NewMediaPlaylist(0, 1)
 			is.NoErr(err) // must create playlist
-			err = p.DecodeFrom(bufio.NewReader(f), true)
+			err = p.DecodeFrom(f, true)
 			if d.wantErr {
 				is.True(err != nil) // must return an error
 			} else {
@@ -1804,7 +1894,7 @@ func TestParseSkipTag(t *testing.T) {
 
 func ExampleDecodeFrom_withDiscontinuityAndOutput() {
 	f, _ := os.Open("sample-playlists/media-playlist-with-discontinuity.m3u8")
-	p, _, _ := DecodeFrom(bufio.NewReader(f), true)
+	p, _, _ := DecodeFrom(f, true)
 	pp := p.(*MediaPlaylist)
 	defer pp.ReleasePlaylist()
 	fmt.Printf("%s", pp)
@@ -1835,7 +1925,7 @@ func BenchmarkDecodeMasterPlaylist(b *testing.B) {
 			b.Fatal(err)
 		}
 		p := NewMasterPlaylist()
-		if err := p.DecodeFrom(bufio.NewReader(f), false); err != nil {
+		if err := p.DecodeFrom(f, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -1851,7 +1941,7 @@ func BenchmarkDecodeMediaPlaylist(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Create media playlist failed: %s", err)
 		}
-		if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
+		if err = p.DecodeFrom(f, true); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -1867,7 +1957,7 @@ func BenchmarkDecodeMediaPlaylistPooled(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Create media playlist failed: %s", err)
 		}
-		if err = p.DecodeFrom(bufio.NewReader(f), true); err != nil {
+		if err = p.DecodeFrom(f, true); err != nil {
 			b.Fatal(err)
 		}
 		p.ReleasePlaylist()
@@ -1882,7 +1972,7 @@ func readTestMasterPlaylist(t *testing.T, fileName string) (*MasterPlaylist, err
 	}
 	defer f.Close()
 	p := NewMasterPlaylist()
-	err = p.DecodeFrom(bufio.NewReader(f), false)
+	err = p.DecodeFrom(f, false)
 	if err != nil {
 		t.Fail()
 	}
@@ -1900,7 +1990,7 @@ func readTestMediaPlaylist(t *testing.T, fileName string) (*MediaPlaylist, error
 	if err != nil {
 		t.Fatalf("Create media playlist failed: %s", err)
 	}
-	err = p.DecodeFrom(bufio.NewReader(f), true)
+	err = p.DecodeFrom(f, true)
 	if err != nil {
 		t.Fail()
 	}

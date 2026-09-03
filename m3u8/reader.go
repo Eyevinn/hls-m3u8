@@ -5,6 +5,7 @@ package m3u8
 */
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -38,12 +39,7 @@ func (p *MasterPlaylist) Decode(data bytes.Buffer, strict bool) error {
 // DecodeFrom parses a master playlist passed from an io.Reader.
 // If strict parameter is true then it returns first syntax error.
 func (p *MasterPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(reader)
-	if err != nil {
-		return err
-	}
-	return p.decode(buf, strict)
+	return p.decode(bufio.NewReader(reader), strict)
 }
 
 // WithCustomDecoders adds custom tag decoders to the master playlist for decoding
@@ -59,18 +55,21 @@ func (p *MasterPlaylist) WithCustomDecoders(customDecoders []CustomDecoder) Play
 }
 
 // Parse master playlist. Internal function.
-func (p *MasterPlaylist) decode(buf *bytes.Buffer, strict bool) error {
+func (p *MasterPlaylist) decode(buf lineReader, strict bool) error {
 	var eof bool
 
 	state := new(decodingState)
 
 	for !eof {
 		line, err := buf.ReadString('\n')
-		if err == io.EOF {
-			eof = true
-		} else if err != nil {
-			break
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				eof = true
+			} else {
+				return err
+			}
 		}
+
 		line = trimLineEnd(line)
 		if line == "" {
 			continue
@@ -136,12 +135,7 @@ func (p *MediaPlaylist) Decode(data bytes.Buffer, strict bool) error {
 // DecodeFrom parses a media playlist passed from the io.Reader stream.
 // If strict parameter is true then it returns first syntax error.
 func (p *MediaPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(reader)
-	if err != nil {
-		return err
-	}
-	return p.decode(buf, strict)
+	return p.decode(bufio.NewReader(reader), strict)
 }
 
 // WithCustomDecoders adds custom tag decoders to the media playlist for decoding.
@@ -231,18 +225,21 @@ func (p *MediaPlaylist) SCTE35Syntax() SCTE35Syntax {
 	return p.scte35Syntax
 }
 
-func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
+func (p *MediaPlaylist) decode(buf lineReader, strict bool) error {
 	var eof bool
-	var line string
-	var err error
 
 	state := new(decodingState)
+
 	for !eof {
-		if line, err = buf.ReadString('\n'); err == io.EOF {
-			eof = true
-		} else if err != nil {
-			break
+		line, err := buf.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				eof = true
+			} else {
+				return err
+			}
 		}
+
 		line = trimLineEnd(line)
 		if line == "" {
 			continue
@@ -271,6 +268,12 @@ func (p *MediaPlaylist) storeTrailingDateRanges(state *decodingState) {
 	p.scte35Syntax = SCTE35_DATERANGE
 }
 
+type lineReader interface {
+	// ReadString reads until the first occurrence of delim in the input,
+	// returning a string containing the data up to and including the delimiter.
+	ReadString(delim byte) (line string, err error)
+}
+
 // Decode detects type of playlist and decodes it.
 func Decode(data bytes.Buffer, strict bool) (Playlist, ListType, error) {
 	return decode(&data, strict, nil)
@@ -278,27 +281,19 @@ func Decode(data bytes.Buffer, strict bool) (Playlist, ListType, error) {
 
 // DecodeFrom detects type of playlist and decodes it.
 func DecodeFrom(reader io.Reader, strict bool) (Playlist, ListType, error) {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(reader)
-	if err != nil {
-		return nil, 0, err
-	}
-	return decode(buf, strict, nil)
+	return decode(bufio.NewReader(reader), strict, nil)
 }
 
 // DecodeWith detects the type of playlist and decodes it. It accepts either bytes.Buffer
 // or io.Reader as input. Any custom decoders provided will be used during decoding.
 func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) (Playlist, ListType, error) {
 	switch v := input.(type) {
+	case lineReader:
+		return decode(v, strict, customDecoders)
 	case bytes.Buffer:
 		return decode(&v, strict, customDecoders)
 	case io.Reader:
-		buf := new(bytes.Buffer)
-		_, err := buf.ReadFrom(v)
-		if err != nil {
-			return nil, 0, err
-		}
-		return decode(buf, strict, customDecoders)
+		return decode(bufio.NewReader(v), strict, customDecoders)
 	default:
 		return nil, 0, fmt.Errorf("input must be bytes.Buffer or io.Reader type, got %T", input)
 	}
@@ -306,13 +301,13 @@ func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) 
 
 // Detect playlist type and decode it. May be used as decoder for both
 // master and media playlists.
-func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Playlist, ListType, error) {
+func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playlist, ListType, error) {
 	var eof bool
 	var line string
 	var master *MasterPlaylist
 	var media *MediaPlaylist
 	var listType ListType
-	var err error
+	var err, ioErr error
 
 	state := new(decodingState)
 
@@ -330,11 +325,18 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	}
 
 	for !eof {
-		if line, err = buf.ReadString('\n'); err == io.EOF {
-			eof = true
-		} else if err != nil {
-			break
+		line, ioErr = buf.ReadString('\n')
+		if ioErr != nil {
+			if errors.Is(ioErr, io.EOF) {
+				eof = true
+				// normal eof not a error, so reset
+				ioErr = nil
+			} else {
+				// unknown io error occur
+				break
+			}
 		}
+
 		line = trimLineEnd(line)
 		if line == "" {
 			continue
@@ -353,7 +355,12 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 				return media, state.listType, err
 			}
 		}
+	}
 
+	// Use a separate variable to flag I/O errors
+	// so that they can be distinguished from parsing errors when not in strict mode.
+	if ioErr != nil {
+		return nil, UNKNOWN, ioErr
 	}
 
 	if strict && !state.m3u {
