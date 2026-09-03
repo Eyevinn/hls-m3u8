@@ -300,21 +300,26 @@ func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) 
 
 // Detect playlist type and decode it. May be used as decoder for both
 // master and media playlists.
-func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Playlist, ListType, error) {
+func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (_ Playlist, listType ListType, err error) {
 	var eof bool
 	var line string
 	var master *MasterPlaylist
 	var media *MediaPlaylist
-	var listType ListType
-	var err error
 
 	state := new(decodingState)
 
-	master = NewMasterPlaylist()
 	media, err = NewMediaPlaylist(8, 1024) // Winsize for VoD will become 0, capacity auto extends
 	if err != nil {
-		return nil, 0, fmt.Errorf("create media playlist failed: %w", err)
+		return nil, UNKNOWN, fmt.Errorf("create media playlist failed: %w", err)
 	}
+	master = NewMasterPlaylist()
+
+	defer func() {
+		if err != nil {
+			media.ReleasePlaylist()
+			master.ReleasePlaylist()
+		}
+	}()
 
 	// If we have custom tags to parse
 	if customDecoders != nil {
@@ -337,21 +342,21 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		if state.listType != MEDIA {
 			err = decodeLineOfMasterPlaylist(master, state, line, strict)
 			if strict && err != nil {
-				return master, state.listType, err
+				return nil, UNKNOWN, err
 			}
 		}
 
 		if state.listType != MASTER {
 			err = decodeLineOfMediaPlaylist(media, state, line, strict)
 			if strict && err != nil {
-				return media, state.listType, err
+				return nil, UNKNOWN, err
 			}
 		}
 
 	}
 
 	if strict && !state.m3u {
-		return nil, listType, ErrExtM3UAbsent
+		return nil, UNKNOWN, ErrExtM3UAbsent
 	}
 
 	switch state.listType {
@@ -366,7 +371,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		media.storeTrailingDateRanges(state)
 		return media, MEDIA, nil
 	}
-	return nil, state.listType, ErrCannotDetectPlaylistType
+	return nil, UNKNOWN, ErrCannotDetectPlaylistType
 }
 
 // decodeAndTrimAttributes decodes a line of attributes into a map.

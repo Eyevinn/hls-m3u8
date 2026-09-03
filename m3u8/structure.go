@@ -78,7 +78,8 @@ type ListType uint
 
 const (
 	// use 0 for undefined type
-	MASTER ListType = iota + 1
+	UNKNOWN ListType = iota
+	MASTER
 	MEDIA
 )
 
