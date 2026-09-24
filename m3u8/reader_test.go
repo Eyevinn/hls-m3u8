@@ -889,6 +889,96 @@ func TestMediaPlaylistWithOATCLSSCTE35Tag(t *testing.T) {
 	}
 }
 
+func TestMediaPlaylistWithBackToBackSCTE35Breaks(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-with-oatcls-scte35-back-to-back.m3u8")
+	is.NoErr(err) // must open file
+	p, _, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+
+	// Two ads back to back on one segment boundary: the 8s break of media0
+	// ends on the exact frame where the 12s break of media1+media2 starts,
+	// so media1 carries both the CUE-IN and the CUE-OUT. The lone CUE-IN
+	// closing the second break stays a regular End cue on media3. Each cue
+	// carries the splice_insert of its own break (event id, break_duration).
+	cue8 := "/DAlAAAAAAAAAP/wFAUAAAABf+/+AA27oP4ACvyAAAAAAAAA5mVLpA=="
+	cue12 := "/DAlAAAAAAAAAP/wFAUAAAACf+/+ABi4IP4AEHrAAAAAAAAARY3J0g=="
+	expect := []struct {
+		cueIn bool
+		scte  *SCTE
+	}{
+		{false, &SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Start, Cue: cue8, Time: 8}},
+		{true, &SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Start, Cue: cue12, Time: 12}},
+		{false, nil},
+		{false, &SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_End}},
+	}
+	for i, e := range expect {
+		if pp.Segments[i].SCTE35CueIn != e.cueIn {
+			t.Errorf("segment %d SCTE35CueIn = %v, want %v", i, pp.Segments[i].SCTE35CueIn, e.cueIn)
+		}
+		if !reflect.DeepEqual(pp.Segments[i].SCTE, e.scte) {
+			t.Errorf("segment %d SCTE\ngot: %#v\nexp: %#v", i, pp.Segments[i].SCTE, e.scte)
+		}
+	}
+}
+
+// TestBackToBackBreaksWithDateRanges decodes the full pattern of two ad
+// breaks chained on the same frame: the first break's end, the next break's
+// start and the segment boundary are the exact same instant, so the CUE-IN
+// and CUE-OUT sit on one segment, interleaved with the EXT-X-DATERANGE tags
+// of the four SCTE-35 events. Both cues and every date range must survive.
+func TestBackToBackBreaksWithDateRanges(t *testing.T) {
+	is := is.New(t)
+	playlist := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-TARGETDURATION:10
+#EXTINF:9.120,
+media0.ts
+#EXT-X-DATERANGE:ID="po-1",START-DATE="2026-09-25T13:25:11.200Z",END-DATE="2026-09-25T13:29:19.240Z",DURATION=248.04,SCTE35-IN=0xFC302700000000000000FFF00506FE001E84800011020F43554549000000647FBF000035010167763955
+#EXT-X-CUE-IN
+#EXT-X-DATERANGE:ID="break-end-1",START-DATE="2026-09-25T13:29:19.240Z",SCTE35-CMD=0xFC302700000000000000FFF00506FE001E84800011020F43554549000000C87FBF0000230101E695AE84
+#EXT-X-DATERANGE:ID="break-start-2",START-DATE="2026-09-25T13:29:19.240Z",DURATION=185.96,SCTE35-CMD=0xFC302C00000000000000FFF00506FE001E84800016021443554549000000C97FFF0000FF6090000022010147B3A046
+#EXT-X-DATERANGE:ID="po-2",START-DATE="2026-09-25T13:29:19.240Z",PLANNED-DURATION=185.96,SCTE35-OUT=0xFC302C00000000000000FFF00506FE001E84800016021443554549000000657FFF0000FF609000003401016290E97C
+#EXT-X-CUE-OUT:185.96
+#EXT-X-PROGRAM-DATE-TIME:2026-09-25T13:29:19.240Z
+#EXTINF:7.680,
+media1.ts
+`
+	p, _, err := DecodeFrom(bufio.NewReader(strings.NewReader(playlist)), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+
+	seg := pp.Segments[1]
+	if !seg.SCTE35CueIn {
+		t.Error("CUE-IN lost on the back-to-back segment")
+	}
+	if seg.SCTE == nil || seg.SCTE.CueType != SCTE35Cue_Start || seg.SCTE.Time != 185.96 {
+		t.Errorf("CUE-OUT = %#v, want Start/185.96", seg.SCTE)
+	}
+	if len(seg.SCTE35DateRanges) != 4 {
+		t.Fatalf("date ranges = %d, want 4", len(seg.SCTE35DateRanges))
+	}
+	if seg.SCTE35DateRanges[0].SCTE35In == "" || seg.SCTE35DateRanges[3].SCTE35Out == "" ||
+		seg.SCTE35DateRanges[1].SCTE35Cmd == "" || seg.SCTE35DateRanges[2].SCTE35Cmd == "" {
+		t.Errorf("date range attributes lost: %#v", seg.SCTE35DateRanges)
+	}
+
+	// Re-encoding keeps both cues and all four date ranges (order within the
+	// pre-segment tag block is the library's own, it carries no semantics).
+	out := p.String()
+	for _, want := range []string{"#EXT-X-CUE-IN", "#EXT-X-CUE-OUT:185.96",
+		`ID="po-1"`, `ID="break-end-1"`, `ID="break-start-2"`, `ID="po-2"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("re-encoded playlist misses %s", want)
+		}
+	}
+	if strings.Index(out, "#EXT-X-CUE-IN") > strings.Index(out, "#EXT-X-CUE-OUT:") {
+		t.Error("CUE-IN must precede CUE-OUT")
+	}
+}
+
 func TestMediaPlaylistWithDateRangeSCTE35Tag(t *testing.T) {
 	f, err := os.Open("sample-playlists/media-playlist-with-scte35-daterange.m3u8")
 	if err != nil {

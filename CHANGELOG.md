@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MediaPlaylist.AppendTrailingDateRange` to add such a tag when generating a playlist
 - `ListType` constant `UNKNOWN`, returned by `Decode`, `DecodeFrom` and `DecodeWith` when the playlist type
   is not known (PR #99)
+- `MediaSegment.SCTE35CueIn` writes an `EXT-X-CUE-IN` before the segment's SCTE-35 cue,
+  for back-to-back breaks where one break ends on the segment boundary that starts the
+  next one; decoding such playlists no longer drops the `CUE-IN` or merges it into the
+  following `CUE-OUT`
+- `MediaPlaylist.SetSCTE35CueIn` to mark the currently last segment when generating a playlist
 
 ### Fixed
 - `Encode` now raises `EXT-X-VERSION` to the minimum version required by the playlist content,
