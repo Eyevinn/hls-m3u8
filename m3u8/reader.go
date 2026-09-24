@@ -1017,6 +1017,15 @@ func deQuote(s string) string {
 	return s
 }
 
+// pendingOATCLSCueIn reports whether the pending SCTE-35 state is a bare
+// OATCLS CUE-IN. A CUE-OUT following it before any segment belongs to the
+// next break of a back-to-back pair: the CUE-IN is then parked on the
+// segment (SCTE35CueIn) and the state restarts for the CUE-OUT.
+func pendingOATCLSCueIn(state *decodingState) bool {
+	return state.tagSCTE35 && state.scte != nil &&
+		state.scte.Syntax == SCTE35_OATCLS && state.scte.CueType == SCTE35Cue_End
+}
+
 // Parse one line of a media playlist.
 func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line string, strict bool) error {
 	var err error
@@ -1121,6 +1130,12 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		}
 		if state.tagSCTE35 {
 			state.tagSCTE35 = false
+			if state.scteCueIn {
+				state.scteCueIn = false
+				if err = p.SetSCTE35CueIn(); strict && err != nil {
+					return err
+				}
+			}
 			if err = p.SetSCTE35(state.scte); strict && err != nil {
 				return err
 			}
@@ -1332,15 +1347,18 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				state.scte.Time, _ = strconv.ParseFloat(value, 64)
 			}
 		}
-	case !state.tagSCTE35 && strings.HasPrefix(line, "#EXT-OATCLS-SCTE35:"):
+	case (!state.tagSCTE35 || pendingOATCLSCueIn(state)) && strings.HasPrefix(line, "#EXT-OATCLS-SCTE35:"):
 		// EXT-OATCLS-SCTE35 contains the SCTE35 tag, EXT-X-CUE-OUT contains duration
+		if pendingOATCLSCueIn(state) {
+			state.scteCueIn = true
+		}
 		state.tagSCTE35 = true
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_OATCLS
 		state.scte.Cue = line[19:]
 		// on the line below, state.scte.Syntax is a nil pointer
-	case state.tagSCTE35 && state.scte != nil &&
-		state.scte.Syntax == SCTE35_OATCLS && strings.HasPrefix(line, "#EXT-X-CUE-OUT:"):
+	case state.tagSCTE35 && state.scte != nil && state.scte.Syntax == SCTE35_OATCLS &&
+		state.scte.CueType != SCTE35Cue_End && strings.HasPrefix(line, "#EXT-X-CUE-OUT:"):
 		// EXT-OATCLS-SCTE35 contains the SCTE35 tag, EXT-X-CUE-OUT contains duration
 		state.scte.Time, _ = strconv.ParseFloat(line[15:], 64)
 		state.scte.CueType = SCTE35Cue_Start
@@ -1359,7 +1377,10 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				state.scte.Elapsed, _ = strconv.ParseFloat(value, 64)
 			}
 		}
-	case !state.tagSCTE35 && strings.HasPrefix(line, "#EXT-X-CUE-OUT"):
+	case (!state.tagSCTE35 || pendingOATCLSCueIn(state)) && strings.HasPrefix(line, "#EXT-X-CUE-OUT"):
+		if pendingOATCLSCueIn(state) {
+			state.scteCueIn = true
+		}
 		state.tagSCTE35 = true
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_OATCLS
