@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Encode` now raises `EXT-X-VERSION` to the minimum version required by the playlist content,
   so e.g. a media playlist with an `EXT-X-MAP` tag but no `EXT-X-I-FRAMES-ONLY` tag signals
   version 6 instead of 5 (issue #95)
+- `Encode` and `String` no longer return stale output after `Set*` and `Append*` methods
+  modify an already encoded playlist, and repeated `Close` calls write one `EXT-X-ENDLIST` (PR #94)
 - `Encode` no longer shifts the media playlist head pointer, so it is not destructive (PR #90)
 - Panic when encoding a media playlist whose segment ring buffer has wrapped around,
   e.g. after `capacity` calls to `Slide` (PR #91)
