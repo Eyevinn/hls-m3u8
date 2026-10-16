@@ -258,6 +258,7 @@ type MediaSegment struct {
 	Map              *Map         // EXT-X-MAP changes the Media Initialization Section until next EXT-X-MAP tag.
 	Discontinuity    bool         // EXT-X-DISCONTINUITY signals a discontinuity between the surrounding segments.
 	SCTE             *SCTE        // SCTE-35 used for Ad signaling in HLS.
+	SCTE35CueIn      bool         // Writes an EXT-X-CUE-IN before this segment's cue (back-to-back breaks).
 	SCTE35DateRanges []*DateRange // SCTE-35 date-range tags preceeding this segment
 	ProgramDateTime  time.Time    // EXT-X-PROGRAM-DATE-TIME associates first sample with an absolute date and/or time.
 	Custom           CustomMap    // Custom holds custom tags
@@ -388,6 +389,7 @@ type decodingState struct {
 	lastReadMap        *Map
 	lastStoredMap      *Map
 	scte               *SCTE
+	scteCueIn          bool // a bare OATCLS CUE-IN preceded the pending cue (back-to-back breaks)
 	scte35DateRanges   []*DateRange
 	custom             CustomMap
 }

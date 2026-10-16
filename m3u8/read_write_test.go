@@ -415,6 +415,7 @@ func TestReadWritePlaylists(t *testing.T) {
 		"media-playlist-low-latency.m3u8",
 		"media-playlist-with-skip.m3u8",
 		"media-playlist-trailing-scte35-daterange.m3u8",
+		"media-playlist-with-oatcls-scte35-back-to-back.m3u8",
 	}
 
 	for _, fileName := range files {

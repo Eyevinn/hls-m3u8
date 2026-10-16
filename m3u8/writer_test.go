@@ -147,6 +147,54 @@ func TestSetSCTE35(t *testing.T) {
 	}
 }
 
+// TestSetSCTE35CueIn: a segment carrying both a CUE-IN and a CUE-OUT
+// (back-to-back breaks) writes the CUE-IN first, closing the previous break
+// before the next one opens.
+func TestSetSCTE35CueIn(t *testing.T) {
+	is := is.New(t)
+	p, err := NewMediaPlaylist(3, 3)
+	is.NoErr(err)
+
+	if err := p.SetSCTE35CueIn(); err == nil {
+		t.Error("SetSCTE35CueIn expected empty playlist error")
+	}
+
+	// A 6s ad immediately chained to a 12s ad: the second break starts on
+	// the exact frame (and segment boundary) where the first one ends. Each
+	// cue carries the splice_insert of its own break.
+	cue6 := "/DAlAAAAAAAAAP/wFAUAAAABf+/+AA27oP4ACD1gAAAAAAAA65jKxw=="
+	cue12 := "/DAlAAAAAAAAAP/wFAUAAAACf+/+ABX5AP4AEHrAAAAAAAAA641gBQ=="
+	is.NoErr(p.Append("media0.ts", 6.0, ""))
+	is.NoErr(p.SetSCTE35(&SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Start, Cue: cue6, Time: 6}))
+	is.NoErr(p.Append("media1.ts", 6.0, ""))
+	is.NoErr(p.SetSCTE35CueIn())
+	is.NoErr(p.SetSCTE35(&SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_Start, Cue: cue12, Time: 12}))
+	is.NoErr(p.Append("media2.ts", 6.0, ""))
+
+	out := p.Encode().String()
+	cueIn := strings.Index(out, "#EXT-X-CUE-IN")
+	secondOut := strings.Index(out, "#EXT-X-CUE-OUT:12")
+	if cueIn < 0 {
+		t.Fatal("CUE-IN missing from output")
+	}
+	if secondOut < 0 {
+		t.Fatal("second CUE-OUT missing from output")
+	}
+	if cueIn > secondOut {
+		t.Errorf("CUE-IN written after the CUE-OUT it should precede:\n%s", out)
+	}
+
+	// Marking a segment after an encode must invalidate the cache.
+	p2, err := NewMediaPlaylist(2, 2)
+	is.NoErr(err)
+	is.NoErr(p2.Append("media0.ts", 6.0, ""))
+	_ = p2.Encode() // fill the cache
+	is.NoErr(p2.SetSCTE35CueIn())
+	if !strings.Contains(p2.Encode().String(), "#EXT-X-CUE-IN") {
+		t.Error("SetSCTE35CueIn after Encode: stale cache served without the CUE-IN")
+	}
+}
+
 func TestAppendTrailingDateRange(t *testing.T) {
 	is := is.New(t)
 	p, err := NewMediaPlaylist(0, 5)

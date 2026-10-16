@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `MediaPlaylist.TrailingDateRanges` provides `EXT-X-DATERANGE` tags (SCTE-35) found after the last segment
 - `MediaPlaylist.AppendTrailingDateRange` to add such a tag when generating a playlist
+- `MediaSegment.SCTE35CueIn` and `MediaPlaylist.SetSCTE35CueIn` support an `EXT-X-CUE-IN` and
+  an `EXT-X-CUE-OUT` on the same segment (back-to-back breaks)
 
 ### Fixed
 - `Encode` now raises `EXT-X-VERSION` to the minimum version required by the playlist content,

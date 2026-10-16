@@ -1095,6 +1095,11 @@ func (p *MediaPlaylist) encode(segmentsToSkipInTotal uint64) *bytes.Buffer {
 		if seg.Discontinuity {
 			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
 		}
+		if seg.SCTE35CueIn {
+			// Close the previous break before any cue below opens the next
+			// one (back-to-back breaks sharing one segment boundary).
+			p.buf.WriteString("#EXT-X-CUE-IN\n")
+		}
 		if seg.SCTE != nil {
 			switch seg.SCTE.Syntax {
 			case SCTE35_67_2014:
@@ -1429,6 +1434,18 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].SCTE = scte35
+	p.ResetCache()
+	return nil
+}
+
+// SetSCTE35CueIn marks the currently last media segment with an EXT-X-CUE-IN
+// tag written before its SCTE-35 cue, for back-to-back breaks where the
+// previous break ends on the same segment boundary that starts the next one.
+func (p *MediaPlaylist) SetSCTE35CueIn() error {
+	if p.count == 0 {
+		return ErrPlaylistEmpty
+	}
+	p.Segments[p.last()].SCTE35CueIn = true
 	p.ResetCache()
 	return nil
 }
