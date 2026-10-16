@@ -1377,7 +1377,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 				state.scte.Elapsed, _ = strconv.ParseFloat(value, 64)
 			}
 		}
-	case (!state.tagSCTE35 || pendingOATCLSCueIn(state)) && strings.HasPrefix(line, "#EXT-X-CUE-OUT"):
+	case (!state.tagSCTE35 || pendingOATCLSCueIn(state)) &&
+		strings.HasPrefix(line, "#EXT-X-CUE-OUT") && !strings.HasPrefix(line, "#EXT-X-CUE-OUT-CONT"):
 		if pendingOATCLSCueIn(state) {
 			state.scteCueIn = true
 		}

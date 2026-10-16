@@ -923,6 +923,43 @@ func TestMediaPlaylistWithBackToBackSCTE35Breaks(t *testing.T) {
 	}
 }
 
+// TestCueOutContAfterPendingCueIn: an EXT-X-CUE-OUT-CONT after a pending
+// EXT-X-CUE-IN continues the break that CUE-IN just closed; it starts no
+// new break. The CONT line is dropped and the CUE-IN is kept, instead of
+// decoding as a zero-duration CUE-OUT stacked on the CUE-IN.
+func TestCueOutContAfterPendingCueIn(t *testing.T) {
+	is := is.New(t)
+	playlist := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-CUE-IN
+#EXT-X-CUE-OUT-CONT:ElapsedTime=8.000,Duration=12.000,SCTE35=ABCD
+#EXTINF:4.000,
+media0.ts
+#EXT-X-ENDLIST
+`
+	p, _, err := DecodeFrom(bytes.NewBufferString(playlist), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+
+	want := &SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_End}
+	if !reflect.DeepEqual(pp.Segments[0].SCTE, want) {
+		t.Errorf("segment 0 SCTE\ngot: %#v\nexp: %#v (the kept CUE-IN)", pp.Segments[0].SCTE, want)
+	}
+	if pp.Segments[0].SCTE35CueIn {
+		t.Error("segment 0 SCTE35CueIn set, the CONT must not start a second break")
+	}
+
+	out := pp.String()
+	if !strings.Contains(out, "#EXT-X-CUE-IN\n") {
+		t.Error("re-encoded playlist lost the CUE-IN")
+	}
+	if strings.Contains(out, "#EXT-X-CUE-OUT") {
+		t.Errorf("re-encoded playlist invented a CUE-OUT:\n%s", out)
+	}
+}
+
 // TestBackToBackBreaksWithDateRanges decodes the full pattern of two ad
 // breaks chained on the same frame: the first break's end, the next break's
 // start and the segment boundary are the exact same instant, so the CUE-IN
