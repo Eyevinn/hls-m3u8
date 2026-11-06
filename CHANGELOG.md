@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `EXT-X-BYTERANGE` or `EXT-X-PART` `BYTERANGE` that omits its offset without a preceding
   sub-range of the same resource is now reported in strict mode, instead of silently
   decoding to offset zero (PR #93)
+- `Decode`, `DecodeFrom` and `DecodeWith` now release the unused master or media playlist to its pool,
+  so decoding a master playlist uses about a third of the memory (issue #97)
 
 ### Changed
 - `EXT-X-VERSION` in encoded output may be higher than before, since it is now raised to the

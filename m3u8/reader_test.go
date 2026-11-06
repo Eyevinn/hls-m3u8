@@ -94,6 +94,44 @@ func TestDecodeFromReaderTypes(t *testing.T) {
 	}
 }
 
+// decode releases the playlist it does not return to the pools. Releasing clears
+// segments in place, so the returned playlists must keep their content.
+func TestDecodeKeepsReturnedPlaylist(t *testing.T) {
+	is := is.New(t)
+	decodeString := func(input string) (Playlist, ListType, error) {
+		return DecodeFrom(strings.NewReader(input), true)
+	}
+	segURIs := func(p Playlist) []string {
+		var uris []string
+		for _, s := range p.(*MediaPlaylist).GetAllSegments() {
+			uris = append(uris, s.URI)
+		}
+		return uris
+	}
+
+	mediaA, _, err := decodeString("#EXTM3U\n#EXT-X-TARGETDURATION:10\n" +
+		"#EXTINF:10.000,\na0.ts\n#EXTINF:10.000,\na1.ts\n#EXT-X-ENDLIST\n")
+	is.NoErr(err)
+	// A strict-mode error returns the partly decoded playlist.
+	broken, listType, err := decodeString("#EXTM3U\n#EXT-X-TARGETDURATION:10\n" +
+		"#EXTINF:10.000,\nc0.ts\n#EXTINF:bad,\nc1.ts\n")
+	is.True(err != nil)
+	is.Equal(listType, MEDIA)
+	master, _, err := decodeString("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nlow.m3u8\n")
+	is.NoErr(err)
+	mediaB, _, err := decodeString("#EXTM3U\n#EXT-X-TARGETDURATION:10\n" +
+		"#EXTINF:10.000,\nb0.ts\n#EXT-X-ENDLIST\n")
+	is.NoErr(err)
+	_, _, err = decodeString("no playlist\n")
+	is.True(errors.Is(err, ErrExtM3UAbsent))
+
+	is.Equal(segURIs(mediaA), []string{"a0.ts", "a1.ts"})
+	is.Equal(segURIs(broken), []string{"c0.ts"})
+	is.Equal(len(master.(*MasterPlaylist).Variants), 1)
+	is.Equal(master.(*MasterPlaylist).Variants[0].URI, "low.m3u8")
+	is.Equal(segURIs(mediaB), []string{"b0.ts"})
+}
+
 func TestDecodeExtM3UAbsentReturnsDetectedType(t *testing.T) {
 	cases := []struct {
 		desc     string

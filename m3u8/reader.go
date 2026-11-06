@@ -340,8 +340,9 @@ func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) 
 }
 
 // Detect playlist type and decode it. May be used as decoder for both
-// master and media playlists.
-func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playlist, ListType, error) {
+// master and media playlists. Lines are decoded into both a master and a
+// media playlist until the type is known.
+func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (pl Playlist, _ ListType, _ error) {
 	var eof bool
 	var line string
 	var master *MasterPlaylist
@@ -350,11 +351,22 @@ func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playli
 
 	state := new(decodingState)
 
-	master = NewMasterPlaylist()
 	media, err = NewMediaPlaylist(8, 1024) // Winsize for VoD will become 0, capacity auto extends
 	if err != nil {
 		return nil, UNKNOWN, fmt.Errorf("create media playlist failed: %w", err)
 	}
+	master = NewMasterPlaylist()
+
+	// Both playlists come from pools. Release the one that is not returned,
+	// or both if none is, so that their buffers and segments can be reused.
+	defer func() {
+		if pl != master {
+			master.ReleasePlaylist()
+		}
+		if pl != media {
+			media.ReleasePlaylist()
+		}
+	}()
 
 	// If we have custom tags to parse
 	if customDecoders != nil {
