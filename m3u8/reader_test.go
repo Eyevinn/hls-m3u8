@@ -5,6 +5,7 @@ Playlist parsing tests.
 */
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/matryer/is"
@@ -61,6 +63,66 @@ video0.ts
 		is.Equal(typ, UNKNOWN)
 		is.True(list == nil)
 	})
+}
+
+func TestDecodeFromReaderTypes(t *testing.T) {
+	data, err := os.ReadFile("sample-playlists/wowza-vod-chunklist.m3u8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		desc   string
+		reader func() io.Reader
+	}{
+		{"bytes.Reader", func() io.Reader { return bytes.NewReader(data) }},
+		{"bufio.Reader", func() io.Reader { return bufio.NewReaderSize(bytes.NewReader(data), 16) }},
+		{"bytes.Buffer", func() io.Reader { return bytes.NewBuffer(data) }},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			is := is.New(t)
+			p, listType, err := DecodeFrom(c.reader(), true)
+			is.NoErr(err)
+			is.Equal(listType, MEDIA)
+			is.Equal(p.(*MediaPlaylist).Count(), uint(522))
+
+			p, listType, err = DecodeWith(c.reader(), true, nil)
+			is.NoErr(err)
+			is.Equal(listType, MEDIA)
+			is.Equal(p.(*MediaPlaylist).Count(), uint(522))
+		})
+	}
+}
+
+func TestDecodeFromLineLongerThanReadBuffer(t *testing.T) {
+	is := is.New(t)
+	uri := strings.Repeat("a", 3*readerBufSize) + ".ts"
+	input := "#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.000,\n" + uri + "\n#EXT-X-ENDLIST\n"
+	p, listType, err := DecodeFrom(strings.NewReader(input), true)
+	is.NoErr(err)
+	is.Equal(listType, MEDIA)
+	pp := p.(*MediaPlaylist)
+	is.Equal(pp.Count(), uint(1))
+	is.Equal(pp.Segments[0].URI, uri)
+}
+
+func TestDecodeFromReusesReaderAfterError(t *testing.T) {
+	is := is.New(t)
+	// Fail mid-stream, so that the pooled reader still holds unread data when it is returned.
+	broken := io.MultiReader(strings.NewReader("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=1"),
+		iotest.ErrReader(io.ErrUnexpectedEOF))
+	_, _, err := DecodeFrom(broken, true)
+	is.True(errors.Is(err, io.ErrUnexpectedEOF))
+
+	for i := 0; i < 3; i++ {
+		f, err := os.Open("sample-playlists/master.m3u8")
+		is.NoErr(err)
+		p, listType, err := DecodeFrom(f, true)
+		f.Close()
+		is.NoErr(err)
+		is.Equal(listType, MASTER)
+		is.Equal(len(p.(*MasterPlaylist).Variants), 5)
+	}
 }
 
 func TestDecodeMasterPlaylist(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,7 +40,9 @@ func (p *MasterPlaylist) Decode(data bytes.Buffer, strict bool) error {
 // DecodeFrom parses a master playlist passed from an io.Reader.
 // If strict parameter is true then it returns first syntax error.
 func (p *MasterPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
-	return p.decode(bufio.NewReader(reader), strict)
+	lr, pooled := getLineReader(reader)
+	defer putLineReader(pooled)
+	return p.decode(lr, strict)
 }
 
 // WithCustomDecoders adds custom tag decoders to the master playlist for decoding
@@ -135,7 +138,9 @@ func (p *MediaPlaylist) Decode(data bytes.Buffer, strict bool) error {
 // DecodeFrom parses a media playlist passed from the io.Reader stream.
 // If strict parameter is true then it returns first syntax error.
 func (p *MediaPlaylist) DecodeFrom(reader io.Reader, strict bool) error {
-	return p.decode(bufio.NewReader(reader), strict)
+	lr, pooled := getLineReader(reader)
+	defer putLineReader(pooled)
+	return p.decode(lr, strict)
 }
 
 // WithCustomDecoders adds custom tag decoders to the media playlist for decoding.
@@ -274,6 +279,37 @@ type lineReader interface {
 	ReadString(delim byte) (line string, err error)
 }
 
+// readerBufSize is the buffer size of the pooled readers used to decode from an io.Reader.
+// It is large enough to read typical playlists in one or a few reads.
+const readerBufSize = 64 * 1024
+
+var readers = sync.Pool{
+	New: func() any {
+		return bufio.NewReaderSize(nil, readerBufSize)
+	},
+}
+
+// getLineReader returns r itself if it can already read lines (e.g. *bufio.Reader or *bytes.Buffer),
+// and otherwise a pooled bufio.Reader that reads from r. The second return value is the pooled
+// reader, or nil if none was taken, and must be passed to putLineReader when decoding is done.
+func getLineReader(r io.Reader) (lineReader, *bufio.Reader) {
+	if lr, ok := r.(lineReader); ok {
+		return lr, nil
+	}
+	br := readers.Get().(*bufio.Reader)
+	br.Reset(r)
+	return br, br
+}
+
+// putLineReader returns a reader taken by getLineReader to the pool. It does nothing for nil.
+func putLineReader(br *bufio.Reader) {
+	if br == nil {
+		return
+	}
+	br.Reset(nil) // drop the reference to the source reader
+	readers.Put(br)
+}
+
 // Decode detects type of playlist and decodes it.
 func Decode(data bytes.Buffer, strict bool) (Playlist, ListType, error) {
 	return decode(&data, strict, nil)
@@ -281,7 +317,9 @@ func Decode(data bytes.Buffer, strict bool) (Playlist, ListType, error) {
 
 // DecodeFrom detects type of playlist and decodes it.
 func DecodeFrom(reader io.Reader, strict bool) (Playlist, ListType, error) {
-	return decode(bufio.NewReader(reader), strict, nil)
+	lr, pooled := getLineReader(reader)
+	defer putLineReader(pooled)
+	return decode(lr, strict, nil)
 }
 
 // DecodeWith detects the type of playlist and decodes it. It accepts either bytes.Buffer
@@ -293,7 +331,9 @@ func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) 
 	case bytes.Buffer:
 		return decode(&v, strict, customDecoders)
 	case io.Reader:
-		return decode(bufio.NewReader(v), strict, customDecoders)
+		lr, pooled := getLineReader(v)
+		defer putLineReader(pooled)
+		return decode(lr, strict, customDecoders)
 	default:
 		return nil, 0, fmt.Errorf("input must be bytes.Buffer or io.Reader type, got %T", input)
 	}
