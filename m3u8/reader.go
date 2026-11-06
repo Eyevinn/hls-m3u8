@@ -335,7 +335,7 @@ func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) 
 		defer putLineReader(pooled)
 		return decode(lr, strict, customDecoders)
 	default:
-		return nil, 0, fmt.Errorf("input must be bytes.Buffer or io.Reader type, got %T", input)
+		return nil, UNKNOWN, fmt.Errorf("input must be bytes.Buffer or io.Reader type, got %T", input)
 	}
 }
 
@@ -346,7 +346,6 @@ func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playli
 	var line string
 	var master *MasterPlaylist
 	var media *MediaPlaylist
-	var listType ListType
 	var err, ioErr error
 
 	state := new(decodingState)
@@ -354,7 +353,7 @@ func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playli
 	master = NewMasterPlaylist()
 	media, err = NewMediaPlaylist(8, 1024) // Winsize for VoD will become 0, capacity auto extends
 	if err != nil {
-		return nil, 0, fmt.Errorf("create media playlist failed: %w", err)
+		return nil, UNKNOWN, fmt.Errorf("create media playlist failed: %w", err)
 	}
 
 	// If we have custom tags to parse
@@ -404,7 +403,7 @@ func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playli
 	}
 
 	if strict && !state.m3u {
-		return nil, listType, ErrExtM3UAbsent
+		return nil, state.listType, ErrExtM3UAbsent
 	}
 
 	switch state.listType {
@@ -419,7 +418,7 @@ func decode(buf lineReader, strict bool, customDecoders []CustomDecoder) (Playli
 		media.storeTrailingDateRanges(state)
 		return media, MEDIA, nil
 	}
-	return nil, state.listType, ErrCannotDetectPlaylistType
+	return nil, UNKNOWN, ErrCannotDetectPlaylistType
 }
 
 // decodeAndTrimAttributes decodes a line of attributes into a map.

@@ -77,7 +77,7 @@ const (
 type ListType uint
 
 const (
-	// use 0 for undefined type
+	// UNKNOWN is returned when the playlist type cannot be determined, for example on errors.
 	UNKNOWN ListType = iota
 	MASTER
 	MEDIA

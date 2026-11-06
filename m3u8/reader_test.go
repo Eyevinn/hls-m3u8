@@ -94,6 +94,27 @@ func TestDecodeFromReaderTypes(t *testing.T) {
 	}
 }
 
+func TestDecodeExtM3UAbsentReturnsDetectedType(t *testing.T) {
+	cases := []struct {
+		desc     string
+		input    string
+		wantType ListType
+	}{
+		{"master", "#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nlow.m3u8\n", MASTER},
+		{"media", "#EXT-X-TARGETDURATION:10\n#EXTINF:10.000,\nseg0.ts\n", MEDIA},
+		{"no tags", "seg0.ts\n", UNKNOWN},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			is := is.New(t)
+			p, listType, err := DecodeFrom(strings.NewReader(c.input), true)
+			is.True(errors.Is(err, ErrExtM3UAbsent))
+			is.Equal(listType, c.wantType)
+			is.True(p == nil)
+		})
+	}
+}
+
 func TestDecodeFromLineLongerThanReadBuffer(t *testing.T) {
 	is := is.New(t)
 	uri := strings.Repeat("a", 3*readerBufSize) + ".ts"
