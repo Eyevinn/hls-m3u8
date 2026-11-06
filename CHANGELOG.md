@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `MediaPlaylist.TrailingDateRanges` provides `EXT-X-DATERANGE` tags (SCTE-35) found after the last segment
 - `MediaPlaylist.AppendTrailingDateRange` to add such a tag when generating a playlist
+- `ListType` constant `UNKNOWN`, returned by `Decode`, `DecodeFrom` and `DecodeWith` when the playlist type
+  is not known (PR #99)
 
 ### Fixed
 - `Encode` now raises `EXT-X-VERSION` to the minimum version required by the playlist content,
@@ -49,6 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unambiguous, so an omitted part offset is not reproduced verbatim on encode (PR #93)
 - `EXT-X-MAP` with a `BYTERANGE` that lacks the required offset now reports that, rather
   than a generic parse error (PR #93)
+- `DecodeFrom` and `DecodeWith` read an `io.Reader` line by line instead of copying all of it first,
+  which uses less memory, and in strict mode they stop reading at the first error (PR #99)
+- `ErrExtM3UAbsent` is now returned with the detected playlist type instead of 0 (PR #99)
 
 ### Deprecated
 - `ErrDanglingSCTE35DateRange` is never returned anymore
