@@ -39,6 +39,11 @@ install: all
 update:
 	go get -t -u ./...
 
+# wwhrd reads the licenses of the packages in a vendor directory, and without one it checks nothing and passes.
+# So the Go files, go.mod, go.sum and .wwhrd.yml are copied to a temporary directory, the dependencies are
+# vendored there, and wwhrd checks that copy, which leaves no vendor directory in the repository.
 .PHONY: check-licenses
 check-licenses: prepare
-	wwhrd check
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && \
+	git ls-files -z -c -o --exclude-standard '*.go' go.mod go.sum .wwhrd.yml | xargs -0 tar cf - | tar xf - -C "$$tmp" && \
+	cd "$$tmp" && go mod vendor && wwhrd -q check
