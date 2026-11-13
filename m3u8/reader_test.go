@@ -960,6 +960,42 @@ media0.ts
 	}
 }
 
+// TestOATCLSAfterPendingCueIn: an EXT-OATCLS-SCTE35 line after a pending
+// EXT-X-CUE-IN starts no new break unless an EXT-X-CUE-OUT follows. Without
+// one, the OATCLS line is dropped and the CUE-IN kept, instead of decoding
+// as a zero-duration CUE-OUT stacked on the CUE-IN.
+func TestOATCLSAfterPendingCueIn(t *testing.T) {
+	is := is.New(t)
+	playlist := `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:4
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-OATCLS-SCTE35:/DAlAAAAAAAAAP/wFAUAAAABf+/+AA27oP4ACvyAAAAAAAAA5mVLpA==
+#EXT-X-CUE-OUT:8.000
+#EXTINF:4.000,
+media0.ts
+#EXT-X-CUE-IN
+#EXT-OATCLS-SCTE35:/DAlAAAAAAAAAP/wFAUAAAACf+/+ABi4IP4AEHrAAAAAAAAARY3J0g==
+#EXTINF:4.000,
+media1.ts
+#EXT-X-ENDLIST
+`
+	p, _, err := DecodeFrom(bytes.NewBufferString(playlist), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+
+	want := &SCTE{Syntax: SCTE35_OATCLS, CueType: SCTE35Cue_End}
+	if !reflect.DeepEqual(pp.Segments[1].SCTE, want) {
+		t.Errorf("segment 1 SCTE\ngot: %#v\nexp: %#v (the kept CUE-IN)", pp.Segments[1].SCTE, want)
+	}
+	if pp.Segments[1].SCTE35CueIn {
+		t.Error("segment 1 SCTE35CueIn set, the OATCLS line must not start a second break")
+	}
+	if n := strings.Count(pp.String(), "#EXT-X-CUE-OUT"); n != 1 {
+		t.Errorf("re-encoded playlist has %d CUE-OUT tags, want 1:\n%s", n, pp.String())
+	}
+}
+
 // TestBackToBackBreaksWithDateRanges decodes the full pattern of two ad
 // breaks chained on the same frame: the first break's end, the next break's
 // start and the segment boundary are the exact same instant, so the CUE-IN

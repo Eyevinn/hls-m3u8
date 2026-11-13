@@ -1441,6 +1441,7 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 // SetSCTE35CueIn marks the currently last media segment with an EXT-X-CUE-IN
 // tag written before its SCTE-35 cue, for back-to-back breaks where the
 // previous break ends on the same segment boundary that starts the next one.
+// Use it with an SCTE35_OATCLS cue of type SCTE35Cue_Start set by SetSCTE35.
 func (p *MediaPlaylist) SetSCTE35CueIn() error {
 	if p.count == 0 {
 		return ErrPlaylistEmpty
