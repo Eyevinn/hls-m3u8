@@ -34,3 +34,14 @@ jobs:
 
       - name: Test
         run: go test -v ./...
+
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the check looks for the tag of the latest version
+
+      - name: Check changelog entries
+        run: scripts/check-changelog.sh
