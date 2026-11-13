@@ -1020,7 +1020,9 @@ func deQuote(s string) string {
 // pendingOATCLSCueIn reports whether the pending SCTE-35 state is a bare
 // OATCLS CUE-IN. A CUE-OUT following it before any segment belongs to the
 // next break of a back-to-back pair: the CUE-IN is then parked on the
-// segment (SCTE35CueIn) and the state restarts for the CUE-OUT.
+// segment (SCTE35CueIn) and the state restarts for the CUE-OUT. An
+// EXT-OATCLS-SCTE35 line in between is kept for that CUE-OUT, and dropped
+// if no CUE-OUT follows.
 func pendingOATCLSCueIn(state *decodingState) bool {
 	return state.tagSCTE35 && state.scte != nil &&
 		state.scte.Syntax == SCTE35_OATCLS && state.scte.CueType == SCTE35Cue_End
@@ -1141,6 +1143,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 			}
 			p.scte35Syntax = state.scte.Syntax
 			state.scte = nil
+			state.nextOATCLSCue = ""
 
 		}
 		if len(state.scte35DateRanges) > 0 {
@@ -1350,7 +1353,9 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 	case (!state.tagSCTE35 || pendingOATCLSCueIn(state)) && strings.HasPrefix(line, "#EXT-OATCLS-SCTE35:"):
 		// EXT-OATCLS-SCTE35 contains the SCTE35 tag, EXT-X-CUE-OUT contains duration
 		if pendingOATCLSCueIn(state) {
-			state.scteCueIn = true
+			// Only a following CUE-OUT starts the next break.
+			state.nextOATCLSCue = line[19:]
+			break
 		}
 		state.tagSCTE35 = true
 		state.scte = new(SCTE)
@@ -1386,6 +1391,8 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, state *decodingState, line stri
 		state.scte = new(SCTE)
 		state.scte.Syntax = SCTE35_OATCLS
 		state.scte.CueType = SCTE35Cue_Start
+		state.scte.Cue = state.nextOATCLSCue
+		state.nextOATCLSCue = ""
 		lenLine := len(line)
 		// EXT-X-CUE-OUT may have DURATION attribute or just a duration value.
 		// It's not part of the standard, and different vendors use different formats.
