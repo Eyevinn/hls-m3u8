@@ -20,8 +20,9 @@ The module needs Go 1.21 or later. Lint, test and check the licenses of the depe
 [golangci-lint](https://golangci-lint.run) and `make check-licenses` needs
 [wwhrd](https://github.com/frapposelli/wwhrd). Run a single test with `go test -run TestName ./m3u8`.
 
-Pre-commit hooks run `go fmt`, `golangci-lint`, the unit tests and the changelog check. Install
-[pre-commit](https://pre-commit.com) and run `pre-commit install` once per clone.
+Pre-commit hooks run `go fmt`, `golangci-lint`, the unit tests and the changelog check, and check
+the commit message. Install [pre-commit](https://pre-commit.com) and run `pre-commit install` once
+per clone, which installs both the pre-commit and the commit-msg hook.
 
 ## Contributing Code
 
@@ -50,7 +51,10 @@ agents.
 ## Commit messages
 
 Commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary)
-specification. Examples:
+specification, which the commit-msg hook checks with [commitlint](https://commitlint.js.org) as
+configured in [.commitlintrc.yaml](.commitlintrc.yaml). The type is one of `feat`, `fix`, `perf`,
+`refactor`, `test`, `docs`, `ci`, `build`, `chore`, `style` and `revert`, in lower case, and the
+subject does not end with a period. Examples:
 
 - `feat: support a CUE-IN and a CUE-OUT on the same segment`
 - `fix: resolve omitted byte range offsets to absolute offsets when decoding`
