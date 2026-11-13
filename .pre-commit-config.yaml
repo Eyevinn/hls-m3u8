@@ -10,3 +10,11 @@ repos:
       - id: go-fmt
       - id: golangci-lint
       - id: go-unit-tests
+  - repo: local
+    hooks:
+      - id: check-changelog
+        name: check changelog entries
+        entry: scripts/check-changelog.sh
+        language: script
+        pass_filenames: false
+        files: ^(CHANGELOG\.md|changelog\.d/)

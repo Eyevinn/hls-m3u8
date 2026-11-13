@@ -144,7 +144,9 @@ hopefully be fine to go.
 Later versions have more changes and additions, so it is likely
 that more changes are needed to legacy code.
 
-See [CHANGELOG](CHANGELOG) for a list of changes.
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes. Changes since the latest release are listed in
+[changelog.d](changelog.d/), one file per change, and move into CHANGELOG.md when the next version
+is released.
 
 ## Contributing
 

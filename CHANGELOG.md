@@ -7,60 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `MediaPlaylist.TrailingDateRanges` provides `EXT-X-DATERANGE` tags (SCTE-35) found after the last segment
-- `MediaPlaylist.AppendTrailingDateRange` to add such a tag when generating a playlist
-- `ListType` constant `UNKNOWN`, returned by `Decode`, `DecodeFrom` and `DecodeWith` when the playlist type
-  is not known (PR #99)
-- `MediaSegment.SCTE35CueIn` and `MediaPlaylist.SetSCTE35CueIn` support an `EXT-X-CUE-IN` and
-  an `EXT-X-CUE-OUT` on the same segment (back-to-back breaks) (PR #100)
-
-### Fixed
-- `Encode` now raises `EXT-X-VERSION` to the minimum version required by the playlist content,
-  so e.g. a media playlist with an `EXT-X-MAP` tag but no `EXT-X-I-FRAMES-ONLY` tag signals
-  version 6 instead of 5 (issue #95)
-- `Encode` and `String` no longer return stale output after `Set*` and `Append*` methods
-  modify an already encoded playlist, and repeated `Close` calls write one `EXT-X-ENDLIST` (PR #94)
-- `Encode` no longer shifts the media playlist head pointer, so it is not destructive (PR #90)
-- Panic when encoding a media playlist whose segment ring buffer has wrapped around,
-  e.g. after `capacity` calls to `Slide` (PR #91)
-- `EXT-X-MEDIA-SEQUENCE` now reports the sequence number of the first segment in the
-  encoded playlist, instead of that of the head segment (PR #91)
-- `Encode` no longer consumes the partial segments of a low-latency media playlist,
-  so that repeated calls keep writing all `EXT-X-PART` tags (PR #91)
-- Expired partial segments are now also removed when a full segment is appended, so
-  they no longer linger, and are no longer reported by `IsSegmentReady` (PR #91)
-- `EXT-X-BYTERANGE` no longer writes `@0` for a sub-range that continues the previous
-  segment's range, since an omitted offset and `@0` are not equivalent (PR #86)
-- `MediaSegment.Offset` and `PartialSegment.Offset` are now resolved to absolute offsets
-  when the playlist omits them, instead of being left as zero (PR #93)
-- Decoding no longer fails on an `EXT-X-PART` whose `BYTERANGE` omits the optional offset (PR #93)
-- An `EXT-X-BYTERANGE` or `EXT-X-PART` `BYTERANGE` that omits its offset without a preceding
-  sub-range of the same resource is now reported in strict mode, instead of silently
-  decoding to offset zero (PR #93)
-- `Decode`, `DecodeFrom` and `DecodeWith` now release the unused master or media playlist to its pool,
-  so decoding a master playlist uses about a third of the memory (issue #97)
-
-### Changed
-- `EXT-X-VERSION` in encoded output may be higher than before, since it is now raised to the
-  minimum version required by the playlist content. `SetVersion` therefore sets a floor, and a
-  version lower than the required minimum is no longer output (issue #95)
-- Encoded output of a live media playlist with more segments than `winsize` changes,
-  since `EXT-X-MEDIA-SEQUENCE` now matches the first segment written (PR #91)
-- Decoding no longer fails on SCTE-35 `EXT-X-DATERANGE` tags after the last segment
-- `EXT-X-BYTERANGE` omits its offset only for a sub-range that starts exactly where the
-  previous sub-range of the same resource ended. A segment whose `Offset` is zero but does
-  not continue the previous range is now written as `@0` (PR #93)
-- `EXT-X-PART` `BYTERANGE` is always written with an explicit offset, which is valid and
-  unambiguous, so an omitted part offset is not reproduced verbatim on encode (PR #93)
-- `EXT-X-MAP` with a `BYTERANGE` that lacks the required offset now reports that, rather
-  than a generic parse error (PR #93)
-- `DecodeFrom` and `DecodeWith` read an `io.Reader` line by line instead of copying all of it first,
-  which uses less memory, and in strict mode they stop reading at the first error (PR #99)
-- `ErrExtM3UAbsent` is now returned with the detected playlist type instead of 0 (PR #99)
-
-### Deprecated
-- `ErrDanglingSCTE35DateRange` is never returned anymore
+Changes since the latest release are listed in [changelog.d](changelog.d/).
 
 ## [v0.6.5] 2026-06-10
 
