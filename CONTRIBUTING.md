@@ -1,13 +1,29 @@
-# Contributing
+# Contributing to hls-m3u8
+
+Contributions are welcome, as issues and as pull requests against the `main` branch.
+Coding agents follow these conventions too, with the additions in [AGENTS.md](AGENTS.md).
 
 ## Submitting Issues
 
 We use GitHub issues to track public bugs. If you are submitting a bug, please provide
 as much info as possible to make it easier to reproduce the issue and update unit tests.
 
-## Contributing Code
+## Setting up
 
-This project uses [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/#summary).
+The module needs Go 1.21 or later. Lint, test and check the licenses of the dependencies with
+
+    make lint
+    make test
+    make check-licenses
+
+`make` runs them all and writes a coverage report. `make lint` needs
+[golangci-lint](https://golangci-lint.run) and `make check-licenses` needs
+[wwhrd](https://github.com/frapposelli/wwhrd). Run a single test with `go test -run TestName ./m3u8`.
+
+Pre-commit hooks run `go fmt`, `golangci-lint`, the unit tests and the changelog check. Install
+[pre-commit](https://pre-commit.com) and run `pre-commit install` once per clone.
+
+## Contributing Code
 
 We follow the [GitHub Flow](https://guides.github.com/introduction/flow/index.html) so all contributions happen through pull requests. We actively welcome your pull requests:
 
@@ -22,6 +38,78 @@ We follow the [GitHub Flow](https://guides.github.com/introduction/flow/index.ht
 7. Issue that pull request!
 
 When submitting code changes your submissions are understood to be under the same MIT License that covers the project. Feel free to contact Eyevinn Technology if that's a concern.
+
+### Working with coding agents
+
+Changes written with the help of a coding agent are welcome. Credit the agent as a co-author with a
+`Co-Authored-By:` trailer in each commit it helped write, naming the agent and its model, for example
+`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. The person who opens the pull request is
+its author, reviews what the agent wrote and answers questions about it. AUTHORS lists people, not
+agents.
+
+## Commit messages
+
+Commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary)
+specification. Examples:
+
+- `feat: support a CUE-IN and a CUE-OUT on the same segment`
+- `fix: resolve omitted byte range offsets to absolute offsets when decoding`
+- `perf: decode from io.Reader line by line instead of buffering the whole input`
+- `ci: use latest checkout and setup-node majors (v7)`
+
+The subject says what the commit does. The body says why: what was broken, how it was found and what
+the change affects.
+
+## Code conventions
+
+### Specification
+
+The library follows the latest [rfc8216bis](https://datatracker.ietf.org/doc/draft-pantos-hls-rfc8216bis/)
+draft that [README.md](README.md) names. Code that implements a rule of the specification says in a
+comment which section it follows.
+
+### Decoding and encoding
+
+Every tag that is decoded is also encoded. A playlist tag is decoded in `decodeLineOfMasterPlaylist`
+or `decodeLineOfMediaPlaylist` in [m3u8/reader.go](m3u8/reader.go) and encoded in
+[m3u8/writer.go](m3u8/writer.go). For a new tag, add a sample playlist to
+[m3u8/sample-playlists](m3u8/sample-playlists/) and its name to `TestReadWritePlaylists` in
+[m3u8/read_write_test.go](m3u8/read_write_test.go), which checks that decoding and encoding give the
+file back.
+
+Decoding takes a `strict` flag. In strict mode, a playlist that breaks a rule of the specification gives
+an error. Otherwise, decoding accepts what it can still make sense of.
+
+A tag or attribute that needs a minimum protocol version is added to `CalcMinVersion` in
+[m3u8/calcversion.go](m3u8/calcversion.go), since `Encode` raises `EXT-X-VERSION` to that version.
+
+### The encoding cache
+
+`Encode` keeps its output in a buffer that serves as a cache, and must not change the playlist, so
+that it can be called repeatedly. Every method that changes a playlist calls `ResetCache`, so that the
+next `Encode` writes the change.
+
+### Tests
+
+Tests use the [is](https://github.com/matryer/is) package: `is := is.New(t)`, then `is.NoErr(err)`,
+`is.Equal(got, want)` and so on. Sample playlists for tests are in
+[m3u8/sample-playlists](m3u8/sample-playlists/).
+
+### Comments and changelog
+
+Code comments describe the current behaviour. What was broken before and why it changed belongs
+in the commit message and the pull request description.
+
+For each change that users will notice, add a file to [changelog.d](changelog.d/) instead of editing
+[CHANGELOG.md](CHANGELOG.md), as described in [changelog.d/README.md](changelog.d/README.md). Keep
+each entry to one or two lines that say what changed and name the affected API or tag. The entries
+move into CHANGELOG.md when a version is released.
+
+### Documentation
+
+The guide to the library is the package documentation in [m3u8/doc.go](m3u8/doc.go), shown on
+[pkg.go.dev](https://pkg.go.dev/github.com/Eyevinn/hls-m3u8/m3u8), and the structure and design
+section of [README.md](README.md). Update them when you change how the library is used.
 
 ## Releases
 
